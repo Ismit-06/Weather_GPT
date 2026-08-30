@@ -1,0 +1,619 @@
+package com.example.weathergpt.navigation
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.example.weathergpt.ui.screens.AlertsScreen
+import com.example.weathergpt.ui.screens.ChatScreen
+import com.example.weathergpt.ui.screens.DamScreen
+import com.example.weathergpt.ui.screens.ForecastScreen
+import com.example.weathergpt.ui.screens.HomeScreen
+import com.example.weathergpt.ui.screens.MapScreen
+
+sealed class Screen(
+    val route: String,
+    val title: String
+) {
+
+    data object Home : Screen(
+        route = "home",
+        title = "Home"
+    )
+
+    data object Chat : Screen(
+        route = "chat",
+        title = "Chat"
+    )
+
+    data object Forecast : Screen(
+        route = "forecast",
+        title = "Forecast"
+    )
+
+    data object Map : Screen(
+        route = "map",
+        title = "Map"
+    )
+
+    data object Alerts : Screen(
+        route = "alerts",
+        title = "Alerts"
+    )
+
+    data object Dams : Screen(
+        route = "dams",
+        title = "Dams"
+    )
+}
+
+
+@Composable
+fun AppNavigation(
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit
+) {
+
+    val navController =
+        rememberNavController()
+
+    val screens =
+        listOf(
+            Screen.Home,
+            Screen.Chat,
+            Screen.Forecast,
+            Screen.Map,
+            Screen.Alerts
+        )
+
+    val backStackEntry by
+        navController
+            .currentBackStackEntryAsState()
+
+    val currentRoute =
+        backStackEntry
+            ?.destination
+            ?.route
+
+    Scaffold(
+
+        containerColor =
+            MaterialTheme.colorScheme.background,
+
+        topBar = {
+
+            ModernHeader(
+                darkMode = darkMode,
+                onToggleDarkMode = onToggleDarkMode
+            )
+        },
+
+        bottomBar = {
+
+            ModernBottomBar(
+                screens = screens,
+                currentRoute = currentRoute,
+                onNavigate = { route ->
+
+                    if (currentRoute != route) {
+
+                        navController.navigate(route) {
+
+                            popUpTo(
+                                Screen.Home.route
+                            ) {
+                                saveState = true
+                            }
+
+                            launchSingleTop = true
+
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+
+    ) { innerPadding ->
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme
+                                    .colorScheme
+                                    .background,
+
+                                MaterialTheme
+                                    .colorScheme
+                                    .surface,
+
+                                MaterialTheme
+                                    .colorScheme
+                                    .background
+                            )
+                        )
+                    )
+        ) {
+
+            NavHost(
+
+                navController =
+                    navController,
+
+                startDestination =
+                    Screen.Home.route,
+
+                modifier =
+                    Modifier.fillMaxSize()
+            ) {
+
+                composable(
+                    Screen.Home.route
+                ) {
+
+                    HomeScreen(
+                        onOpenChat = {
+
+                            navController.navigate(
+                                Screen.Chat.route
+                            )
+                        }
+                    )
+                }
+
+
+                composable(
+                    Screen.Chat.route
+                ) {
+
+                    ChatScreen()
+                }
+
+
+                composable(
+                    Screen.Forecast.route
+                ) {
+
+                    ForecastScreen()
+                }
+
+
+                composable(
+                    Screen.Map.route
+                ) {
+
+                    MapScreen()
+                }
+
+
+                composable(
+                    Screen.Alerts.route
+                ) {
+
+                    AlertsScreen(
+                        onOpenDams = {
+
+                            navController.navigate(
+                                Screen.Dams.route
+                            )
+                        }
+                    )
+                }
+
+
+                composable(
+                    Screen.Dams.route
+                ) {
+
+                    DamScreen(
+                        onBack = {
+
+                            navController.popBackStack()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/*
+ * ================================================================
+ * MODERN HEADER
+ * ================================================================
+ */
+
+@Composable
+private fun ModernHeader(
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit
+) {
+
+    Surface(
+        color =
+            MaterialTheme
+                .colorScheme
+                .surface.copy(alpha = 0.96f),
+
+        shadowElevation = 0.dp
+    ) {
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 20.dp,
+                        vertical = 10.dp
+                    )
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(40.dp)
+                                .clip(
+                                    RoundedCornerShape(13.dp)
+                                )
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            Color(0xFF5BA7FF),
+                                            Color(0xFF7755FF)
+                                        )
+                                    )
+                                ),
+
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Icon(
+                            imageVector =
+                                Icons.Default.Cloud,
+
+                            contentDescription = null,
+
+                            tint =
+                                Color.White,
+
+                            modifier =
+                                Modifier.size(23.dp)
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.size(11.dp)
+                    )
+
+                    Column {
+
+                        Text(
+                            text = "WeatherGPT",
+
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurface,
+
+                            fontSize = 19.sp
+                        )
+
+                        Text(
+                            text =
+                                "Weather intelligence",
+
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant,
+
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Surface(
+                        shape =
+                            RoundedCornerShape(20.dp),
+
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .primary
+                                .copy(alpha = 0.10f)
+                    ) {
+
+                        Row(
+                            modifier =
+                                Modifier.padding(
+                                    horizontal = 10.dp,
+                                    vertical = 6.dp
+                                ),
+
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(7.dp)
+                                        .clip(
+                                            androidx.compose.foundation
+                                                .shape
+                                                .CircleShape
+                                        )
+                                        .background(
+                                            Color(0xFF39D98A)
+                                        )
+                            )
+
+                            Spacer(
+                                modifier =
+                                    Modifier.size(6.dp)
+                            )
+
+                            Text(
+                                text = "LIVE",
+
+                                color =
+                                    Color(0xFF39D98A),
+
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.size(5.dp)
+                    )
+
+                    IconButton(
+                        onClick =
+                            onToggleDarkMode
+                    ) {
+
+                        Icon(
+
+                            imageVector =
+                                if (darkMode) {
+                                    Icons.Default.LightMode
+                                } else {
+                                    Icons.Default.DarkMode
+                                },
+
+                            contentDescription =
+                                if (darkMode) {
+                                    "Light mode"
+                                } else {
+                                    "Dark mode"
+                                },
+
+                            tint =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/*
+ * ================================================================
+ * MODERN BOTTOM NAVIGATION
+ * ================================================================
+ */
+
+@Composable
+private fun ModernBottomBar(
+    screens: List<Screen>,
+    currentRoute: String?,
+    onNavigate: (String) -> Unit
+) {
+
+    Surface(
+        color =
+            MaterialTheme
+                .colorScheme
+                .surface,
+
+        shadowElevation = 14.dp
+    ) {
+
+        NavigationBar(
+
+            containerColor =
+                Color.Transparent,
+
+            tonalElevation = 0.dp,
+
+            modifier =
+                Modifier.padding(
+                    horizontal = 10.dp,
+                    vertical = 7.dp
+                )
+        ) {
+
+            screens.forEach { screen ->
+
+                val selected =
+                    currentRoute ==
+                        screen.route
+
+                NavigationBarItem(
+
+                    selected =
+                        selected,
+
+                    onClick = {
+                        onNavigate(
+                            screen.route
+                        )
+                    },
+
+                    icon = {
+
+                        Icon(
+
+                            imageVector =
+                                navigationIcon(
+                                    screen
+                                ),
+
+                            contentDescription =
+                                screen.title,
+
+                            modifier =
+                                Modifier.size(
+                                    22.dp
+                                )
+                        )
+                    },
+
+                    label = {
+
+                        Text(
+                            text =
+                                screen.title,
+
+                            fontSize =
+                                10.sp
+                        )
+                    },
+
+                    colors =
+                        NavigationBarItemDefaults.colors(
+
+                            selectedIconColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary,
+
+                            selectedTextColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary,
+
+                            unselectedIconColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant,
+
+                            unselectedTextColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant,
+
+                            indicatorColor =
+                                MaterialTheme
+                                    .colorScheme
+                                    .primary
+                                    .copy(
+                                        alpha = 0.14f
+                                    )
+                        )
+                )
+            }
+        }
+    }
+}
+
+
+private fun navigationIcon(
+    screen: Screen
+): androidx.compose.ui.graphics.vector.ImageVector {
+
+    return when (screen) {
+
+        Screen.Home ->
+            Icons.Default.Home
+
+        Screen.Chat ->
+            Icons.AutoMirrored.Filled.Chat
+
+        Screen.Forecast ->
+            Icons.Default.Cloud
+
+        Screen.Map ->
+            Icons.Default.Map
+
+        Screen.Alerts ->
+            Icons.Default.Warning
+
+        Screen.Dams ->
+            Icons.Default.WaterDrop
+    }
+}

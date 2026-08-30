@@ -18,3 +18,12 @@ __pycache__/
 .idea/
 .vscode/
 app_phase1_backup_*/
+
+# Android project local files
+android/local.properties
+android/.gradle/
+android/.idea/
+android/**/build/
+android/ui-backups/
+android/**/*.before-*.kt
+android/**/*.backup
