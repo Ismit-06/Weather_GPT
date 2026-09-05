@@ -1,13 +1,14 @@
 package com.example.weathergpt.ui.screens
 
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -53,186 +55,208 @@ enum class OrbState {
 }
 
 // ============================================================
-//  WEATHER AI ORB — Main Composable
+//  WEATHER AI ORB — Living Organic Assistant Orb
 // ============================================================
 
 /**
- * Premium audio-reactive AI orb for WeatherGPT.
+ * Premium audio-reactive living organism AI orb for WeatherGPT.
  *
- * @param orbState   The current assistant state driving all animations.
- * @param audioAmplitude  Real-time RMS amplitude from [VoiceAssistantManager.rmsLevel] (0–1).
- * @param modifier   Standard Compose modifier.
- * @param onTap      Called when the user taps the orb.
+ * Implements realistic biological respiration (asymmetric inhale, apex hold,
+ * smooth exhale, resting pause) combined with micro-vascular pulses and
+ * real-time audio reactivity.
  */
 @Composable
 fun WeatherAIOrb(
     orbState: OrbState,
     audioAmplitude: Float,
     modifier: Modifier = Modifier,
+    size: Dp = 190.dp,
     onTap: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
 
-    // Smooth the raw RMS amplitude with a spring for natural attack/release.
-    // Fast attack (spring responds quickly to increases), slow release (spring
-    // settles gently when signal drops).
+    // Smooth raw RMS amplitude with organic spring attack/release
     val smoothedAmplitude by animateFloatAsState(
         targetValue = audioAmplitude.coerceIn(0f, 1f),
         animationSpec = spring(
-            dampingRatio = 0.65f,
+            dampingRatio = 0.62f,
             stiffness = Spring.StiffnessLow
         ),
         label = "amplitude"
     )
 
-    val infinite = rememberInfiniteTransition(label = "orb_infinite")
+    val infinite = rememberInfiniteTransition(label = "orb_living_transition")
 
-    // ---- Breathing scale ---------------------------------------------------
-    val breathTarget = when (orbState) {
-        OrbState.IDLE    -> 1.02f
-        OrbState.PAUSED  -> 1.0f
-        OrbState.OFFLINE -> 1.0f
-        OrbState.ERROR   -> 1.01f
-        else             -> 1.035f
+    // ========================================================
+    // 1. ORGANIC RESPIRATION (Keyframed Asymmetric Breathing)
+    // ========================================================
+    // Real lung/organism breathing curve:
+    // 0% -> 38% Inhale (expand)
+    // 38% -> 46% Inhale Hold (slight apex stretch)
+    // 46% -> 82% Exhale (smooth relaxation)
+    // 82% -> 100% Resting Pause
+    val breathCycleMs = when (orbState) {
+        OrbState.IDLE -> 4600
+        OrbState.LISTENING -> 2200
+        OrbState.USER_SPEAKING -> 1600
+        OrbState.PROCESSING -> 1400
+        OrbState.AI_SPEAKING -> 1800
+        OrbState.PAUSED -> 6000
+        OrbState.ERROR -> 3200
+        OrbState.OFFLINE -> 8000
     }
-    val breathDurationMs = when (orbState) {
-        OrbState.IDLE        -> 4200
-        OrbState.LISTENING   -> 1800
-        OrbState.PROCESSING  -> 1200
-        OrbState.AI_SPEAKING -> 1100
-        OrbState.PAUSED      -> 6000
-        OrbState.ERROR       -> 3000
-        OrbState.OFFLINE     -> 8000
-        else                 -> 2500
-    }
-    val breathScale by infinite.animateFloat(
-        initialValue = 0.98f,
-        targetValue  = breathTarget,
+
+    val organicBreathScale by infinite.animateFloat(
+        initialValue = 0.965f,
+        targetValue = 0.965f,
         animationSpec = infiniteRepeatable(
-            animation    = tween(breathDurationMs, easing = FastOutSlowInEasing),
-            repeatMode   = RepeatMode.Reverse
+            animation = keyframes {
+                durationMillis = breathCycleMs
+                0.965f at 0 using FastOutSlowInEasing          // Start of inhale
+                1.042f at (breathCycleMs * 0.38f).toInt() using LinearOutSlowInEasing // Inhale Peak
+                1.048f at (breathCycleMs * 0.46f).toInt() using FastOutSlowInEasing   // Apex hold
+                0.968f at (breathCycleMs * 0.82f).toInt() using FastOutSlowInEasing   // Exhale bottom
+                0.965f at breathCycleMs                                               // Rest pause
+            },
+            repeatMode = RepeatMode.Restart
         ),
-        label = "breath"
+        label = "organic_breath"
     )
 
-    // ---- Fluid rotation ----------------------------------------------------
-    val fluidDurationMs = when (orbState) {
-        OrbState.IDLE          -> 14000
-        OrbState.LISTENING     -> 6000
-        OrbState.USER_SPEAKING -> 3500
-        OrbState.PROCESSING    -> 2500
-        OrbState.AI_SPEAKING   -> 5000
-        OrbState.PAUSED        -> 40000
-        OrbState.OFFLINE       -> 60000
-        else                   -> 12000
+    // ========================================================
+    // 2. MICRO-BIOMORPHIC HEARTBEAT / VITALITY PULSE
+    // ========================================================
+    val microPulse by infinite.animateFloat(
+        initialValue = 0.992f,
+        targetValue = 1.008f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1150, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "micro_pulse"
+    )
+
+    // ========================================================
+    // 3. FLUID INTERNAL MOTION (Multi-harmonic swirling)
+    // ========================================================
+    val fluidAngleDuration = when (orbState) {
+        OrbState.IDLE -> 11000
+        OrbState.LISTENING -> 5500
+        OrbState.USER_SPEAKING -> 3200
+        OrbState.PROCESSING -> 2000
+        OrbState.AI_SPEAKING -> 4200
+        OrbState.PAUSED -> 30000
+        OrbState.OFFLINE -> 50000
+        else -> 10000
     }
     val fluidAngle by infinite.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 360f,
+        initialValue = 0f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(fluidDurationMs, easing = LinearEasing),
+            animation = tween(fluidAngleDuration, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "fluid"
+        label = "fluid_angle"
     )
 
-    // ---- Orbital ring rotation ---------------------------------------------
-    val ringDurationMs = when (orbState) {
-        OrbState.PROCESSING  -> 2200
-        OrbState.AI_SPEAKING -> 4500
-        OrbState.LISTENING   -> 5000
-        else                 -> 9000
-    }
-    val ringAngle by infinite.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 360f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(ringDurationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "ring"
-    )
-
-    // ---- Glow pulse --------------------------------------------------------
-    val glowPulseDurationMs = when (orbState) {
-        OrbState.PROCESSING  -> 700
-        OrbState.AI_SPEAKING -> 800
-        OrbState.LISTENING   -> 1200
-        else                 -> 2000
-    }
+    // ========================================================
+    // 4. BIOLUMINESCENT GLOW PULSE
+    // ========================================================
     val glowPulse by infinite.animateFloat(
-        initialValue  = 0.85f,
-        targetValue   = 1.15f,
+        initialValue = 0.82f,
+        targetValue = 1.18f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(glowPulseDurationMs, easing = FastOutSlowInEasing),
+            animation = tween(
+                durationMillis = when (orbState) {
+                    OrbState.PROCESSING -> 650
+                    OrbState.AI_SPEAKING -> 850
+                    OrbState.LISTENING -> 1100
+                    else -> 2100
+                },
+                easing = FastOutSlowInEasing
+            ),
             repeatMode = RepeatMode.Reverse
         ),
         label = "glow_pulse"
     )
 
-    // ---- Ripple rings (LISTENING / USER_SPEAKING) --------------------------
-    val rippleProgress by infinite.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1f,
+    // ========================================================
+    // 5. ORBITAL RING & RIPPLE
+    // ========================================================
+    val ringAngle by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(1800, easing = LinearOutSlowInEasing),
+            animation = tween(
+                durationMillis = if (orbState == OrbState.PROCESSING) 1900 else 7000,
+                easing = LinearEasing
+            ),
             repeatMode = RepeatMode.Restart
         ),
-        label = "ripple"
+        label = "ring_angle"
     )
 
-    // ---- Derived animation parameters --------------------------------------
+    val rippleProgress by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1700, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripple_progress"
+    )
 
-    // Effective scale driven by breathing + amplitude
-    val effectiveScale = when (orbState) {
-        OrbState.USER_SPEAKING -> (breathScale + smoothedAmplitude * 0.08f).coerceIn(0.96f, 1.14f)
-        OrbState.AI_SPEAKING   -> (breathScale + smoothedAmplitude * 0.05f).coerceIn(0.96f, 1.10f)
-        else                   -> breathScale
+    // Combined organic scale = Respiration + Micro Heartbeat + Audio Reactivity
+    val combinedScale = when (orbState) {
+        OrbState.USER_SPEAKING -> (organicBreathScale * microPulse + smoothedAmplitude * 0.09f).coerceIn(0.95f, 1.15f)
+        OrbState.AI_SPEAKING -> (organicBreathScale * microPulse + smoothedAmplitude * 0.06f).coerceIn(0.95f, 1.11f)
+        OrbState.OFFLINE -> 0.98f
+        OrbState.PAUSED -> 0.99f
+        else -> (organicBreathScale * microPulse)
     }
 
-    // Glow intensity (drives halo, ring brightness, ripple alpha)
+    // Glow intensity
     val glowIntensity = (when (orbState) {
-        OrbState.IDLE          -> 0.35f * glowPulse
-        OrbState.LISTENING     -> 0.55f * glowPulse
-        OrbState.USER_SPEAKING -> (0.42f + smoothedAmplitude * 0.58f) * glowPulse.coerceIn(0.9f, 1.1f)
-        OrbState.PROCESSING    -> 0.72f * glowPulse
-        OrbState.AI_SPEAKING   -> (0.38f + smoothedAmplitude * 0.48f) * glowPulse.coerceIn(0.9f, 1.1f)
-        OrbState.PAUSED        -> 0.20f
-        OrbState.ERROR         -> 0.30f * glowPulse
-        OrbState.OFFLINE       -> 0.10f
+        OrbState.IDLE -> 0.38f * glowPulse
+        OrbState.LISTENING -> 0.60f * glowPulse
+        OrbState.USER_SPEAKING -> (0.45f + smoothedAmplitude * 0.55f) * glowPulse.coerceIn(0.9f, 1.1f)
+        OrbState.PROCESSING -> 0.78f * glowPulse
+        OrbState.AI_SPEAKING -> (0.40f + smoothedAmplitude * 0.48f) * glowPulse.coerceIn(0.9f, 1.1f)
+        OrbState.PAUSED -> 0.20f
+        OrbState.ERROR -> 0.35f * glowPulse
+        OrbState.OFFLINE -> 0.08f
     }).coerceIn(0f, 1f)
 
     // Fluid wave amplitude
     val waveAmp = when (orbState) {
-        OrbState.IDLE          -> 0.12f
-        OrbState.LISTENING     -> 0.22f
-        OrbState.USER_SPEAKING -> (0.20f + smoothedAmplitude * 0.62f).coerceIn(0f, 0.88f)
-        OrbState.PROCESSING    -> 0.42f
-        OrbState.AI_SPEAKING   -> (0.18f + smoothedAmplitude * 0.46f).coerceIn(0f, 0.72f)
-        OrbState.PAUSED        -> 0.04f
-        OrbState.ERROR         -> 0.04f
-        OrbState.OFFLINE       -> 0.02f
+        OrbState.IDLE -> 0.14f
+        OrbState.LISTENING -> 0.25f
+        OrbState.USER_SPEAKING -> (0.22f + smoothedAmplitude * 0.65f).coerceIn(0f, 0.92f)
+        OrbState.PROCESSING -> 0.46f
+        OrbState.AI_SPEAKING -> (0.20f + smoothedAmplitude * 0.48f).coerceIn(0f, 0.76f)
+        OrbState.PAUSED -> 0.05f
+        OrbState.ERROR -> 0.05f
+        OrbState.OFFLINE -> 0.02f
     }
 
     // Particle alpha
     val particleAlpha = (when (orbState) {
-        OrbState.IDLE          -> 0.15f
-        OrbState.LISTENING     -> 0.30f
-        OrbState.USER_SPEAKING -> (0.20f + smoothedAmplitude * 0.62f).coerceIn(0f, 1f)
-        OrbState.PROCESSING    -> (0.55f * glowPulse).coerceIn(0f, 1f)
-        OrbState.AI_SPEAKING   -> (0.25f + smoothedAmplitude * 0.46f).coerceIn(0f, 1f)
-        OrbState.PAUSED        -> 0.05f
-        OrbState.ERROR         -> 0.05f
-        OrbState.OFFLINE       -> 0.0f
+        OrbState.IDLE -> 0.18f
+        OrbState.LISTENING -> 0.35f
+        OrbState.USER_SPEAKING -> (0.25f + smoothedAmplitude * 0.60f).coerceIn(0f, 1f)
+        OrbState.PROCESSING -> (0.60f * glowPulse).coerceIn(0f, 1f)
+        OrbState.AI_SPEAKING -> (0.30f + smoothedAmplitude * 0.45f).coerceIn(0f, 1f)
+        OrbState.PAUSED -> 0.05f
+        OrbState.ERROR -> 0.05f
+        OrbState.OFFLINE -> 0.0f
     }).coerceIn(0f, 1f)
 
-    // ---- Render ------------------------------------------------------------
     Box(
         modifier = modifier
-            .size(220.dp)
+            .size(size)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication        = null
+                indication = null
             ) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onTap()
@@ -243,19 +267,17 @@ fun WeatherAIOrb(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    // Apply breathing + amplitude scale via graphicsLayer so
-                    // the touch target remains constant at 220dp.
-                    scaleX = effectiveScale
-                    scaleY = effectiveScale
+                    scaleX = combinedScale
+                    scaleY = combinedScale
                 }
         ) {
-            drawOrbLayers(
-                orbState       = orbState,
-                fluidAngle     = Math.toRadians(fluidAngle.toDouble()).toFloat(),
-                ringAngle      = ringAngle,
-                glowIntensity  = glowIntensity,
-                waveAmp        = waveAmp,
-                particleAlpha  = particleAlpha,
+            drawLivingOrbLayers(
+                orbState = orbState,
+                fluidAngle = Math.toRadians(fluidAngle.toDouble()).toFloat(),
+                ringAngle = ringAngle,
+                glowIntensity = glowIntensity,
+                waveAmp = waveAmp,
+                particleAlpha = particleAlpha,
                 rippleProgress = rippleProgress
             )
         }
@@ -263,177 +285,179 @@ fun WeatherAIOrb(
 }
 
 // ============================================================
-//  ORB CANVAS DRAWING — All 9 layers
+//  LIVING ORB CANVAS RENDERING (9 Biomimetic Layers)
 // ============================================================
 
-private fun DrawScope.drawOrbLayers(
-    orbState:       OrbState,
-    fluidAngle:     Float,   // radians
-    ringAngle:      Float,   // degrees (for drawArc startAngle)
-    glowIntensity:  Float,
-    waveAmp:        Float,
-    particleAlpha:  Float,
+private fun DrawScope.drawLivingOrbLayers(
+    orbState: OrbState,
+    fluidAngle: Float,
+    ringAngle: Float,
+    glowIntensity: Float,
+    waveAmp: Float,
+    particleAlpha: Float,
     rippleProgress: Float
 ) {
     val c = Offset(size.width / 2f, size.height / 2f)
-    // Base radius is slightly inset so outer layers have room to breathe.
     val r = size.minDimension * 0.36f
 
-    // State-based colour palette
-    val cyanColor   = when (orbState) {
-        OrbState.ERROR   -> Color(0xFFFF6B6B)
+    // Organic color scheme
+    val cyanColor = when (orbState) {
+        OrbState.ERROR -> Color(0xFFFF6B6B)
         OrbState.OFFLINE -> Color(0xFF5E6B7C)
-        else             -> Color(0xFF52D9FF)
+        else -> Color(0xFF52D9FF)
     }
-    val blueColor   = when (orbState) {
-        OrbState.ERROR   -> Color(0xFFCC4444)
+    val blueColor = when (orbState) {
+        OrbState.ERROR -> Color(0xFFCC4444)
         OrbState.OFFLINE -> Color(0xFF3A4758)
-        else             -> Color(0xFF4DA3FF)
+        else -> Color(0xFF4DA3FF)
     }
     val purpleColor = when (orbState) {
         OrbState.OFFLINE -> Color(0xFF2D3A4A)
-        else             -> Color(0xFF7C5CFF)
+        else -> Color(0xFF8B7CFF)
     }
     val deepColor = Color(0xFF050A12)
 
     // ------------------------------------------------------------------
-    // LAYER 1 — Ambient outer halo (very wide, very low opacity)
+    // LAYER 1 — Ambient Respiration Halo (Bioluminescent Atmosphere)
     // ------------------------------------------------------------------
-    val haloA = (glowIntensity * 0.22f).coerceIn(0f, 0.30f)
+    val haloA = (glowIntensity * 0.26f).coerceIn(0f, 0.35f)
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                cyanColor.copy(alpha = haloA * 1.4f),
-                cyanColor.copy(alpha = haloA * 0.35f),
+                cyanColor.copy(alpha = haloA * 1.5f),
+                purpleColor.copy(alpha = haloA * 0.45f),
                 Color.Transparent
             ),
             center = c,
-            radius = r * 1.70f
+            radius = r * 1.75f
         ),
-        radius = r * 1.70f,
+        radius = r * 1.75f,
         center = c
     )
 
     // ------------------------------------------------------------------
-    // LAYER 2 — Soft inner glow (simulated blur: 3 concentric strokes)
+    // LAYER 2 — Multi-layered Soft Glow Rings (Simulating Membrane Aura)
     // ------------------------------------------------------------------
     for (i in 1..3) {
-        val ga = (glowIntensity * 0.42f / i).coerceIn(0f, 0.5f)
+        val ga = (glowIntensity * 0.44f / i).coerceIn(0f, 0.5f)
         drawCircle(
-            color  = cyanColor.copy(alpha = ga),
-            radius = r + (i * 7f),
+            color = cyanColor.copy(alpha = ga),
+            radius = r + (i * 6.5f),
             center = c,
-            style  = Stroke(width = 9f - i * 2f)
+            style = Stroke(width = 8f - i * 2f)
         )
     }
 
     // ------------------------------------------------------------------
-    // LAYER 3 — Main sphere body (radial gradient, off-centre for depth)
+    // LAYER 3 — Deep Space Biomembrane Body (Radial depth gradient)
     // ------------------------------------------------------------------
     val sAlpha = if (orbState == OrbState.OFFLINE) 0.55f else 0.95f
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                blueColor.copy(alpha = sAlpha * 0.85f),
+                blueColor.copy(alpha = sAlpha * 0.88f),
                 Color(0xFF1A3580).copy(alpha = sAlpha),
                 deepColor.copy(alpha = sAlpha)
             ),
             center = Offset(c.x - r * 0.22f, c.y - r * 0.22f),
-            radius = r * 1.1f
+            radius = r * 1.12f
         ),
         radius = r,
         center = c
     )
 
     // ------------------------------------------------------------------
-    // LAYER 4 — Animated fluid inner core (orbits inside sphere)
+    // LAYER 4 — Living Bioluminescent Core (Organic Harmonic Displacement)
     // ------------------------------------------------------------------
-    val fOff = Offset(
-        c.x + cos(fluidAngle) * r * 0.28f,
-        c.y + sin(fluidAngle) * r * 0.28f
+    // Organic harmonic path combining 1st and 2nd harmonics
+    val harmonicX = cos(fluidAngle) * 0.75f + cos(fluidAngle * 2.3f) * 0.25f
+    val harmonicY = sin(fluidAngle) * 0.75f + sin(fluidAngle * 2.3f) * 0.25f
+    val coreOffset = Offset(
+        c.x + harmonicX * r * 0.26f,
+        c.y + harmonicY * r * 0.26f
     )
+
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                cyanColor.copy(alpha  = (waveAmp * 0.90f).coerceIn(0f, 1f)),
-                purpleColor.copy(alpha = (waveAmp * 0.60f).coerceIn(0f, 1f)),
+                cyanColor.copy(alpha = (waveAmp * 0.92f).coerceIn(0f, 1f)),
+                purpleColor.copy(alpha = (waveAmp * 0.65f).coerceIn(0f, 1f)),
                 Color.Transparent
             ),
-            center = fOff,
-            radius = r * 0.74f
+            center = coreOffset,
+            radius = r * 0.76f
         ),
-        radius = r * 0.74f,
-        center = fOff
+        radius = r * 0.76f,
+        center = coreOffset
     )
 
     // ------------------------------------------------------------------
-    // LAYER 5 — Fluid S-curve waves (two bezier paths, amplitude driven)
+    // LAYER 5 — Organic Fluid Wave S-Curves (Dynamic Plasma Waves)
     // ------------------------------------------------------------------
     if (waveAmp > 0.03f) {
-        // Primary wave
-        val wy1 = c.y + sin(fluidAngle) * r * waveAmp * 0.78f
+        val wy1 = c.y + sin(fluidAngle) * r * waveAmp * 0.80f
         val wave1 = Path().apply {
             moveTo(c.x - r * 0.88f, wy1)
             cubicTo(
-                c.x - r * 0.28f, wy1 - r * waveAmp * 1.30f,
-                c.x + r * 0.28f, wy1 + r * waveAmp * 1.30f,
+                c.x - r * 0.28f, wy1 - r * waveAmp * 1.35f,
+                c.x + r * 0.28f, wy1 + r * waveAmp * 1.35f,
                 c.x + r * 0.88f, wy1
             )
         }
         drawPath(
-            path  = wave1,
+            path = wave1,
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
-                    cyanColor.copy(alpha  = (waveAmp * 1.1f).coerceIn(0f, 0.90f)),
-                    purpleColor.copy(alpha = (waveAmp * 0.7f).coerceIn(0f, 0.70f)),
+                    cyanColor.copy(alpha = (waveAmp * 1.15f).coerceIn(0f, 0.92f)),
+                    purpleColor.copy(alpha = (waveAmp * 0.75f).coerceIn(0f, 0.75f)),
                     Color.Transparent
                 ),
                 start = Offset(c.x - r, c.y),
-                end   = Offset(c.x + r, c.y)
+                end = Offset(c.x + r, c.y)
             ),
             style = Stroke(
-                width = (7f + waveAmp * 15f).coerceIn(5f, 24f),
-                cap   = StrokeCap.Round
+                width = (7f + waveAmp * 16f).coerceIn(5f, 25f),
+                cap = StrokeCap.Round
             )
         )
 
-        // Secondary wave (opposite phase, lower amplitude)
-        val wy2 = c.y - sin(fluidAngle) * r * waveAmp * 0.46f
+        // Secondary counter-wave
+        val wy2 = c.y - sin(fluidAngle * 1.2f) * r * waveAmp * 0.48f
         val wave2 = Path().apply {
-            moveTo(c.x - r * 0.70f, wy2)
+            moveTo(c.x - r * 0.72f, wy2)
             cubicTo(
-                c.x - r * 0.18f, wy2 + r * waveAmp * 0.85f,
-                c.x + r * 0.18f, wy2 - r * waveAmp * 0.85f,
-                c.x + r * 0.70f, wy2
+                c.x - r * 0.18f, wy2 + r * waveAmp * 0.90f,
+                c.x + r * 0.18f, wy2 - r * waveAmp * 0.90f,
+                c.x + r * 0.72f, wy2
             )
         }
         drawPath(
-            path  = wave2,
+            path = wave2,
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
-                    purpleColor.copy(alpha = (waveAmp * 0.50f).coerceIn(0f, 0.55f)),
+                    purpleColor.copy(alpha = (waveAmp * 0.55f).coerceIn(0f, 0.60f)),
                     Color.Transparent
                 ),
                 start = Offset(c.x - r, c.y),
-                end   = Offset(c.x + r, c.y)
+                end = Offset(c.x + r, c.y)
             ),
             style = Stroke(
-                width = (4f + waveAmp * 7f).coerceIn(3f, 13f),
-                cap   = StrokeCap.Round
+                width = (4f + waveAmp * 8f).coerceIn(3f, 14f),
+                cap = StrokeCap.Round
             )
         )
     }
 
     // ------------------------------------------------------------------
-    // LAYER 6 — Glass specular highlight (upper-left)
+    // LAYER 6 — Specular Glass Membrane Highlight
     // ------------------------------------------------------------------
     val specC = Offset(c.x - r * 0.26f, c.y - r * 0.28f)
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.62f),
+                Color.White.copy(alpha = 0.64f),
                 Color.White.copy(alpha = 0.18f),
                 Color.Transparent
             ),
@@ -443,11 +467,11 @@ private fun DrawScope.drawOrbLayers(
         radius = r * 0.36f,
         center = specC
     )
-    // Tiny secondary specular for realism
+
     val specC2 = Offset(c.x + r * 0.34f, c.y + r * 0.30f)
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
+            colors = listOf(Color.White.copy(alpha = 0.12f), Color.Transparent),
             center = specC2,
             radius = r * 0.16f
         ),
@@ -456,10 +480,9 @@ private fun DrawScope.drawOrbLayers(
     )
 
     // ------------------------------------------------------------------
-    // LAYER 7 — Particles (8 dots orbiting at varying radii)
+    // LAYER 7 — Orbiting Living Particle Nodes
     // ------------------------------------------------------------------
     if (particleAlpha > 0.01f) {
-        // Each entry: [orbitRadiusFactor, baseAngleRadians, dotRadius]
         val particleDefs = arrayOf(
             floatArrayOf(0.73f, 0.000f, 3.2f),
             floatArrayOf(0.81f, 0.785f, 2.4f),
@@ -473,10 +496,10 @@ private fun DrawScope.drawOrbLayers(
         val ringRad = Math.toRadians(ringAngle.toDouble()).toFloat()
         for (pd in particleDefs) {
             val angle = pd[1] + ringRad
-            val px    = c.x + cos(angle) * r * pd[0]
-            val py    = c.y + sin(angle) * r * pd[0]
+            val px = c.x + cos(angle) * r * pd[0]
+            val py = c.y + sin(angle) * r * pd[0]
             drawCircle(
-                color  = cyanColor.copy(alpha = (particleAlpha * 0.80f).coerceIn(0f, 0.80f)),
+                color = cyanColor.copy(alpha = (particleAlpha * 0.82f).coerceIn(0f, 0.85f)),
                 radius = pd[2] * (particleAlpha * 0.7f + 0.3f).coerceIn(0.3f, 1.0f),
                 center = Offset(px, py)
             )
@@ -484,53 +507,51 @@ private fun DrawScope.drawOrbLayers(
     }
 
     // ------------------------------------------------------------------
-    // LAYER 8 — Orbital ring arc (rotates, creates focus / halo effect)
+    // LAYER 8 — Orbital Atmosphere Ring
     // ------------------------------------------------------------------
-    val rRad  = r * 1.07f
-    val ringA = (glowIntensity * 0.72f).coerceIn(0f, 0.82f)
+    val rRad = r * 1.07f
+    val ringA = (glowIntensity * 0.75f).coerceIn(0f, 0.85f)
     val ringStroke = if (orbState == OrbState.PROCESSING) 2.8f else 1.6f
 
-    // Primary arc (240° bright segment)
     drawArc(
-        color      = cyanColor.copy(alpha = ringA),
+        color = cyanColor.copy(alpha = ringA),
         startAngle = ringAngle,
         sweepAngle = 240f,
-        useCenter  = false,
-        topLeft    = Offset(c.x - rRad, c.y - rRad),
-        size       = Size(rRad * 2, rRad * 2),
-        style      = Stroke(width = ringStroke, cap = StrokeCap.Round)
+        useCenter = false,
+        topLeft = Offset(c.x - rRad, c.y - rRad),
+        size = Size(rRad * 2, rRad * 2),
+        style = Stroke(width = ringStroke, cap = StrokeCap.Round)
     )
-    // Trailing arc (60° dim purple tail)
     drawArc(
-        color      = purpleColor.copy(alpha = (ringA * 0.45f).coerceIn(0f, 0.45f)),
+        color = purpleColor.copy(alpha = (ringA * 0.45f).coerceIn(0f, 0.45f)),
         startAngle = ringAngle + 240f,
         sweepAngle = 60f,
-        useCenter  = false,
-        topLeft    = Offset(c.x - rRad, c.y - rRad),
-        size       = Size(rRad * 2, rRad * 2),
-        style      = Stroke(width = 1.0f, cap = StrokeCap.Round)
+        useCenter = false,
+        topLeft = Offset(c.x - rRad, c.y - rRad),
+        size = Size(rRad * 2, rRad * 2),
+        style = Stroke(width = 1.0f, cap = StrokeCap.Round)
     )
 
     // ------------------------------------------------------------------
-    // LAYER 9 — Ripple rings (LISTENING and USER_SPEAKING states only)
+    // LAYER 9 — Audio-Reactive Ripple Waves (Listening / Speaking)
     // ------------------------------------------------------------------
     if (orbState == OrbState.LISTENING || orbState == OrbState.USER_SPEAKING) {
         val maxRipple = r * (1.58f + waveAmp * 0.38f)
 
         fun drawRipple(progress: Float, alphaScale: Float, strokeW: Float) {
-            val rr  = r + (maxRipple - r) * progress
-            val ra  = ((1f - progress) * alphaScale * glowIntensity).coerceIn(0f, 1f)
+            val rr = r + (maxRipple - r) * progress
+            val ra = ((1f - progress) * alphaScale * glowIntensity).coerceIn(0f, 1f)
             if (ra > 0.01f) {
                 drawCircle(
-                    color  = cyanColor.copy(alpha = ra),
+                    color = cyanColor.copy(alpha = ra),
                     radius = rr,
                     center = c,
-                    style  = Stroke(width = strokeW)
+                    style = Stroke(width = strokeW)
                 )
             }
         }
 
-        drawRipple(rippleProgress,                         0.45f, 1.8f)
+        drawRipple(rippleProgress, 0.45f, 1.8f)
         drawRipple((rippleProgress + 0.40f) % 1f, 0.30f, 1.3f)
         drawRipple((rippleProgress + 0.72f) % 1f, 0.18f, 1.0f)
     }
