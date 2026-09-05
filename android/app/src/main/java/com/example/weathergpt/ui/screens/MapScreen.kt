@@ -56,11 +56,12 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.compass.CompassOverlay
+import com.example.weathergpt.data.BackendConfig
 import java.net.HttpURLConnection
 import java.net.URL
 
 private const val BACKEND_URL =
-    "https://weather-gpt-jfpk.onrender.com"
+    BackendConfig.BASE_URL_NO_SLASH
 
 private data class DamMarkerData(
     val name: String,

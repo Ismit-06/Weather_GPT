@@ -26,7 +26,7 @@ interface LocationReverseApi {
 object LocationReverseClient {
 
     private const val BASE_URL =
-        "https://weather-gpt-jfpk.onrender.com/"
+        BackendConfig.BASE_URL
 
     val api: LocationReverseApi by lazy {
         Retrofit.Builder()

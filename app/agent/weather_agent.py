@@ -1060,16 +1060,40 @@ class WeatherAgent:
         )
 
         # -----------------------------------------------------
-        # Generate final grounded answer.
+        # Generate final grounded answer (OpenRouter / Sarvam / Fallback).
         # -----------------------------------------------------
+        import os
+        answer = None
 
-        answer = await sarvam_chat(
-            question=question,
-            language=detected_language
-                or "English",
-            weather_context=weather_text,
-            history=history,
-        )
+        if os.getenv("OPENROUTER_API_KEY"):
+            try:
+                from app.services.openrouter_chat import chat as openrouter_chat
+                answer = await openrouter_chat(
+                    question=question,
+                    language=detected_language or "English",
+                    weather_context=weather_text,
+                    history=history,
+                )
+            except Exception:
+                answer = None
+
+        if not answer and os.getenv("SARVAM_API_KEY"):
+            try:
+                answer = await sarvam_chat(
+                    question=question,
+                    language=detected_language or "English",
+                    weather_context=weather_text,
+                    history=history,
+                )
+            except Exception:
+                answer = None
+
+        if not answer:
+            answer = self._generate_fallback_answer(
+                question=question,
+                weather_context=weather_context,
+                tool_result=tool_result,
+            )
 
         return {
             "status":
@@ -1153,3 +1177,58 @@ class WeatherAgent:
                     self.context
                 ),
         }
+
+    def _generate_fallback_answer(
+        self,
+        question: str,
+        weather_context: dict,
+        tool_result: dict | None,
+    ) -> str:
+        import os
+        if os.getenv("OPENAI_API_KEY"):
+            try:
+                from app.chat.llm_service import generate_weather_answer
+                loc_str = f"{weather_context.get('location', {}).get('latitude', '')}, {weather_context.get('location', {}).get('longitude', '')}"
+                return generate_weather_answer(
+                    question=question,
+                    location=loc_str,
+                    weather_context=weather_context,
+                )
+            except Exception:
+                pass
+
+        if not tool_result:
+            return "Based on your location, weather conditions are being monitored. Please specify your query."
+
+        if isinstance(tool_result, dict):
+            if tool_result.get("status") == "needs_clarification":
+                activity = self.context.activity
+                if activity:
+                    return f"To evaluate conditions for {activity}, please specify a time (for example: 'Can I {activity} today at 4 PM?' or 'What about tomorrow?')."
+                msg = tool_result.get("message")
+                if msg:
+                    return msg
+                return "Please specify a specific time or date for your request."
+
+            # If activity or conditions assessment was performed
+            for key in ["answer", "recommendation", "assessment", "message", "summary"]:
+                if key in tool_result and isinstance(tool_result[key], str) and tool_result[key].strip():
+                    return tool_result[key].strip()
+
+            current = tool_result.get("current") or tool_result.get("conditions")
+            if isinstance(current, dict):
+                temp = current.get("temperature_c") or current.get("temperature")
+                rain = current.get("rain_probability_pct") or current.get("rainfall_probability")
+                cond = current.get("condition") or current.get("summary")
+                parts = []
+                if temp is not None:
+                    parts.append(f"The temperature is {temp}°C.")
+                if rain is not None:
+                    parts.append(f"Rain probability is {rain}%.")
+                if cond:
+                    parts.append(f"Condition: {cond}.")
+                if parts:
+                    return " ".join(parts)
+
+        return "Weather conditions have been evaluated for your location. You can view the live parameters in the dashboard."
+

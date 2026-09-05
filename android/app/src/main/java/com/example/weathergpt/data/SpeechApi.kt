@@ -32,7 +32,7 @@ interface SpeechApi {
 object SpeechClient {
 
     private const val BASE_URL =
-        "https://weather-gpt-jfpk.onrender.com/"
+        BackendConfig.BASE_URL
 
     private val httpClient =
         OkHttpClient.Builder()

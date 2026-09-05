@@ -138,7 +138,7 @@ interface FeatureApi {
 object FeatureClient {
 
     private const val BASE_URL =
-        "https://weather-gpt-jfpk.onrender.com/"
+        BackendConfig.BASE_URL
 
     val api: FeatureApi by lazy {
 

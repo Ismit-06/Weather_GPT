@@ -17,6 +17,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Mic
@@ -78,6 +84,20 @@ fun ChatScreen(
             LocationStore.getLocation(
                 context
             )
+        }
+
+    val speechRecognizerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val spokenText = result.data
+                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull()
+                if (!spokenText.isNullOrBlank()) {
+                    message.value = spokenText
+                }
+            }
         }
 
     fun sendMessage() {
@@ -666,7 +686,27 @@ fun ChatScreen(
             )
 
             IconButton(
-                onClick = {}
+                onClick = {
+                    try {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                            )
+                            putExtra(
+                                RecognizerIntent.EXTRA_PROMPT,
+                                "Speak your weather question..."
+                            )
+                        }
+                        speechRecognizerLauncher.launch(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            context,
+                            "Voice recognition not available on this device",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
             ) {
 
                 Icon(

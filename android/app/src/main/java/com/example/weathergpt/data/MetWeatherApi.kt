@@ -47,7 +47,7 @@ interface MetWeatherApi {
 object MetWeatherClient {
 
     private const val BASE_URL =
-        "https://weather-gpt-jfpk.onrender.com/"
+        BackendConfig.BASE_URL
 
     val api: MetWeatherApi by lazy {
 

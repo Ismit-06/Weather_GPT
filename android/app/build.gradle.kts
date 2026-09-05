@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -22,10 +23,7 @@ android {
     namespace =
         "com.example.weathergpt"
 
-    compileSdk {
-        version =
-            release(37)
-    }
+    compileSdk = 35
 
     defaultConfig {
 
@@ -36,7 +34,7 @@ android {
             26
 
         targetSdk =
-            37
+            35
 
         versionCode =
             1
@@ -62,20 +60,17 @@ android {
     buildTypes {
 
         release {
-
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = false
         }
     }
 
     compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
 
-        sourceCompatibility =
-            JavaVersion.VERSION_11
-
-        targetCompatibility =
-            JavaVersion.VERSION_11
+    kotlinOptions {
+        jvmTarget = "11"
     }
 
     buildFeatures {
@@ -100,11 +95,11 @@ dependencies {
     )
 
     implementation(
-        "androidx.lifecycle:lifecycle-runtime-compose:2.9.2"
+        "androidx.lifecycle:lifecycle-runtime-compose:2.8.7"
     )
 
     implementation(
-        "androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2"
+        "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
     )
 
     implementation(
@@ -116,7 +111,7 @@ dependencies {
     )
 
     implementation(
-        "androidx.navigation:navigation-compose:2.10.0"
+        "androidx.navigation:navigation-compose:2.8.8"
     )
 
     implementation(

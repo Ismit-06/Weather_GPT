@@ -115,7 +115,7 @@ interface ChatApi {
 object ChatClient {
 
     private const val BASE_URL =
-        "https://weather-gpt-jfpk.onrender.com/"
+        BackendConfig.BASE_URL
 
     val api: ChatApi by lazy {
 
