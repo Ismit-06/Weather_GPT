@@ -1,12 +1,16 @@
 package com.example.weathergpt.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -227,6 +231,7 @@ fun ChatScreen(
     ) { isGranted ->
         if (isGranted) {
             voiceAssistant.startListening(
+                languageCode = selectedLanguage,
                 onResult = { text ->
                     message.value = text
                 },
@@ -977,87 +982,52 @@ fun ChatScreen(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        horizontal = 12.dp,
-                        vertical = 10.dp
+                        horizontal = 14.dp,
+                        vertical = 8.dp
                     )
                     .clip(
-                        RoundedCornerShape(
-                            18.dp
-                        )
+                        RoundedCornerShape(28.dp)
                     )
                     .background(
-                        MaterialTheme
-                            .colorScheme
-                            .surface
-                            .copy(
-                                alpha =
-                                    0.97f
-                            )
+                        Color(0xFF101726)
+                    )
+                    .border(
+                        1.dp,
+                        Color(0xFF1E2B45),
+                        RoundedCornerShape(28.dp)
                     )
                     .padding(
-                        start = 7.dp,
-                        end = 5.dp,
-                        top = 5.dp,
-                        bottom = 5.dp
+                        start = 14.dp,
+                        end = 6.dp,
+                        top = 4.dp,
+                        bottom = 4.dp
                     ),
-
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
-
-            OutlinedTextField(
-
-                value =
-                    message.value,
-
-                onValueChange = {
-                    message.value = it
-                },
-
-                modifier =
-                    Modifier.weight(1f),
-
-                enabled =
-                    !uiState.isLoading,
-
-                placeholder = {
-
-                    Text(
-                        text =
-                            if (isListening) {
-                                "Listening... Speak your weather question"
-                            } else {
-                                "Ask WeatherGPT..."
-                            },
-
-                        color =
-                            if (isListening) {
-                                NeonCyan
-                            } else {
-                                TextMuted
-                            }
-                    )
-                },
-
-                singleLine = true,
-
-                shape =
-                    RoundedCornerShape(
-                        15.dp
-                    ),
-
-                keyboardOptions =
-                    KeyboardOptions(
-                        imeAction =
-                            ImeAction.Send
-                    ),
-
-                keyboardActions =
-                    KeyboardActions(
-                        onSend = {
-                            sendMessage()
-                        }
-                    )
+            androidx.compose.foundation.text.BasicTextField(
+                value = message.value,
+                onValueChange = { message.value = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 10.dp),
+                enabled = !uiState.isLoading,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = Color.White,
+                    fontSize = 14.sp
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                decorationBox = { innerTextField ->
+                    if (message.value.isEmpty()) {
+                        Text(
+                            text = if (isListening) "Listening... Speak now" else "Ask WeatherGPT...",
+                            color = if (isListening) Color(0xFF38BDF8) else Color(0xFF64748B),
+                            fontSize = 14.sp
+                        )
+                    }
+                    innerTextField()
+                }
             )
 
             val pulseTransition = rememberInfiniteTransition(label = "pulse")
@@ -1083,6 +1053,7 @@ fun ChatScreen(
 
                         if (hasPermission) {
                             voiceAssistant.startListening(
+                                languageCode = selectedLanguage,
                                 onResult = { spokenText ->
                                     message.value = spokenText
                                 },
@@ -1095,14 +1066,8 @@ fun ChatScreen(
                         }
                     }
                 },
-                modifier = Modifier
-                    .padding(horizontal = 2.dp)
-                    .background(
-                        color = if (isListening) RiskRed.copy(alpha = 0.2f) else Color.Transparent,
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                modifier = Modifier.size(36.dp)
             ) {
-
                 Icon(
                     imageVector =
                         if (isListening) {
@@ -1110,82 +1075,49 @@ fun ChatScreen(
                         } else {
                             Icons.Default.Mic
                         },
-
                     contentDescription =
                         if (isListening) {
                             "Stop listening"
                         } else {
                             "Voice input"
                         },
-
                     tint =
                         if (isListening) {
-                            RiskRed
+                            Color(0xFFEF4444)
                         } else {
-                            NeonCyan
+                            Color(0xFF94A3B8)
                         },
-
                     modifier =
                         if (isListening) {
                             Modifier.scale(pulseScale)
                         } else {
-                            Modifier
+                            Modifier.size(20.dp)
                         }
                 )
             }
 
-            Button(
-                onClick =
-                    {
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (message.value.isNotBlank() && !uiState.isLoading) Color(0xFF388BFF)
+                        else Color(0xFF1E2B45)
+                    )
+                    .clickable(
+                        enabled = message.value.isNotBlank() && !uiState.isLoading
+                    ) {
                         sendMessage()
                     },
-
-                enabled =
-                    message.value
-                        .isNotBlank() &&
-                        !uiState.isLoading,
-
-                modifier =
-                    Modifier.size(
-                        width = 64.dp,
-                        height = 46.dp
-                    ),
-
-                contentPadding =
-                    PaddingValues(0.dp),
-
-                shape =
-                    RoundedCornerShape(
-                        14.dp
-                    ),
-
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor =
-                            NeonBlue,
-
-                        disabledContainerColor =
-                            NeonBlue.copy(
-                                alpha =
-                                    0.22f
-                            )
-                    )
+                contentAlignment = Alignment.Center
             ) {
-
                 Icon(
-                    imageVector =
-                        Icons.AutoMirrored.Filled.Send,
-
-                    contentDescription =
-                        "Send",
-
-                    tint =
-                        Color.White,
-
-                    modifier =
-                        Modifier.size(
-                            19.dp
-                        )
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF64748B),
+                    modifier = Modifier.size(22.dp)
                 )
             }
         }
@@ -1258,76 +1190,38 @@ fun ChatScreen(
 private fun UserBubble(
     text: String
 ) {
-
     Row(
-        modifier =
-            Modifier.fillMaxWidth(),
-
-        horizontalArrangement =
-            Arrangement.End
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.End
     ) {
-
         Surface(
-            modifier =
-                Modifier.fillMaxWidth(
-                    0.82f
-                ),
-
-            shape =
-                RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = 18.dp,
-                    bottomEnd = 5.dp
-                ),
-
-            color =
-                NeonBlue.copy(
-                    alpha =
-                        0.18f
-                )
+            shape = RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = 18.dp,
+                bottomEnd = 4.dp
+            ),
+            color = Color(0xFF1B273E)
         ) {
-
-            Column(
-                modifier =
-                    Modifier.padding(
-                        15.dp
-                    )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-
                 Text(
-                    text =
-                        "YOU",
-
-                    color =
-                        NeonBlue,
-
-                    fontSize =
-                        9.sp,
-
-                    letterSpacing =
-                        0.8.sp
+                    text = text,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
                 )
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            5.dp
-                        )
-                )
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Text(
-                    text =
-                        text,
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        15.sp,
-
-                    lineHeight =
-                        21.sp
+                    text = "9:41 PM",
+                    color = Color(0xFF64748B),
+                    fontSize = 10.sp
                 )
             }
         }
@@ -1363,83 +1257,58 @@ private fun BotBubble(
         if (filtered.isNotEmpty()) filtered.joinToString("\n\n") else t
     }
 
-    GlassCard(
-        modifier =
-            Modifier.fillMaxWidth(
-                0.94f
-            )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.Start
     ) {
-
-        Row(
-            verticalAlignment =
-                Alignment.Top
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(0.96f)
         ) {
-
-            Surface(
-                modifier =
-                    Modifier.size(
-                        38.dp
-                    ),
-
-                shape =
-                    RoundedCornerShape(
-                        12.dp
-                    ),
-
-                color =
-                    NeonCyan.copy(
-                        alpha =
-                            0.12f
-                    )
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.Cloud,
-
-                    contentDescription =
-                        null,
-
-                    tint =
-                        NeonCyan,
-
-                    modifier =
-                        Modifier.padding(
-                            8.dp
-                        )
-                )
-            }
-
-            Spacer(
-                modifier =
-                    Modifier.size(
-                        10.dp
-                    )
-            )
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-
+            Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF388BFF), Color(0xFF2563EB))
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Cloud,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
 
-                    Text(
-                        text =
-                            "WEATHERGPT",
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                        color =
-                            NeonCyan,
+                        Text(
+                            text = "WeatherGPT",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
 
-                        fontSize =
-                            9.sp,
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                        letterSpacing =
-                            1.0.sp
-                    )
+                        Text(
+                            text = "9:41 PM",
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp
+                        )
+                    }
 
                     IconButton(
                         onClick = onSpeak,
@@ -1452,45 +1321,30 @@ private fun BotBubble(
                                 } else {
                                     Icons.Default.VolumeUp
                                 },
-
                             contentDescription =
                                 if (isSpeaking) {
                                     "Stop reading"
                                 } else {
                                     "Read aloud"
                                 },
-
                             tint =
                                 if (isSpeaking) {
-                                    NeonCyan
+                                    Color(0xFF388BFF)
                                 } else {
-                                    TextMuted
+                                    Color(0xFF64748B)
                                 },
-
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            4.dp
-                        )
-                )
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text =
-                        cleanDisplayText,
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        15.sp,
-
-                    lineHeight =
-                        22.sp
+                    text = cleanDisplayText,
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp
                 )
             }
         }

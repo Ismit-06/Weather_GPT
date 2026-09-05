@@ -100,10 +100,10 @@ private val ProWeatherTypography =
         displayLarge =
             TextStyle(
                 fontFamily =
-                    FontFamily.Serif,
+                    FontFamily.SansSerif,
 
                 fontWeight =
-                    FontWeight.Normal,
+                    FontWeight.Bold,
 
                 fontSize =
                     48.sp,
@@ -115,10 +115,10 @@ private val ProWeatherTypography =
         displayMedium =
             TextStyle(
                 fontFamily =
-                    FontFamily.Serif,
+                    FontFamily.SansSerif,
 
                 fontWeight =
-                    FontWeight.Normal,
+                    FontWeight.Bold,
 
                 fontSize =
                     38.sp,
@@ -130,10 +130,10 @@ private val ProWeatherTypography =
         headlineLarge =
             TextStyle(
                 fontFamily =
-                    FontFamily.Serif,
+                    FontFamily.SansSerif,
 
                 fontWeight =
-                    FontWeight.Medium,
+                    FontWeight.SemiBold,
 
                 fontSize =
                     30.sp,
@@ -145,10 +145,10 @@ private val ProWeatherTypography =
         headlineMedium =
             TextStyle(
                 fontFamily =
-                    FontFamily.Serif,
+                    FontFamily.SansSerif,
 
                 fontWeight =
-                    FontWeight.Medium,
+                    FontWeight.SemiBold,
 
                 fontSize =
                     24.sp,
@@ -160,10 +160,10 @@ private val ProWeatherTypography =
         headlineSmall =
             TextStyle(
                 fontFamily =
-                    FontFamily.Serif,
+                    FontFamily.SansSerif,
 
                 fontWeight =
-                    FontWeight.Medium,
+                    FontWeight.SemiBold,
 
                 fontSize =
                     21.sp,

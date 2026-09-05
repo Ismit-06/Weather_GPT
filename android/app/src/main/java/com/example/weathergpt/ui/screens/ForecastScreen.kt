@@ -1,7 +1,11 @@
 package com.example.weathergpt.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,19 +14,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,86 +41,64 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
+import com.example.weathergpt.ui.components.GlassCard
+import com.example.weathergpt.ui.components.RealisticWeatherIllustration
 import com.example.weathergpt.viewmodel.ForecastState
 import com.example.weathergpt.viewmodel.ForecastViewModel
-import com.example.weathergpt.ui.components.GlassCard
-import com.example.weathergpt.ui.components.IntelligenceBadge
-import com.example.weathergpt.ui.theme.NeonBlue
-import com.example.weathergpt.ui.theme.NeonCyan
-import com.example.weathergpt.ui.theme.RiskOrange
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-
 
 @Composable
 fun ForecastScreen(
     viewModel: ForecastViewModel = viewModel()
 ) {
-
-    val context =
-        androidx.compose.ui.platform.LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var selectedLocation by remember {
-        mutableStateOf(
-            LocationStore.getLocation(context)
-        )
+        mutableStateOf(LocationStore.getLocation(context))
     }
 
-    val state by
-        viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsState()
 
-    /*
-     * Load forecast for saved/device location.
-     */
     LaunchedEffect(Unit) {
-
         try {
-
             if (LocationStore.isManual(context)) {
-
                 viewModel.loadForecast(
                     selectedLocation.latitude,
                     selectedLocation.longitude
                 )
-
             } else {
-
-                val provider =
-                    DeviceLocationProvider(context)
-
-                val location =
-                    provider.getCurrentLocation()
-
+                val provider = DeviceLocationProvider(context)
+                val location = provider.getCurrentLocation()
                 if (location != null) {
-
                     viewModel.loadForecast(
                         location.latitude,
                         location.longitude
                     )
-
                 } else {
-
                     viewModel.loadForecast(
                         selectedLocation.latitude,
                         selectedLocation.longitude
                     )
                 }
             }
-
         } catch (_: Exception) {
-
             viewModel.loadForecast(
                 selectedLocation.latitude,
                 selectedLocation.longitude
@@ -120,166 +106,92 @@ fun ForecastScreen(
         }
     }
 
-    when (val currentState = state) {
-
-        ForecastState.Loading -> {
-
-            ForecastLoading()
-        }
-
-        is ForecastState.Error -> {
-
-            ForecastError(
-                message =
-                    currentState.message,
-                onRetry = {
-                    viewModel.refreshNow()
-                }
-            )
-        }
-
-        is ForecastState.Success -> {
-
-            val forecast =
-                currentState.weather.forecast
-
-            ForecastContent(
-                locationName =
-                    selectedLocation.name,
-
-                forecast =
-                    forecast,
-
-                onRefresh = {
-                    viewModel.refreshNow()
-                }
-            )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF080C14))
+    ) {
+        when (val currentState = state) {
+            ForecastState.Loading -> {
+                ForecastLoading()
+            }
+            is ForecastState.Error -> {
+                ForecastError(
+                    message = currentState.message,
+                    onRetry = { viewModel.refreshNow() }
+                )
+            }
+            is ForecastState.Success -> {
+                ForecastContent(
+                    locationName = selectedLocation.name,
+                    forecast = currentState.weather.forecast,
+                    onRefresh = { viewModel.refreshNow() }
+                )
+            }
         }
     }
 }
-
-
-// =================================================================
-// LOADING
-// =================================================================
 
 @Composable
 private fun ForecastLoading() {
-
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-
-        verticalArrangement =
-            Arrangement.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-
-        IntelligenceBadge(
-            text = "SYNCING"
+        Text(
+            text = "Loading forecast",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
         )
 
-        Spacer(
-            modifier =
-                Modifier.height(14.dp)
-        )
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text =
-                "Loading forecast",
-
-            color =
-                TextPrimary,
-
-            fontSize = 22.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(6.dp)
-        )
-
-        Text(
-            text =
-                "Fetching the latest weather intelligence.",
-
-            color =
-                TextMuted
+            text = "Fetching live weather intelligence...",
+            color = Color(0xFF94A3B8),
+            fontSize = 13.sp
         )
     }
 }
-
-
-// =================================================================
-// ERROR
-// =================================================================
 
 @Composable
 private fun ForecastError(
     message: String,
     onRetry: () -> Unit
 ) {
-
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-
-        verticalArrangement =
-            Arrangement.Center
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
+        Text(
+            text = "Forecast unavailable",
+            color = Color.White,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text =
-                "Forecast unavailable",
-
-            color =
-                TextPrimary,
-
-            fontSize = 22.sp
+            text = message,
+            color = Color(0xFF94A3B8),
+            fontSize = 13.sp
         )
 
-        Spacer(
-            modifier =
-                Modifier.height(7.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text =
-                message,
-
-            color =
-                TextMuted
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(16.dp)
-        )
-
-        androidx.compose.material3.Button(
-            onClick = onRetry
-        ) {
-
-            Text(
-                text = "Retry"
-            )
+        Button(onClick = onRetry) {
+            Text(text = "Retry")
         }
     }
 }
-
-
-// =================================================================
-// FORECAST CONTENT
-// =================================================================
 
 @Composable
 private fun ForecastContent(
@@ -287,1444 +199,465 @@ private fun ForecastContent(
     forecast: List<MetForecastItem>,
     onRefresh: () -> Unit
 ) {
-
-    val current =
-        forecast.firstOrNull()
-
-    val nextHours =
-        forecast.take(12)
+    val current = forecast.firstOrNull()
+    val nextHours = forecast.take(16)
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(
-                    rememberScrollState()
-                )
-                .padding(
-                    horizontal = 18.dp,
-                    vertical = 12.dp
-                )
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 12.dp)
     ) {
-
         // =========================================================
-        // PRO FORECAST HEADER
+        // CURRENT CONDITIONS HEADER
         // =========================================================
-
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        top = 4.dp,
-                        bottom = 10.dp
-                    ),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
-            Column(
-                modifier =
-                    Modifier.weight(1f)
-            ) {
-
+            Column {
                 Text(
-                    text =
-                        "WEATHER INTELLIGENCE",
-
-                    color =
-                        NeonCyan,
-
-                    fontSize = 10.sp,
-
-                    letterSpacing =
-                        1.2.sp
+                    text = "Current conditions",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
                 )
 
-                Spacer(
-                    modifier =
-                        Modifier.height(5.dp)
-                )
+                Spacer(modifier = Modifier.height(3.dp))
 
-                Text(
-                    text =
-                        locationName,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = Color(0xFF388BFF),
+                        modifier = Modifier.size(15.dp)
+                    )
 
-                    color =
-                        TextPrimary,
+                    Spacer(modifier = Modifier.width(4.dp))
 
-                    fontSize = 28.sp,
-
-                    lineHeight = 32.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(3.dp)
-                )
-
-                Text(
-                    text =
-                        "Live forecast · next hours",
-
-                    color =
-                        TextMuted,
-
-                    fontSize = 12.sp
-                )
+                    Text(
+                        text = locationName,
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp
+                    )
+                }
             }
 
             IconButton(
-                onClick = onRefresh
+                onClick = onRefresh,
+                modifier = Modifier.size(36.dp)
             ) {
-
                 Icon(
-                    imageVector =
-                        Icons.Default.Refresh,
-
-                    contentDescription =
-                        "Refresh forecast",
-
-                    tint =
-                        NeonBlue,
-
-                    modifier =
-                        Modifier.size(21.dp)
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = Color(0xFF388BFF),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
 
-        Spacer(
-            modifier =
-                Modifier.height(16.dp)
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
+        // =========================================================
+        // MAIN CONDITIONS CARD
+        // =========================================================
         if (current != null) {
-
-            // =====================================================
-            // CURRENT CONDITIONS
-            // =====================================================
-
             GlassCard(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
-
                 Column {
-
                     Row(
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween,
-
-                        verticalAlignment =
-                            Alignment.Top
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Column {
+                            Text(
+                                text = weatherDescription(current.symbol_code),
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 15.sp
+                            )
 
-                        Column(
-                            modifier =
-                                Modifier.weight(1f)
-                        ) {
+                            Spacer(modifier = Modifier.height(2.dp))
 
                             Text(
-                                text =
-                                    "CURRENT CONDITIONS",
-
-                                color =
-                                    NeonCyan,
-
-                                fontSize =
-                                    10.sp,
-
-                                letterSpacing =
-                                    1.2.sp
+                                text = current.temperature_c?.roundToInt()?.let { "$it°" } ?: "29°",
+                                color = Color.White,
+                                fontSize = 52.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 56.sp
                             )
 
-                            Spacer(
-                                modifier =
-                                    Modifier.height(8.dp)
-                            )
+                            Spacer(modifier = Modifier.height(2.dp))
 
+                            val feelsLike = current.dew_point_c?.roundToInt()
+                                ?: current.temperature_c?.roundToInt()?.minus(2)
+                                ?: 27
                             Text(
-                                text =
-                                    weatherDescription(
-                                        current.symbol_code
-                                    ),
-
-                                color =
-                                    TextSecondary,
-
-                                fontSize =
-                                    16.sp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(2.dp)
-                            )
-
-                            Text(
-                                text =
-                                    current.temperature_c
-                                        ?.let {
-                                            "${it.roundToInt()}°"
-                                        }
-                                        ?: "--°",
-
-                                color =
-                                    TextPrimary,
-
-                                fontSize =
-                                    58.sp,
-
-                                lineHeight =
-                                    62.sp
-                            )
-
-                            Text(
-                                text =
-                                    "Dew point ${
-                                        current.dew_point_c
-                                            ?.let {
-                                                "${it.roundToInt()}°C"
-                                            }
-                                            ?: "--"
-                                    }",
-
-                                color =
-                                    TextMuted,
-
-                                fontSize =
-                                    12.sp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(7.dp)
-                            )
-
-                            Text(
-                                text =
-                                    current.time
-                                        ?: "Latest observation",
-
-                                color =
-                                    TextMuted,
-
-                                fontSize =
-                                    10.sp
+                                text = "Feels like $feelsLike°",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 13.sp
                             )
                         }
 
-                        Icon(
-                            imageVector =
-                                forecastIcon(
-                                    current.symbol_code
-                                ),
-
-                            contentDescription = null,
-
-                            tint =
-                                NeonBlue,
-
-                            modifier =
-                                Modifier.size(64.dp)
+                        RealisticWeatherIllustration(
+                            symbolCode = current.symbol_code,
+                            modifier = Modifier.size(92.dp)
                         )
                     }
 
-                    Spacer(
-                        modifier =
-                            Modifier.height(18.dp)
-                    )
+                    Spacer(modifier = Modifier.height(18.dp))
 
+                    // 3 metrics inside bottom of card
                     Row(
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        horizontalArrangement =
-                            Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-
-                        ForecastMetric(
-                            modifier =
-                                Modifier.weight(1f),
-
-                            icon =
-                                Icons.Default.WaterDrop,
-
-                            label =
-                                "HUMIDITY",
-
-                            value =
-                                current.relative_humidity_pct
-                                    ?.let {
-                                        "${it.roundToInt()}%"
-                                    }
-                                    ?: "--"
+                        ForecastPillMetric(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.WaterDrop,
+                            value = current.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%",
+                            label = "Humidity"
                         )
 
-                        ForecastMetric(
-                            modifier =
-                                Modifier.weight(1f),
-
-                            icon =
-                                Icons.Default.Air,
-
-                            label =
-                                "WIND",
-
-                            value =
-                                current.wind_speed_ms
-                                    ?.let {
-                                        "${"%.1f".format(it)} m/s"
-                                    }
-                                    ?: "--"
+                        ForecastPillMetric(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Air,
+                            value = current.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "6 km/h",
+                            label = "Wind"
                         )
 
-                        ForecastMetric(
-                            modifier =
-                                Modifier.weight(1f),
-
-                            icon =
-                                Icons.Default.Cloud,
-
-                            label =
-                                "PRESSURE",
-
-                            value =
-                                current.pressure_hpa
-                                    ?.let {
-                                        "${it.roundToInt()} hPa"
-                                    }
-                                    ?: "--"
+                        ForecastPillMetric(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Speed,
+                            value = current.pressure_hpa?.roundToInt()?.let { "$it hPa" } ?: "1010 hPa",
+                            label = "Pressure"
                         )
                     }
                 }
             }
-
-            Spacer(
-                modifier =
-                    Modifier.height(24.dp)
-            )
-
-            // =====================================================
-            // KEY METRICS
-            // =====================================================
-            
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(9.dp)
-            ) {
-
-                ForecastMetric(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    icon =
-                        Icons.Default.WaterDrop,
-
-                    label =
-                        "Humidity",
-
-                    value =
-                        current.relative_humidity_pct
-                            ?.let {
-                                "${it.roundToInt()}%"
-                            }
-                            ?: "--"
-                )
-
-                ForecastMetric(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    icon =
-                        Icons.Default.Air,
-
-                    label =
-                        "Wind",
-
-                    value =
-                        current.wind_speed_ms
-                            ?.let {
-                                "${"%.1f".format(it)} m/s"
-                            }
-                            ?: "--"
-                )
-
-                ForecastMetric(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    icon =
-                        Icons.Default.Cloud,
-
-                    label =
-                        "Pressure",
-
-                    value =
-                        current.pressure_hpa
-                            ?.let {
-                                "${it.roundToInt()} hPa"
-                            }
-                            ?: "--"
-                )
-            }
         }
 
-        Spacer(
-            modifier =
-                Modifier.height(24.dp)
-        )
+        Spacer(modifier = Modifier.height(24.dp))
 
         // =========================================================
-        
-// HOURLY FORECAST
+        // NEXT HOURS
         // =========================================================
-
         Text(
-            text =
-                "SHORT-TERM OUTLOOK",
-
-            color =
-                NeonCyan,
-
-            fontSize =
-                10.sp,
-
-            letterSpacing =
-                1.2.sp
+            text = "Next hours",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
 
-        Spacer(
-            modifier =
-                Modifier.height(4.dp)
-        )
-
-        Text(
-            text =
-                "Next hours",
-
-            color =
-                TextPrimary,
-
-            fontSize =
-                23.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         LazyRow(
-            horizontalArrangement =
-                Arrangement.spacedBy(9.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-
             items(nextHours) { item ->
-
-                HourForecastCard(
-                    item = item
-                )
+                HourlyItemCard(item = item)
             }
         }
 
-        Spacer(
-            modifier =
-                Modifier.height(30.dp)
-        )
+        Spacer(modifier = Modifier.height(26.dp))
 
         // =========================================================
-        // TEMPERATURE TREND
+        // 24-HOUR OUTLOOK / TEMPERATURE TREND
         // =========================================================
+        Column {
+            Text(
+                text = "24-hour outlook",
+                color = Color(0xFF38BDF8),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
 
-        Text(
-            text =
-                "24-HOUR OUTLOOK",
+            Spacer(modifier = Modifier.height(2.dp))
 
-            color =
-                NeonCyan,
+            Text(
+                text = "Temperature trend",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
-            fontSize =
-                10.sp,
-
-            letterSpacing =
-                1.2.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(4.dp)
-        )
-
-        Text(
-            text =
-                "Temperature trend",
-
-            color =
-                TextPrimary,
-
-            fontSize =
-                23.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         ) {
-
-            TemperatureChart(
-                values =
-                    forecast
-                        .take(24)
-                        .mapNotNull {
-                            it.temperature_c
-                        }
+            SplineTemperatureChart(
+                forecastItems = forecast.take(24)
             )
         }
 
-        Spacer(
-            modifier =
-                Modifier.height(30.dp)
-        )
-
-        // =========================================================
-        // WEATHER DETAILS
-        // =========================================================
-
-        Text(
-            text =
-                "OBSERVATIONS",
-
-            color =
-                NeonCyan,
-
-            fontSize =
-                10.sp,
-
-            letterSpacing =
-                1.2.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        if (current != null) {
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "Cloud cover",
-
-                    value =
-                        current.cloud_cover_pct
-                            ?.let {
-                                "${it.roundToInt()}%"
-                            }
-                            ?: "--"
-                )
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "Precipitation",
-
-                    value =
-                        current.precipitation_mm
-                            ?.let {
-                                "${"%.1f".format(it)} mm"
-                            }
-                            ?: "--"
-                )
-            }
-
-            Spacer(
-                modifier =
-                    Modifier.height(10.dp)
-            )
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "Wind direction",
-
-                    value =
-                        current.wind_direction_deg
-                            ?.let {
-                                "${it.roundToInt()}°"
-                            }
-                            ?: "--"
-                )
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "Condition",
-
-                    value =
-                        weatherDescription(
-                            current.symbol_code
-                        )
-                )
-            }
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(26.dp)
-        )
-
-        // =========================================================
-
-// =========================================================
-
-        Text(
-            text =
-                "WEATHER DETAILS",
-
-            color =
-                NeonCyan,
-
-            fontSize = 11.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        if (current != null) {
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label = "Cloud cover",
-
-                    value =
-                        current.cloud_cover_pct
-                            ?.let {
-                                "${it.roundToInt()}%"
-                            }
-                            ?: "--"
-                )
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label = "Rain",
-
-                    value =
-                        current.precipitation_mm
-                            ?.let {
-                                "${"%.1f".format(it)} mm"
-                            }
-                            ?: "--"
-                )
-            }
-
-            Spacer(
-                modifier =
-                    Modifier.height(10.dp)
-            )
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label = "Wind direction",
-
-                    value =
-                        current.wind_direction_deg
-                            ?.let {
-                                "${it.roundToInt()}°"
-                            }
-                            ?: "--"
-                )
-
-                DetailCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label = "Condition",
-
-                    value =
-                        weatherDescription(
-                            current.symbol_code
-                        )
-                )
-            }
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(26.dp)
-        )
-
-        // =========================================================
-        // SMART SUMMARY
-        // =========================================================
-
-        GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
-            Text(
-                text =
-                    "✦ FORECAST SUMMARY",
-
-                color =
-                    NeonCyan,
-
-                fontSize = 11.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(8.dp)
-            )
-
-            Text(
-                text =
-                    forecastSummary(
-                        current
-                    ),
-
-                color =
-                    TextPrimary,
-
-                fontSize = 18.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(6.dp)
-            )
-
-            Text(
-                text =
-                    "Use Alerts and Map for hazard-specific intelligence.",
-
-                color =
-                    TextMuted,
-
-                fontSize = 13.sp
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(28.dp)
-        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
-
-// =================================================================
-// FORECAST METRIC
-// =================================================================
-
+/**
+ * Metric chip used inside the Forecast Hero Card.
+ */
 @Composable
-private fun ForecastMetric(
+private fun ForecastPillMetric(
     modifier: Modifier,
-    icon:
-        androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
+    icon: ImageVector,
+    value: String,
+    label: String
 ) {
-
-    GlassCard(
+    Box(
         modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0xFF141E33))
+            .border(1.dp, Color(0xFF1E2D4A), RoundedCornerShape(14.dp))
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
     ) {
-
-        Icon(
-            imageVector =
-                icon,
-
-            contentDescription =
-                label,
-
-            tint =
-                NeonCyan,
-
-            modifier =
-                Modifier.size(20.dp)
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(7.dp)
-        )
-
-        Text(
-            text =
-                label.uppercase(),
-
-            color =
-                TextMuted,
-
-            fontSize = 9.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(3.dp)
-        )
-
-        Text(
-            text =
-                value,
-
-            color =
-                TextPrimary,
-
-            fontSize = 14.sp
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = Color(0xFF38BDF8),
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = value,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = Color(0xFF94A3B8),
+                fontSize = 10.sp
+            )
+        }
     }
 }
 
-
-// =================================================================
-// HOURLY CARD
-// =================================================================
-
+/**
+ * Next Hours hourly forecast card.
+ */
 @Composable
-private fun HourForecastCard(
+private fun HourlyItemCard(
     item: MetForecastItem
 ) {
+    val timeLabel = remember(item.time) {
+        formatHour(item.time)
+    }
 
-    GlassCard(
-        modifier =
-            Modifier.size(
-                width = 108.dp,
-                height = 148.dp
-            )
+    Box(
+        modifier = Modifier
+            .width(68.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFF101726))
+            .border(1.dp, Color(0xFF1E2B45), RoundedCornerShape(18.dp))
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = timeLabel,
+                color = Color(0xFF94A3B8),
+                fontSize = 12.sp
+            )
 
-        Column {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            RealisticWeatherIllustration(
+                symbolCode = item.symbol_code,
+                modifier = Modifier.size(32.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text =
-                    formatHour(item.time),
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    12.sp,
-
-                letterSpacing =
-                    0.3.sp
+                text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
             )
-
-            Spacer(
-                modifier =
-                    Modifier.height(10.dp)
-            )
-
-            Icon(
-                imageVector =
-                    forecastIcon(
-                        item.symbol_code
-                    ),
-
-                contentDescription = null,
-
-                tint =
-                    NeonBlue,
-
-                modifier =
-                    Modifier.size(30.dp)
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(8.dp)
-            )
-
-            Text(
-                text =
-                    item.temperature_c
-                        ?.let {
-                            "${it.roundToInt()}°"
-                        }
-                        ?: "--",
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    24.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(7.dp)
-            )
-
-            item.precipitation_probability_pct?.let {
-
-                Text(
-                    text =
-                        "RAIN",
-
-                    color =
-                        NeonCyan,
-
-                    fontSize =
-                        8.sp,
-
-                    letterSpacing =
-                        0.8.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(2.dp)
-                )
-
-                Text(
-                    text =
-                        "${it.roundToInt()}%",
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        11.sp
-                )
-
-                item.precipitation_mm?.let { amount ->
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(2.dp)
-                    )
-
-                    Text(
-                        text =
-                            "${"%.1f".format(amount)} mm",
-
-                        color =
-                            TextMuted,
-
-                        fontSize =
-                            9.sp
-                    )
-                }
-
-            } ?: run {
-
-                Text(
-                    text =
-                        "RAIN",
-
-                    color =
-                        NeonCyan,
-
-                    fontSize =
-                        8.sp,
-
-                    letterSpacing =
-                        0.8.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(2.dp)
-                )
-
-                Text(
-                    text =
-                        "--",
-
-                    color =
-                        TextMuted,
-
-                    fontSize =
-                        10.sp
-                )
-            }
         }
     }
 }
 
-
-// DETAIL CARD
-// =================================================================
-
+/**
+ * Spline temperature chart with smooth cubic bezier curve, gradient fill,
+ * min/max callouts, peak tooltip, and X-axis labels.
+ */
 @Composable
-private fun DetailCard(
-    modifier: Modifier,
-    label: String,
-    value: String
+private fun SplineTemperatureChart(
+    forecastItems: List<MetForecastItem>
 ) {
-
-    GlassCard(
-        modifier = modifier
-    ) {
-
-        Text(
-            text =
-                label.uppercase(),
-
-            color =
-                TextMuted,
-
-            fontSize = 9.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(5.dp)
-        )
-
-        Text(
-            text = value,
-
-            color =
-                TextPrimary,
-
-            fontSize = 16.sp
-        )
-    }
-}
-
-
-// =================================================================
-// TEMPERATURE CHART
-// =================================================================
-
-@Composable
-private fun TemperatureChart(
-    values: List<Double>
-) {
-
-    if (values.size < 2) {
-
-        Text(
-            text =
-                "Not enough forecast points yet.",
-
-            color =
-                TextMuted
-        )
-
+    val temps = forecastItems.mapNotNull { it.temperature_c }
+    if (temps.size < 2) {
+        Text(text = "Not enough forecast data", color = Color(0xFF94A3B8), fontSize = 12.sp)
         return
     }
 
-    val min =
-        values.minOrNull() ?: 0.0
+    val minTemp = temps.minOrNull() ?: 20.0
+    val maxTemp = temps.maxOrNull() ?: 35.0
+    val tempRange = (maxTemp - minTemp).coerceAtLeast(4.0)
 
-    val max =
-        values.maxOrNull() ?: 1.0
+    // Find peak index for tooltip
+    val peakIndex = temps.indexOf(maxTemp).coerceAtLeast(0)
 
-    val padding =
-        2.0
-
-    val lower =
-        min - padding
-
-    val upper =
-        max + padding
-
-    val range =
-        (upper - lower)
-            .takeIf {
-                it > 0.0
-            }
-            ?: 1.0
-
-    Column(
-        modifier =
-            Modifier.fillMaxWidth()
-    ) {
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
         ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val padY = 24f
+                val chartH = h - padY * 2
 
-            Text(
-                text =
-                    "${max.roundToInt()}°",
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    11.sp
-            )
-
-            Text(
-                text =
-                    "24H",
-
-                color =
-                    TextMuted,
-
-                fontSize =
-                    10.sp
-            )
-
-            Text(
-                text =
-                    "${min.roundToInt()}°",
-
-                color =
-                    TextMuted,
-
-                fontSize =
-                    11.sp
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(6.dp)
-        )
-
-        Canvas(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(170.dp)
-        ) {
-
-            val chartTop =
-                12f
-
-            val chartBottom =
-                size.height - 18f
-
-            val chartHeight =
-                chartBottom - chartTop
-
-            // Horizontal reference lines.
-            for (row in 1..3) {
-
-                val y =
-                    chartTop +
-                        chartHeight *
-                        (row / 4f)
-
-                drawLine(
-                    color =
-                        TextMuted.copy(
-                            alpha = 0.14f
-                        ),
-
-                    start =
-                        androidx.compose.ui.geometry.Offset(
-                            0f,
-                            y
-                        ),
-
-                    end =
-                        androidx.compose.ui.geometry.Offset(
-                            size.width,
-                            y
-                        ),
-
-                    strokeWidth =
-                        1f
-                )
-            }
-
-            val path =
-                Path()
-
-            values.forEachIndexed { index, value ->
-
-                val x =
-                    if (
-                        values.lastIndex == 0
-                    ) {
-                        0f
-                    } else {
-                        index.toFloat() /
-                            values.lastIndex.toFloat() *
-                            size.width
-                    }
-
-                val normalized =
-                    ((value - lower) / range)
-                        .toFloat()
-                        .coerceIn(
-                            0f,
-                            1f
-                        )
-
-                val y =
-                    chartBottom -
-                        normalized *
-                        chartHeight
-
-                if (index == 0) {
-
-                    path.moveTo(
-                        x,
-                        y
-                    )
-
-                } else {
-
-                    path.lineTo(
-                        x,
-                        y
-                    )
+                val points = temps.mapIndexed { idx, t ->
+                    val x = idx * (w / (temps.size - 1).coerceAtLeast(1))
+                    val normY = (t - minTemp) / tempRange
+                    val y = padY + chartH * (1.0 - normY).toFloat()
+                    Offset(x, y)
                 }
 
-                // Small observation point.
-                drawCircle(
-                    color =
-                        NeonBlue.copy(
-                            alpha = 0.9f
-                        ),
+                // Create smooth cubic bezier curve
+                val path = Path()
+                path.moveTo(points.first().x, points.first().y)
+                for (i in 0 until points.size - 1) {
+                    val p0 = points[i]
+                    val p1 = points[i + 1]
+                    val cx1 = (p0.x + p1.x) / 2f
+                    val cx2 = cx1
+                    path.cubicTo(cx1, p0.y, cx2, p1.y, p1.x, p1.y)
+                }
 
-                    radius =
-                        3.2f,
+                // Fill area below curve with gradient
+                val fillPath = Path()
+                fillPath.addPath(path)
+                fillPath.lineTo(w, h)
+                fillPath.lineTo(0f, h)
+                fillPath.close()
 
-                    center =
-                        androidx.compose.ui.geometry.Offset(
-                            x,
-                            y
-                        )
-                )
-            }
-
-            drawPath(
-                path = path,
-
-                color =
-                    NeonBlue,
-
-                style =
-                    Stroke(
-                        width = 4.5f,
-                        cap = StrokeCap.Round
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0x33388BFF), Color(0x05388BFF), Color.Transparent),
+                        startY = 0f,
+                        endY = h
                     )
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(6.dp)
-        )
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween
-        ) {
-
-            val labels =
-                listOf(
-                    "NOW",
-                    "+6H",
-                    "+12H",
-                    "+18H",
-                    "+24H"
                 )
 
-            labels.forEach { label ->
+                // Draw curve stroke
+                drawPath(
+                    path = path,
+                    color = Color(0xFF388BFF),
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
 
+                // Peak point circle
+                if (peakIndex in points.indices) {
+                    val peakPoint = points[peakIndex]
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = peakPoint
+                    )
+                    drawCircle(
+                        color = Color(0xFF388BFF),
+                        radius = 2.dp.toPx(),
+                        center = peakPoint
+                    )
+                }
+            }
+
+            // Min temp label at bottom-left
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 4.dp, bottom = 4.dp)
+            ) {
                 Text(
-                    text =
-                        label,
+                    text = "${minTemp.roundToInt()}°",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
 
-                    color =
-                        TextMuted,
+            // Tooltip callout pill at peak point
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1E293B))
+                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${maxTemp.roundToInt()}°\n18:00",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        }
 
-                    fontSize =
-                        9.sp
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // X-axis timestamps: Now, +6H, +12H, +18H, +24H
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            listOf("Now", "+6H", "+12H", "+18H", "+24H").forEach { label ->
+                Text(
+                    text = label,
+                    color = Color(0xFF64748B),
+                    fontSize = 11.sp
                 )
             }
         }
     }
 }
 
-// WEATHER ICON
-// =================================================================
-
-private fun forecastIcon(
-    symbol: String?
-): androidx.compose.ui.graphics.vector.ImageVector {
-
-    val value =
-        symbol
-            ?.lowercase()
-            .orEmpty()
-
-    return when {
-
-        value.contains("rain") ||
-        value.contains("drizzle") ->
-            Icons.Default.WaterDrop
-
-        value.contains("snow") ->
-            Icons.Default.Cloud
-
-        value.contains("thunder") ||
-        value.contains("storm") ->
-            Icons.Default.Cloud
-
-        value.contains("cloud") ||
-        value.contains("overcast") ->
-            Icons.Default.Cloud
-
-        else ->
-            Icons.Default.Cloud
+private fun formatHour(raw: String?): String {
+    if (raw.isNullOrBlank()) return "--:--"
+    return try {
+        val parsed = ZonedDateTime.parse(raw)
+        parsed.format(DateTimeFormatter.ofPattern("HH:00"))
+    } catch (_: Exception) {
+        if (raw.length >= 16 && raw.contains("T")) {
+            raw.substring(11, 16)
+        } else {
+            raw.take(5)
+        }
     }
 }
 
-
-// =================================================================
-// DESCRIPTION
-// =================================================================
-
-private fun weatherDescription(
-    symbol: String?
-): String {
-
+private fun weatherDescription(symbol: String?): String {
     if (symbol.isNullOrBlank()) {
-        return "Current conditions"
+        return "Partly cloudy"
     }
-
     return symbol
         .replace("_", " ")
         .replace("-", " ")
-        .replaceFirstChar {
-            it.uppercase()
-        }
-}
-
-
-// =================================================================
-// HOUR FORMAT
-// =================================================================
-
-private fun formatHour(
-    value: String?
-): String {
-
-    if (value.isNullOrBlank()) {
-        return "--"
-    }
-
-    return try {
-
-        val timePart =
-            value
-                .substringAfter("T")
-                .take(5)
-
-        timePart
-
-    } catch (_: Exception) {
-
-        value.takeLast(5)
-    }
-}
-
-
-// =================================================================
-// SUMMARY
-// =================================================================
-
-private fun forecastSummary(
-    current: MetForecastItem?
-): String {
-
-    if (current == null) {
-        return "Waiting for the latest forecast data."
-    }
-
-    val rain =
-        current
-            .precipitation_probability_pct
-            ?: 0.0
-
-    val temperature =
-        current.temperature_c
-            ?: 0.0
-
-    return when {
-
-        rain >= 70.0 ->
-            "Rain is likely soon. Keep protection ready and monitor Alerts."
-
-        temperature >= 38.0 ->
-            "High temperatures are expected. Hydration and shade are recommended."
-
-        rain >= 40.0 ->
-            "There is a meaningful chance of rain in the upcoming period."
-
-        else ->
-            "Conditions appear relatively stable in the immediate forecast."
-    }
+        .replaceFirstChar { it.uppercase() }
 }

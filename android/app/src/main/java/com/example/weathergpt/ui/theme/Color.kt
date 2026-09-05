@@ -8,42 +8,42 @@ import androidx.compose.ui.graphics.Color
 
 /* Background */
 val BackgroundDark =
-    Color(0xFF050914)
+    Color(0xFF080C14)
 
 val BackgroundDeep =
-    Color(0xFF02050C)
+    Color(0xFF05080E)
 
 val BackgroundElevated =
-    Color(0xFF0A1020)
+    Color(0xFF0D1424)
 
 /* Surfaces */
 val SurfaceDark =
-    Color(0xFF10182A)
+    Color(0xFF101726)
 
 val SurfaceElevated =
-    Color(0xFF141E33)
+    Color(0xFF151E32)
 
 val SurfaceGlass =
-    Color(0x661A2740)
+    Color(0xFF121A2C)
 
 val SurfaceGlassStrong =
-    Color(0xCC111C31)
+    Color(0xF0101726)
 
 /* Primary AI colors */
 val NeonBlue =
-    Color(0xFF5CA9FF)
+    Color(0xFF388BFF)
 
 val ElectricBlue =
-    Color(0xFF3D8BFF)
+    Color(0xFF2563EB)
 
 val NeonCyan =
-    Color(0xFF49E7FF)
+    Color(0xFF38BDF8)
 
 val AIViolet =
-    Color(0xFF8B5CFF)
+    Color(0xFF7C3AED)
 
 val NeonPurple =
-    Color(0xFFB15CFF)
+    Color(0xFF8B5CF6)
 
 /*
  * Backward-compatible names used by existing screens.

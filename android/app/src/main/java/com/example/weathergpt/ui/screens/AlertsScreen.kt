@@ -1,7 +1,10 @@
 package com.example.weathergpt.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,858 +23,316 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weathergpt.ui.components.GlassCard
-import com.example.weathergpt.ui.components.IntelligenceBadge
-import com.example.weathergpt.ui.theme.NeonBlue
-import com.example.weathergpt.ui.theme.NeonCyan
-import com.example.weathergpt.ui.theme.RiskOrange
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
 
 @Composable
 fun AlertsScreen(
     onOpenDams: () -> Unit
 ) {
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(
-                    rememberScrollState()
-                )
-                .padding(
-                    horizontal = 18.dp,
-                    vertical = 12.dp
-                )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF080C14))
     ) {
-
-        // =========================================================
-        // HEADER
-        // =========================================================
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-
-            Column {
-
-                Text(
-                    text = "ALERTS",
-                    color = NeonCyan,
-                    fontSize = 11.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(3.dp)
-                )
-
-                Text(
-                    text = "Weather safety center",
-                    color = TextPrimary,
-                    fontSize = 25.sp
-                )
-
-                Text(
-                    text =
-                        "Live warning intelligence",
-                    color = TextMuted,
-                    fontSize = 12.sp
-                )
-            }
-
-            IconButton(
-                onClick = {}
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.Refresh,
-
-                    contentDescription =
-                        "Refresh alerts",
-
-                    tint =
-                        NeonBlue
-                )
-            }
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(16.dp)
-        )
-
-        // =========================================================
-        // STATUS
-        // =========================================================
-
-        GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
-            Column {
-
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.SpaceBetween,
-
-                    verticalAlignment =
-                        Alignment.Top
-                ) {
-
-                    Row(
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
-
-                        androidx.compose.foundation.layout.Box(
-                            modifier =
-                                Modifier
-                                    .size(12.dp)
-                                    .background(
-                                        SuccessGreen,
-                                        androidx.compose.foundation.shape.CircleShape
-                                    )
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.size(10.dp)
-                        )
-
-                        Column {
-
-                            Text(
-                                text =
-                                    "MONITORING ACTIVE",
-
-                                color =
-                                    SuccessGreen,
-
-                                fontSize =
-                                    9.sp,
-
-                                letterSpacing =
-                                    1.0.sp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(4.dp)
-                            )
-
-                            Text(
-                                text =
-                                    "Warning network online",
-
-                                color =
-                                    TextPrimary,
-
-                                fontSize =
-                                    19.sp
-                            )
-                        }
-                    }
-
-                    IntelligenceBadge(
-                        text =
-                            "LIVE"
-                    )
-                }
-
-                Spacer(
-                    modifier =
-                        Modifier.height(16.dp)
-                )
-
-                Text(
-                    text =
-                        "No critical warning detected",
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        15.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(4.dp)
-                )
-
-                Text(
-                    text =
-                        "WeatherGPT is monitoring official warning signals.",
-
-                    color =
-                        TextMuted,
-
-                    fontSize =
-                        12.sp,
-
-                    lineHeight =
-                        18.sp
-                )
-            }
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(25.dp)
-        )
-
-        // =========================================================
-
-// PRIORITY
-        // =========================================================
-
-        SectionTitle(
-            eyebrow =
-                "PRIORITY",
-
-            title =
-                "What needs attention",
-
-            subtitle =
-                "Warnings are ranked by potential user impact."
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        AlertCard(
-            icon =
-                Icons.Default.WaterDrop,
-
-            title =
-                "Heavy rain watch",
-
-            severity =
-                "MODERATE",
-
-            explanation =
-                "Periods of heavy rainfall may affect travel and low-lying areas.",
-
-            action =
-                "Keep rain protection ready.",
-
-            accent =
-                RiskOrange
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        AlertCard(
-            icon =
-                Icons.Default.Warning,
-
-            title =
-                "Flood intelligence",
-
-            severity =
-                "MONITOR",
-
-            explanation =
-                "Water-related risk should be checked using the live flood module.",
-
-            action =
-                "Review flood conditions and nearby infrastructure.",
-
-            accent =
-                NeonBlue
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        AlertCard(
-            icon =
-                Icons.Default.Cloud,
-
-            title =
-                "Weather conditions",
-
-            severity =
-                "NORMAL",
-
-            explanation =
-                "No major severe-weather signal is currently displayed.",
-
-            action =
-                "Continue monitoring live conditions.",
-
-            accent =
-                SuccessGreen
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(25.dp)
-        )
-
-        // =========================================================
-        // DECISION SUPPORT
-        // =========================================================
-
-        SectionTitle(
-            eyebrow =
-                "DECISION SUPPORT",
-
-            title =
-                "What should you do?",
-
-            subtitle =
-                "Warnings become useful when paired with actions."
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
-            ActionRow(
-                number = "01",
-                title = "Monitor",
-                description =
-                    "Check the latest forecast before outdoor travel."
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
-
-            ActionRow(
-                number = "02",
-                title = "Prepare",
-                description =
-                    "Keep rain protection and emergency essentials ready."
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
-
-            ActionRow(
-                number = "03",
-                title = "Verify",
-                description =
-                    "Use official warning sources for critical decisions."
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(25.dp)
-        )
-
-        // =========================================================
-        // INFRASTRUCTURE
-        // =========================================================
-
-        SectionTitle(
-            eyebrow =
-                "INFRASTRUCTURE",
-
-            title =
-                "Nearby water systems",
-
-            subtitle =
-                "Access reservoir intelligence when rainfall risk rises."
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(10.dp)
-        )
-
-        GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
+            // =========================================================
+            // HEADER
+            // =========================================================
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-                Column(
-                    modifier =
-                        Modifier.weight(1f)
-                ) {
-
+                Column {
                     Text(
-                        text =
-                            "Reservoir monitoring",
-
-                        color =
-                            TextPrimary,
-
-                        fontSize = 17.sp
+                        text = "Weather safety center",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(
-                        modifier =
-                            Modifier.height(4.dp)
-                    )
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
-                        text =
-                            "Check dam levels, storage and regional conditions.",
-
-                        color =
-                            TextMuted,
-
+                        text = "Live warning intelligence",
+                        color = Color(0xFF94A3B8),
                         fontSize = 12.sp
                     )
                 }
 
-                Button(
-                    onClick =
-                        onOpenDams
+                IconButton(
+                    onClick = {},
+                    modifier = Modifier.size(36.dp)
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh alerts",
+                        tint = Color(0xFF388BFF),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // =========================================================
+            // OVERALL STATUS CARD
+            // =========================================================
+            GlassCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF22C55E))
+                            )
+
+                            Spacer(modifier = Modifier.width(7.dp))
+
+                            Text(
+                                text = "Monitoring active",
+                                color = Color(0xFF22C55E),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        // LIVE capsule badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFF132036))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF22C55E))
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "LIVE",
+                                    color = Color(0xFF22C55E),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "View dams"
+                        text = "Warning network online",
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "No critical warning detected",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "WeatherGPT is monitoring official warning signals.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // =========================================================
+            // WHAT NEEDS ATTENTION
+            // =========================================================
+            Column {
+                Text(
+                    text = "What needs attention",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = "Warnings are ranked by potential user impact.",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Alert 1: Moderate (Amber)
+            MockupAlertCard(
+                icon = Icons.Default.WaterDrop,
+                title = "Heavy rain watch",
+                severity = "MODERATE",
+                explanation = "Periods of heavy rainfall may affect travel and low-lying areas.",
+                action = "Keep rain protection ready.",
+                accentColor = Color(0xFFF59E0B)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Alert 2: Monitor (Blue) - Clicking opens dams/flood module
+            MockupAlertCard(
+                icon = Icons.Default.Warning,
+                title = "Flood intelligence",
+                severity = "MONITOR",
+                explanation = "Water-related risk should be checked using the live flood module.",
+                action = "Review flood conditions and nearby infrastructure.",
+                accentColor = Color(0xFF388BFF),
+                onClick = onOpenDams
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Alert 3: Normal (Green)
+            MockupAlertCard(
+                icon = Icons.Default.Cloud,
+                title = "Weather conditions",
+                severity = "NORMAL",
+                explanation = "No major severe-weather signal is currently displayed.",
+                action = "Continue monitoring live conditions.",
+                accentColor = Color(0xFF22C55E)
+            )
+
+            Spacer(modifier = Modifier.height(26.dp))
         }
-
-        Spacer(
-            modifier =
-                Modifier.height(25.dp)
-        )
-
-        // =========================================================
-        // SOURCES
-        // =========================================================
-
-        GlassCard(
-            modifier =
-                Modifier.fillMaxWidth()
-        ) {
-
-            Text(
-                text =
-                    "DATA SOURCES",
-
-                color =
-                    NeonCyan,
-
-                fontSize = 10.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(8.dp)
-            )
-
-            Text(
-                text =
-                    "Official weather data • warning feeds • WeatherGPT intelligence",
-
-                color =
-                    TextSecondary,
-
-                fontSize = 13.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(5.dp)
-            )
-
-            Text(
-                text =
-                    "Always verify critical warnings through the relevant official authority.",
-
-                color =
-                    TextMuted,
-
-                fontSize = 11.sp
-            )
-        }
-
-        Spacer(
-            modifier =
-                Modifier.height(28.dp)
-        )
     }
 }
 
-
-// =================================================================
-// SECTION TITLE
-// =================================================================
-
+/**
+ * Alert card matching Screen 5 (Alerts) in the reference mockup.
+ */
 @Composable
-private fun SectionTitle(
-    eyebrow: String,
+private fun MockupAlertCard(
+    icon: ImageVector,
     title: String,
-    subtitle: String
-) {
-
-    Column {
-
-        Text(
-            text =
-                eyebrow,
-
-            color =
-                NeonCyan,
-
-            fontSize = 10.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(3.dp)
-        )
-
-        Text(
-            text =
-                title,
-
-            color =
-                TextPrimary,
-
-            fontSize = 21.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(3.dp)
-        )
-
-        Text(
-            text =
-                subtitle,
-
-            color =
-                TextMuted,
-
-            fontSize = 12.sp
-        )
-    }
-}
-
-
-// =================================================================
-// ALERT CARD
-// =================================================================
-
-@Composable
-private fun AlertCard(
-    icon:
-        androidx.compose.ui.graphics.vector.ImageVector,
-
-    title: String,
-
     severity: String,
-
     explanation: String,
-
     action: String,
-
-    accent: Color
+    accentColor: Color,
+    onClick: (() -> Unit)? = null
 ) {
-
     GlassCard(
-        modifier =
-            Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
     ) {
-
         Column {
-
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.Top
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-                Row(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    verticalAlignment =
-                        Alignment.Top
-                ) {
-
-                    androidx.compose.foundation.layout.Box(
-                        modifier =
-                            Modifier
-                                .size(42.dp)
-                                .background(
-                                    accent.copy(
-                                        alpha = 0.12f
-                                    ),
-
-                                    RoundedCornerShape(
-                                        13.dp
-                                    )
-                                ),
-
-                        contentAlignment =
-                            Alignment.Center
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(accentColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
                     ) {
-
                         Icon(
-                            imageVector =
-                                icon,
-
-                            contentDescription =
-                                title,
-
-                            tint =
-                                accent,
-
-                            modifier =
-                                Modifier.size(22.dp)
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = accentColor,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
-                    Spacer(
-                        modifier =
-                            Modifier.size(11.dp)
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
+                }
 
-                    Column {
-
-                        Text(
-                            text =
-                                title,
-
-                            color =
-                                TextPrimary,
-
-                            fontSize =
-                                17.sp
-                        )
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(4.dp)
-                        )
-
-                        Text(
-                            text =
-                                severity,
-
-                            color =
-                                accent,
-
-                            fontSize =
-                                9.sp,
-
-                            letterSpacing =
-                                1.0.sp
-                        )
-                    }
+                // Severity pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = severity,
+                        color = accentColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text =
-                    explanation,
-
-                color =
-                    TextSecondary,
-
-                fontSize =
-                    13.sp,
-
-                lineHeight =
-                    19.sp
+                text = explanation,
+                color = Color(0xFFCBD5E1),
+                fontSize = 12.sp,
+                lineHeight = 17.sp
             )
 
-            Spacer(
-                modifier =
-                    Modifier.height(13.dp)
-            )
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text =
-                        "ACTION",
-
-                    color =
-                        TextMuted,
-
-                    fontSize =
-                        8.sp,
-
-                    letterSpacing =
-                        0.8.sp
+                    text = "ACTION",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
                 )
 
-                Spacer(
-                    modifier =
-                        Modifier.size(7.dp)
-                )
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
-                    text =
-                        action,
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        12.sp,
-
-                    modifier =
-                        Modifier.weight(1f)
+                    text = action,
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 11.sp
                 )
             }
         }
     }
-}
-
-
-// ACTION ROW
-// =================================================================
-
-@Composable
-private fun ActionRow(
-    number: String,
-    title: String,
-    description: String
-) {
-
-    Row(
-        verticalAlignment =
-            Alignment.Top
-    ) {
-
-        Text(
-            text =
-                number,
-
-            color =
-                NeonBlue,
-
-            fontSize = 11.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.size(12.dp)
-        )
-
-        Column {
-
-            Text(
-                text =
-                    title,
-
-                color =
-                    TextPrimary,
-
-                fontSize = 15.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(2.dp)
-            )
-
-            Text(
-                text =
-                    description,
-
-                color =
-                    TextMuted,
-
-                fontSize = 12.sp
-            )
-        }
-    }
-}
-
-
-// =================================================================
-// STATUS DOT
-// =================================================================
-
-@Composable
-private fun StatusDot(
-    color: Color
-) {
-
-    Spacer(
-        modifier =
-            Modifier
-                .size(10.dp)
-                .then(
-                    Modifier
-                )
-                .background(
-                    color,
-                    androidx.compose.foundation.shape.CircleShape
-                )
-    )
 }

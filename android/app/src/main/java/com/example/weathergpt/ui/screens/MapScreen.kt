@@ -16,12 +16,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.FilterChip
@@ -29,6 +38,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import com.example.weathergpt.ui.components.GlassCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -567,62 +578,59 @@ fun MapScreen() {
         // =========================================================
 
         Surface(
-
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(
                         horizontal = 14.dp,
-                        vertical = 12.dp
+                        vertical = 10.dp
                     ),
-
             shape =
                 RoundedCornerShape(18.dp),
-
             color =
-                Color.White.copy(
-                    alpha = 0.96f
+                Color(0xEE101726),
+            border =
+                androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Color(0xFF1E2B45)
                 )
         ) {
-
             Row(
                 modifier =
                     Modifier.padding(
                         horizontal = 14.dp,
-                        vertical = 11.dp
+                        vertical = 10.dp
                     ),
-
                 horizontalArrangement =
                     Arrangement.SpaceBetween,
-
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
-
                 Column(
                     modifier =
                         Modifier.weight(1f)
                 ) {
-
                     Text(
                         text =
-                            "SMART MAP",
-
+                            "Smart map",
                         color =
-                            Color(0xFF087F8C),
-
-                        fontSize = 10.sp
+                            Color(0xFF38BDF8),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
+
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
                         text =
                             "Weather intelligence",
-
                         color =
-                            Color(0xFF17212B),
-
-                        fontSize = 18.sp
+                            Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold
                     )
+
+                    Spacer(modifier = Modifier.height(1.dp))
 
                     Text(
                         text =
@@ -631,32 +639,29 @@ fun MapScreen() {
                             } else {
                                 "OpenStreetMap • Live data"
                             },
-
                         color =
-                            Color(0xFF71808F),
-
+                            Color(0xFF94A3B8),
                         fontSize = 11.sp
                     )
                 }
 
-                IconButton(
-                    onClick = {
-
-                        mapView?.controller?.animateTo(
-                            defaultLocation
-                        )
-                    }
+                Box(
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF388BFF), Color(0xFF2563EB))
+                                )
+                            ),
+                    contentAlignment = Alignment.Center
                 ) {
-
                     Icon(
-                        imageVector =
-                            Icons.Default.Cloud,
-
-                        contentDescription =
-                            "Center map",
-
-                        tint =
-                            Color(0xFF137CBD)
+                        imageVector = Icons.Default.Cloud,
+                        contentDescription = "Center map",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -666,92 +671,58 @@ fun MapScreen() {
         // LAYERS
         // =========================================================
 
-        Surface(
-
+        Row(
             modifier =
                 Modifier
                     .align(
                         Alignment.TopCenter
                     )
                     .padding(
-                        top = 108.dp,
-                        start = 12.dp,
-                        end = 12.dp
+                        top = 96.dp,
+                        start = 10.dp,
+                        end = 10.dp
+                    )
+                    .horizontalScroll(
+                        rememberScrollState()
                     ),
-
-            shape =
-                RoundedCornerShape(16.dp),
-
-            color =
-                Color.White.copy(
-                    alpha = 0.94f
-                )
+            horizontalArrangement =
+                Arrangement.spacedBy(6.dp)
         ) {
+            LayerChip(
+                "Weather",
+                selectedLayer,
+                onClick = { selectedLayer = "Weather" }
+            )
 
-            Row(
+            LayerChip(
+                "Rain",
+                selectedLayer,
+                onClick = { selectedLayer = "Rain" }
+            )
 
-                modifier =
-                    Modifier
-                        .horizontalScroll(
-                            rememberScrollState()
-                        )
-                        .padding(
-                            horizontal = 8.dp,
-                            vertical = 7.dp
-                        ),
+            LayerChip(
+                "Flood",
+                selectedLayer,
+                onClick = { selectedLayer = "Flood" }
+            )
 
-                horizontalArrangement =
-                    Arrangement.spacedBy(6.dp)
-            ) {
+            LayerChip(
+                "Alerts",
+                selectedLayer,
+                onClick = { selectedLayer = "Alerts" }
+            )
 
-                LayerChip(
-                    "Weather",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Weather"
-                    }
-                )
+            LayerChip(
+                "Dams",
+                selectedLayer,
+                onClick = { selectedLayer = "Dams" }
+            )
 
-                LayerChip(
-                    "Rain",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Rain"
-                    }
-                )
-
-                LayerChip(
-                    "Flood",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Flood"
-                    }
-                )
-
-                LayerChip(
-                    "Alerts",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Alerts"
-                    }
-                )
-
-                LayerChip(
-                    "Dams",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Dams"
-                    }
-                )
-
-                LayerChip(
-                    "Quakes",
-                    selectedLayer,
-                    onClick = {
-                        selectedLayer = "Quakes"
-                    }
-                )
-            }
+            LayerChip(
+                "Quake",
+                if (selectedLayer == "Quakes") "Quake" else selectedLayer,
+                onClick = { selectedLayer = "Quakes" }
+            )
         }
 
         // =========================================================
@@ -979,283 +950,208 @@ fun MapScreen() {
         }
 
         // =========================================================
-        // SELECTED LAYER
+        // RIGHT-SIDE FLOATING ACTION CONTROLS
         // =========================================================
 
         Surface(
-
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.BottomStart
-                    )
-                    .padding(
-                        start = 14.dp,
-                        bottom = 16.dp
-                    ),
-
-            shape =
-                RoundedCornerShape(18.dp),
-
-            color =
-                Color.White.copy(
-                    alpha = 0.96f
-                )
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 14.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xEE101726),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E2B45))
         ) {
-
-            Row(
-                modifier =
-                    Modifier.padding(
-                        horizontal = 14.dp,
-                        vertical = 11.dp
-                    ),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                IconButton(
+                    onClick = {
+                        val layers = listOf("Weather", "Rain", "Flood", "Alerts", "Dams", "Quakes")
+                        val nextIdx = (layers.indexOf(selectedLayer) + 1) % layers.size
+                        selectedLayer = layers[nextIdx]
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Layers,
+                        contentDescription = "Layers",
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
 
-                LayerIcon(
-                    selectedLayer
+                IconButton(
+                    onClick = {
+                        mapView?.controller?.animateTo(defaultLocation)
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "My Location",
+                        tint = Color(0xFFCBD5E1),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(1.dp)
+                        .background(Color(0xFF1E2B45))
                 )
 
-                Column(
-                    modifier =
-                        Modifier.padding(
-                            start = 9.dp
-                        )
+                IconButton(
+                    onClick = { mapView?.controller?.zoomIn() },
+                    modifier = Modifier.size(36.dp)
                 ) {
-
-                    Text(
-                        text =
-                            selectedLayer.uppercase(),
-
-                        color =
-                            Color(0xFF087F8C),
-
-                        fontSize = 9.sp
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Zoom In",
+                        tint = Color.White,
+                        modifier = Modifier.size(19.dp)
                     )
+                }
 
-                    Text(
-                        text =
-                            when (selectedLayer) {
-
-                                "Dams" ->
-                                    if (dams.isEmpty()) {
-                                        "No dam data loaded"
-                                    } else {
-                                        "${dams.size} reservoirs"
-                                    }
-
-                                "Quakes" ->
-                                    if (earthquakes.isEmpty()) {
-                                        "No earthquake data loaded"
-                                    } else {
-                                        "${earthquakes.size} earthquakes"
-                                    }
-
-                                "Alerts" ->
-                                    if (alerts.isEmpty()) {
-                                        "No mapped alerts"
-                                    } else {
-                                        "${alerts.size} active warnings"
-                                    }
-
-                                "Flood" ->
-                                    floodData?.risk
-                                        ?: "Flood-risk zones"
-
-                                "Rain" ->
-                                    "Live radar precipitation"
-
-                                else ->
-                                    "Current weather"
-                            },
-
-                        color =
-                            Color(0xFF17212B),
-
-                        fontSize =
-                            12.sp
+                IconButton(
+                    onClick = { mapView?.controller?.zoomOut() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Zoom Out",
+                        tint = Color.White,
+                        modifier = Modifier.size(19.dp)
                     )
                 }
             }
         }
 
         // =========================================================
-        // ANALYZE THIS AREA
+        // BOTTOM FLOATING CARD
         // =========================================================
 
-        Surface(
-
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.BottomCenter
-                    )
-                    .padding(
-                        bottom = 18.dp
-                    ),
-
-            shape =
-                RoundedCornerShape(24.dp),
-
-            color =
-                Color(0xFF137CBD)
+        GlassCard(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 14.dp, end = 14.dp, bottom = 12.dp)
+                .fillMaxWidth()
         ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF142036)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = null,
+                            tint = Color(0xFF38BDF8),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
 
-            androidx.compose.material3.Button(
-                onClick = {
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                    val center =
-                        selectedMapPoint
-                            ?: mapView
-                                ?.mapCenter
-                                ?.let {
-                                    GeoPoint(
-                                        it.latitude,
-                                        it.longitude
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Current weather in this area",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 11.sp
+                        )
+
+                        Text(
+                            text = areaAnalysis?.placeName ?: "Minsk, Belarus >",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            val center = selectedMapPoint
+                                ?: mapView?.mapCenter?.let { GeoPoint(it.latitude, it.longitude) }
+                                ?: defaultLocation
+
+                            analyzingArea = true
+                            areaAnalysis = null
+
+                            kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+                                areaAnalysis = try {
+                                    analyzeArea(
+                                        latitude = center.latitude,
+                                        longitude = center.longitude
+                                    )
+                                } catch (_: Exception) {
+                                    AreaAnalysis(
+                                        latitude = center.latitude,
+                                        longitude = center.longitude,
+                                        placeName = "Selected area",
+                                        temperature = null,
+                                        rainfallProbability = null,
+                                        floodRisk = null,
+                                        overallRisk = "UNAVAILABLE",
+                                        recommendation = "Unable to load live weather intelligence."
                                     )
                                 }
-                            ?: defaultLocation
-
-                    analyzingArea = true
-                    areaAnalysis = null
-
-                    kotlinx.coroutines.CoroutineScope(
-                        Dispatchers.Main
-                    ).launch {
-
-                        areaAnalysis =
-                            try {
-
-                                analyzeArea(
-                                    latitude =
-                                        center.latitude,
-
-                                    longitude =
-                                        center.longitude
-                                )
-
-                            } catch (_: Exception) {
-
-                                AreaAnalysis(
-                                    latitude =
-                                        center.latitude,
-
-                                    longitude =
-                                        center.longitude,
-
-                                    placeName =
-                                        "Selected area",
-
-                                    temperature =
-                                        null,
-
-                                    rainfallProbability =
-                                        null,
-
-                                    floodRisk =
-                                        null,
-
-                                    overallRisk =
-                                        "UNAVAILABLE",
-
-                                    recommendation =
-                                        "Unable to load live weather intelligence. " +
-                                        "Check your internet connection and try again."
-                                )
+                                analyzingArea = false
                             }
-
-                        analyzingArea = false
-                    }
-                },
-
-                colors =
-                    androidx.compose.material3.ButtonDefaults
-                        .buttonColors(
-                            containerColor =
-                                Color.Transparent
-                        ),
-
-                contentPadding =
-                    androidx.compose.foundation.layout
-                        .PaddingValues(
-                            horizontal = 20.dp,
-                            vertical = 10.dp
-                        )
-            ) {
-
-                Text(
-                    text =
-                        if (analyzingArea) {
-                            "Analyzing..."
-                        } else {
-                            "✦  Analyze This Area"
                         },
-
-                    color =
-                        Color.White,
-
-                    fontSize = 13.sp
-                )
-            }
-        }
-
-        // =========================================================
-        // REFRESH
-        // =========================================================
-
-        Surface(
-
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.BottomEnd
-                    )
-                    .padding(
-                        end = 14.dp,
-                        bottom = 16.dp
-                    ),
-
-            shape =
-                CircleShape,
-
-            color =
-                Color.White.copy(
-                    alpha = 0.96f
-                )
-        ) {
-
-            IconButton(
-                onClick = {
-
-                    if (
-                        selectedLayer == "Dams" ||
-                        selectedLayer == "Quakes" ||
-                        selectedLayer == "Alerts"
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp),
+                        shape = RoundedCornerShape(23.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF388BFF)
+                        )
                     ) {
+                        Text(
+                            text = if (analyzingArea) "Analyzing Area..." else "Analyze This Area",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
 
-                        loadingLayer =
-                            true
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                        mapView?.let {
-                            clearDataMarkers(it)
-                        }
-
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF142036))
+                            .border(1.dp, Color(0xFF1E2D4A), CircleShape)
+                            .clickable {
+                                if (selectedLayer == "Dams" || selectedLayer == "Quakes" || selectedLayer == "Alerts") {
+                                    loadingLayer = true
+                                    mapView?.let { clearDataMarkers(it) }
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color(0xFF388BFF),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Default.Refresh,
-
-                    contentDescription =
-                        "Refresh map",
-
-                    tint =
-                        Color(0xFF137CBD)
-                )
             }
         }
     }
@@ -1377,32 +1273,37 @@ private fun AreaMetric(
 }
 
 
-// =================================================================
-// LAYER CHIP
-// =================================================================
-
 @Composable
 private fun LayerChip(
     text: String,
     selectedLayer: String,
     onClick: () -> Unit
 ) {
-
-    FilterChip(
-        selected =
-            selectedLayer == text,
-
-        onClick =
-            onClick,
-
-        label = {
-
-            Text(
-                text = text,
-                fontSize = 11.sp
+    val selected = selectedLayer == text
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (selected) Color(0xFF388BFF)
+                else Color(0xDD101726)
             )
-        }
-    )
+            .border(
+                1.dp,
+                if (selected) Color(0xFF388BFF)
+                else Color(0xFF1E2B45),
+                RoundedCornerShape(50)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = if (selected) Color.White else Color(0xFF94A3B8),
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
 }
 
 

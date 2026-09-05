@@ -74,6 +74,7 @@ class VoiceAssistantManager(private val context: Context) {
     }
 
     fun startListening(
+        languageCode: String? = null,
         onResult: (String) -> Unit,
         onError: (String) -> Unit = {}
     ) {
@@ -140,9 +141,41 @@ class VoiceAssistantManager(private val context: Context) {
                 })
             }
 
+            val speechLocale = when {
+                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
+                    Locale.getDefault()
+                languageCode.contains("-") ->
+                    Locale.forLanguageTag(languageCode)
+                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) ->
+                    Locale("or", "IN")
+                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) ->
+                    Locale("hi", "IN")
+                languageCode.equals("Telugu", ignoreCase = true) ->
+                    Locale("te", "IN")
+                languageCode.equals("Tamil", ignoreCase = true) ->
+                    Locale("ta", "IN")
+                languageCode.equals("Kannada", ignoreCase = true) ->
+                    Locale("kn", "IN")
+                languageCode.equals("Bengali", ignoreCase = true) ->
+                    Locale("bn", "IN")
+                languageCode.equals("Marathi", ignoreCase = true) ->
+                    Locale("mr", "IN")
+                languageCode.equals("Gujarati", ignoreCase = true) ->
+                    Locale("gu", "IN")
+                languageCode.equals("Malayalam", ignoreCase = true) ->
+                    Locale("ml", "IN")
+                languageCode.equals("Punjabi", ignoreCase = true) ->
+                    Locale("pa", "IN")
+                languageCode.equals("English", ignoreCase = true) ->
+                    Locale.ENGLISH
+                else ->
+                    Locale.forLanguageTag(languageCode)
+            }
+
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLocale.toLanguageTag())
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLocale.toLanguageTag())
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             }
@@ -178,6 +211,8 @@ class VoiceAssistantManager(private val context: Context) {
                     Locale.getDefault()
                 languageCode.contains("-") ->
                     Locale.forLanguageTag(languageCode)
+                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) ->
+                    Locale("or", "IN")
                 languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) ->
                     Locale("hi", "IN")
                 languageCode.equals("Telugu", ignoreCase = true) ->

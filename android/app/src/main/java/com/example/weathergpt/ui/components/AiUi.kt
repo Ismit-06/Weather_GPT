@@ -96,39 +96,153 @@ fun GlassCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-
     Box(
         modifier =
             modifier
                 .background(
-                    brush =
-                        Brush.verticalGradient(
-                            listOf(
-                                SurfaceGlass,
-                                SurfaceDark.copy(
-                                    alpha = 0.94f
-                                )
-                            )
-                        ),
-                    shape =
-                        RoundedCornerShape(22.dp)
+                    color = Color(0xFF101726).copy(alpha = 0.96f),
+                    shape = RoundedCornerShape(22.dp)
                 )
                 .border(
                     width = 1.dp,
-                    brush =
-                        Brush.linearGradient(
-                            listOf(
-                                NeonBlue.copy(0.30f),
-                                Color.Transparent,
-                                AIViolet.copy(0.25f)
-                            )
-                        ),
-                    shape =
-                        RoundedCornerShape(22.dp)
+                    color = Color(0xFF1E2B45),
+                    shape = RoundedCornerShape(22.dp)
                 )
                 .padding(18.dp)
     ) {
         content()
+    }
+}
+
+/**
+ * 3D-styled realistic weather illustration using Compose Canvas.
+ * Accurately renders glossy 3D clouds, sun, crescent moon, and raindrops
+ * without depending on external raster assets.
+ */
+@Composable
+fun RealisticWeatherIllustration(
+    symbolCode: String?,
+    modifier: Modifier = Modifier.size(100.dp)
+) {
+    val code = symbolCode?.lowercase() ?: "clearsky_day"
+    val isNight = code.contains("night") || code.contains("polar")
+    val isRain = code.contains("rain") || code.contains("drizzle")
+    val isSnow = code.contains("snow") || code.contains("sleet")
+    val isThunder = code.contains("thunder")
+    val isCloudy = code.contains("cloud") || code.contains("fog") || code.contains("overcast")
+
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        // 1. Draw Sun or Crescent Moon in background if applicable
+        if (isNight) {
+            // Golden crescent moon
+            val moonCenter = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.32f)
+            val moonRadius = w * 0.26f
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFFF7A0), Color(0xFFFFD13B), Color(0xFFF59E0B)),
+                    center = moonCenter,
+                    radius = moonRadius
+                ),
+                radius = moonRadius,
+                center = moonCenter
+            )
+            // Cut out inner circle with dark sky color to form a clean crescent
+            drawCircle(
+                color = Color(0xFF101726),
+                radius = moonRadius * 0.82f,
+                center = androidx.compose.ui.geometry.Offset(moonCenter.x - moonRadius * 0.38f, moonCenter.y - moonRadius * 0.28f)
+            )
+        } else if (!isCloudy || code.contains("fair") || code.contains("partly")) {
+            // Radiant Golden 3D Sun
+            val sunCenter = androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.30f)
+            val sunRadius = w * 0.24f
+
+            // Outer sun glow
+            drawCircle(
+                color = Color(0x33FBBF24),
+                radius = sunRadius * 1.55f,
+                center = sunCenter
+            )
+            // Inner glowing 3D sun sphere
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFFFFFBEB), Color(0xFFFDE047), Color(0xFFF59E0B)),
+                    center = androidx.compose.ui.geometry.Offset(sunCenter.x - sunRadius * 0.3f, sunCenter.y - sunRadius * 0.3f),
+                    radius = sunRadius
+                ),
+                radius = sunRadius,
+                center = sunCenter
+            )
+        }
+
+        // 2. Front 3D Fluffy Cloud (rendered with soft dimensional spheres and base)
+        val cloudBaseY = h * 0.58f
+        val cloudColorTop = Color(0xFFFFFFFF)
+        val cloudColorMid = Color(0xFFE2E8F0)
+        val cloudColorBottom = Color(0xFF94A3B8)
+
+        val cloudBrush = Brush.verticalGradient(
+            colors = listOf(cloudColorTop, cloudColorMid, cloudColorBottom),
+            startY = h * 0.25f,
+            endY = h * 0.85f
+        )
+
+        // Main cloud lobes
+        // Base rounded pill
+        drawRoundRect(
+            brush = cloudBrush,
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.15f, cloudBaseY),
+            size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.26f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.13f, h * 0.13f)
+        )
+        // Center-left big puff
+        drawCircle(
+            brush = cloudBrush,
+            radius = w * 0.22f,
+            center = androidx.compose.ui.geometry.Offset(w * 0.46f, h * 0.50f)
+        )
+        // Center-right secondary puff
+        drawCircle(
+            brush = cloudBrush,
+            radius = w * 0.17f,
+            center = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.56f)
+        )
+        // Left small puff
+        drawCircle(
+            brush = cloudBrush,
+            radius = w * 0.15f,
+            center = androidx.compose.ui.geometry.Offset(w * 0.28f, h * 0.62f)
+        )
+
+        // Soft cloud rim highlight
+        drawCircle(
+            color = Color(0x66FFFFFF),
+            radius = w * 0.18f,
+            center = androidx.compose.ui.geometry.Offset(w * 0.44f, h * 0.46f)
+        )
+
+        // 3. Raindrops / Thunder / Snow if applicable
+        if (isRain) {
+            val dropColor = Color(0xFF38BDF8)
+            val dropPositions = listOf(
+                androidx.compose.ui.geometry.Offset(w * 0.32f, h * 0.86f),
+                androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.90f),
+                androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.86f)
+            )
+            for (p in dropPositions) {
+                drawLine(
+                    color = dropColor,
+                    start = p,
+                    end = androidx.compose.ui.geometry.Offset(p.x - w * 0.05f, p.y + h * 0.10f),
+                    strokeWidth = w * 0.04f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            }
+        }
     }
 }
 

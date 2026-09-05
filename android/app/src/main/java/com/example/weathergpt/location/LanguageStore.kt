@@ -24,10 +24,11 @@ object LanguageStore {
         "Auto"
 
     val SUPPORTED_LANGUAGES = listOf(
-        AppLanguage("Auto", "Auto Detect", "स्वचालित", "en-IN"),
+        AppLanguage("Auto", "Auto Detect", "ସ୍ୱଚାଳିତ", "en-IN"),
         AppLanguage("English", "English", "English", "en-IN"),
         AppLanguage("Hindi", "Hindi", "हिन्दी", "hi-IN"),
         AppLanguage("Hinglish", "Hinglish", "Hinglish (Roman)", "hi-IN"),
+        AppLanguage("Odia", "Odia", "ଓଡ଼ିଆ", "or-IN"),
         AppLanguage("Telugu", "Telugu", "తెలుగు", "te-IN"),
         AppLanguage("Tamil", "Tamil", "தமிழ்", "ta-IN"),
         AppLanguage("Kannada", "Kannada", "ಕನ್ನಡ", "kn-IN"),

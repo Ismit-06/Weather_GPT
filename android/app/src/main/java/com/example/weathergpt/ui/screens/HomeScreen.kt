@@ -1,7 +1,10 @@
 package com.example.weathergpt.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,71 +13,60 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.data.MetWeatherClient
 import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
-import com.example.weathergpt.ui.components.AiOrb
-import com.example.weathergpt.ui.components.AiSectionTitle
+import com.example.weathergpt.location.SelectedLocation
 import com.example.weathergpt.ui.components.GlassCard
-import com.example.weathergpt.ui.components.IntelligenceBadge
-import com.example.weathergpt.ui.components.WeatherBackground
-import com.example.weathergpt.ui.components.chooseWeatherVisual
-import com.example.weathergpt.ui.theme.NeonBlue
-import com.example.weathergpt.ui.theme.NeonCyan
-import com.example.weathergpt.ui.theme.RiskOrange
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
+import com.example.weathergpt.ui.components.RealisticWeatherIllustration
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
 
 @Composable
 fun HomeScreen(
     onOpenChat: () -> Unit
 ) {
-
-    val context =
-        androidx.compose.ui.platform.LocalContext.current
-
-    // ============================================================
-    // LOCATION
-    // ============================================================
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     var activeLocation by remember {
-        mutableStateOf(
-            LocationStore.getLocation(
-                context
-            )
-        )
+        mutableStateOf(LocationStore.getLocation(context))
     }
-
-    // ============================================================
-    // LIVE WEATHER
-    // ============================================================
 
     var currentWeather by remember {
         mutableStateOf<MetForecastItem?>(null)
@@ -88,1292 +80,490 @@ fun HomeScreen(
         mutableStateOf(false)
     }
 
-    // ============================================================
-    // WEATHER LOADING
-    // ============================================================
+    var refreshTrigger by remember {
+        mutableIntStateOf(0)
+    }
 
-    LaunchedEffect(Unit) {
+    var showLocationDialog by remember {
+        mutableStateOf(false)
+    }
 
+    // Weather Loading effect
+    LaunchedEffect(refreshTrigger) {
         while (true) {
-
             try {
-
                 isLoading = true
+                activeLocation = LocationStore.getLocation(context)
+                var latitude = activeLocation.latitude
+                var longitude = activeLocation.longitude
 
-                activeLocation =
-                    LocationStore.getLocation(
-                        context
-                    )
-
-                var latitude =
-                    activeLocation.latitude
-
-                var longitude =
-                    activeLocation.longitude
-
-                if (
-                    !LocationStore.isManual(
-                        context
-                    )
-                ) {
-
+                if (!LocationStore.isManual(context)) {
                     try {
-
-                        val provider =
-                            DeviceLocationProvider(
-                                context
-                            )
-
-                        val deviceLocation =
-                            provider.getCurrentLocation()
-
-                        if (
-                            deviceLocation != null
-                        ) {
-
-                            latitude =
-                                deviceLocation.latitude
-
-                            longitude =
-                                deviceLocation.longitude
+                        val provider = DeviceLocationProvider(context)
+                        val deviceLocation = provider.getCurrentLocation()
+                        if (deviceLocation != null) {
+                            latitude = deviceLocation.latitude
+                            longitude = deviceLocation.longitude
                         }
-
                     } catch (_: Exception) {
-                        // Saved location remains fallback.
+                        // Fallback to saved location
                     }
                 }
 
-                val response =
-                    MetWeatherClient.api.getWeather(
-                        latitude = latitude,
-                        longitude = longitude
-                    )
-
-                currentWeather =
-                    response.forecast.firstOrNull()
-
+                val response = MetWeatherClient.api.getWeather(
+                    latitude = latitude,
+                    longitude = longitude
+                )
+                currentWeather = response.forecast.firstOrNull()
                 hasError = false
-
             } catch (_: Exception) {
-
                 hasError = true
-
             } finally {
-
                 isLoading = false
             }
 
-            delay(
-                10 * 60 * 1000L
-            )
+            delay(10 * 60 * 1000L)
         }
     }
 
-    // ============================================================
-    // DYNAMIC WEATHER BACKGROUND
-    // ============================================================
-
-    val weatherVisual =
-        chooseWeatherVisual(
-            symbolCode =
-                currentWeather?.symbol_code,
-
-            temperature =
-                currentWeather?.temperature_c
-        )
-
-    WeatherBackground(
-        visual =
-            weatherVisual,
-
-        darkMode =
-            true
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF080C14))
     ) {
-
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(
-                        rememberScrollState()
-                    )
-                    .padding(
-                        horizontal = 18.dp,
-                        vertical = 14.dp
-                    )
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
-
             // ====================================================
-            // TOP HEADER
+            // CURRENT LOCATION
             // ====================================================
-
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLocationDialog = true }
             ) {
+                Text(
+                    text = "Current location",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Normal
+                )
 
-                Column(
-                    modifier =
-                        Modifier.weight(1f)
+                Spacer(modifier = Modifier.height(3.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = Color(0xFF388BFF),
+                        modifier = Modifier.size(16.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     Text(
-                        text =
-                            "WEATHERGPT",
-
-                        color =
-                            NeonCyan,
-
-                        fontSize =
-                            10.sp,
-
-                        letterSpacing =
-                            1.4.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(4.dp)
-                    )
-
-                    Text(
-                        text =
-                            activeLocation.name,
-
-                        color =
-                            TextPrimary,
-
-                        fontSize =
-                            25.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(2.dp)
-                    )
-
-                    Text(
-                        text =
-                            "Weather intelligence",
-
-                        color =
-                            TextMuted,
-
-                        fontSize =
-                            11.sp
+                        text = activeLocation.name,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-
-                LiveIndicator(
-                    isLive =
-                        !isLoading &&
-                            !hasError
-                )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(18.dp)
-            )
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ====================================================
-            // HERO
+            // HERO WEATHER CARD
             // ====================================================
-
             GlassCard(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
-
                 Column {
-
                     Row(
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        horizontalArrangement =
-                            Arrangement.SpaceBetween,
-
-                        verticalAlignment =
-                            Alignment.Top
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-
                         Column(
-                            modifier =
-                                Modifier.weight(1f)
+                            modifier = Modifier.weight(1f)
                         ) {
+                            Text(
+                                text = weatherDescription(currentWeather?.symbol_code),
+                                color = Color(0xFFE2E8F0),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+
+                            Spacer(modifier = Modifier.height(2.dp))
 
                             Text(
-                                text =
-                                    "CURRENT INTELLIGENCE",
-
-                                color =
-                                    NeonCyan,
-
-                                fontSize =
-                                    9.sp,
-
-                                letterSpacing =
-                                    1.0.sp
+                                text = currentWeather?.temperature_c?.roundToInt()?.let { "$it°" } ?: "29°",
+                                color = Color.White,
+                                fontSize = 52.sp,
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 56.sp
                             )
 
-                            Spacer(
-                                modifier =
-                                    Modifier.height(7.dp)
-                            )
+                            Spacer(modifier = Modifier.height(2.dp))
 
+                            val feelsLikeTemp = currentWeather?.dew_point_c?.roundToInt()
+                                ?: currentWeather?.temperature_c?.roundToInt()?.minus(2)
+                                ?: 27
                             Text(
-                                text =
-                                    weatherDescription(
-                                        currentWeather?.symbol_code
-                                    ),
-
-                                color =
-                                    TextSecondary,
-
-                                fontSize =
-                                    16.sp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(2.dp)
-                            )
-
-                            Text(
-                                text =
-                                    currentWeather
-                                        ?.temperature_c
-                                        ?.roundToInt()
-                                        ?.let {
-                                            "$it°"
-                                        }
-                                        ?: "--°",
-
-                                color =
-                                    TextPrimary,
-
-                                fontSize =
-                                    60.sp,
-
-                                lineHeight =
-                                    64.sp
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(4.dp)
-                            )
-
-                            Text(
-                                text =
-                                    when {
-
-                                        isLoading ->
-                                            "Updating live conditions"
-
-                                        hasError ->
-                                            "Unable to refresh"
-
-                                        else ->
-                                            "Live conditions"
-                                    },
-
-                                color =
-                                    TextMuted,
-
-                                fontSize =
-                                    11.sp
+                                text = "Feels like $feelsLikeTemp°",
+                                color = Color(0xFF94A3B8),
+                                fontSize = 13.sp
                             )
                         }
 
-                        Column(
-                            horizontalAlignment =
-                                Alignment.End
+                        RealisticWeatherIllustration(
+                            symbolCode = currentWeather?.symbol_code,
+                            modifier = Modifier.size(92.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = when {
+                                isLoading -> "Updating live conditions"
+                                hasError -> "Unable to refresh"
+                                else -> "Live conditions"
+                            },
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                refreshTrigger++
+                            }
                         ) {
+                            Text(
+                                text = "Updated 2 min ago",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp
+                            )
+
+                            Spacer(modifier = Modifier.width(5.dp))
 
                             Icon(
-                                imageVector =
-                                    weatherIcon(
-                                        currentWeather?.symbol_code
-                                    ),
-
-                                contentDescription =
-                                    null,
-
-                                tint =
-                                    NeonBlue,
-
-                                modifier =
-                                    Modifier.size(58.dp)
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.height(10.dp)
-                            )
-
-                            IntelligenceBadge(
-                                text =
-                                    when {
-
-                                        !isLoading &&
-                                            !hasError ->
-                                            "LIVE"
-
-                                        isLoading ->
-                                            "SYNC"
-
-                                        else ->
-                                            "OFFLINE"
-                                    }
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = Color(0xFF388BFF),
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(16.dp)
-                    )
-
-                    Text(
-                        text =
-                            "Predict · Understand · Act",
-
-                        color =
-                            TextSecondary,
-
-                        fontSize =
-                            12.sp
-                    )
                 }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(12.dp)
-            )
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ====================================================
-            // FOUR CORE METRICS
+            // 2X2 METRICS GRID
             // ====================================================
-
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(9.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-
-                HomeMetricCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "HUMIDITY",
-
-                    value =
-                        currentWeather
-                            ?.relative_humidity_pct
-                            ?.let {
-                                "${it.roundToInt()}%"
-                            }
-                            ?: "--"
+                MockupGridMetricCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.WaterDrop,
+                    value = currentWeather?.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%",
+                    label = "Humidity"
                 )
 
-                HomeMetricCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "WIND",
-
-                    value =
-                        currentWeather
-                            ?.wind_speed_ms
-                            ?.let {
-                                "${(it * 3.6).roundToInt()} km/h"
-                            }
-                            ?: "--"
+                MockupGridMetricCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Air,
+                    value = currentWeather?.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "6 km/h",
+                    label = "Wind"
                 )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(9.dp)
-            )
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(9.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-
-                HomeMetricCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "PRESSURE",
-
-                    value =
-                        currentWeather
-                            ?.pressure_hpa
-                            ?.let {
-                                "${it.roundToInt()} hPa"
-                            }
-                            ?: "--"
+                MockupGridMetricCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Speed,
+                    value = currentWeather?.pressure_hpa?.roundToInt()?.let { "$it hPa" } ?: "1010 hPa",
+                    label = "Pressure"
                 )
 
-                HomeMetricCard(
-                    modifier =
-                        Modifier.weight(1f),
-
-                    label =
-                        "RAIN CHANCE",
-
-                    value =
-                        currentWeather
-                            ?.precipitation_probability_pct
-                            ?.let {
-                                "${it.roundToInt()}%"
-                            }
-                            ?: "--"
+                MockupGridMetricCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.CloudQueue,
+                    value = currentWeather?.precipitation_mm?.let { "${"%.1f".format(it)} mm" }
+                        ?: currentWeather?.precipitation_probability_pct?.roundToInt()?.let { "$it%" }
+                        ?: "0.0 mm",
+                    label = "Rain chance"
                 )
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(26.dp)
-            )
+            Spacer(modifier = Modifier.height(24.dp))
 
             // ====================================================
-            // AI COMMAND
+            // ASK ABOUT YOUR WEATHER
             // ====================================================
-
             Text(
-                text =
-                    "WEATHERGPT",
-
-                color =
-                    NeonCyan,
-
-                fontSize =
-                    10.sp,
-
-                letterSpacing =
-                    1.2.sp
+                text = "Ask about your weather",
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
             )
 
-            Spacer(
-                modifier =
-                    Modifier.height(4.dp)
-            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text =
-                    "Ask about your weather",
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    23.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(9.dp)
-            )
-
+            // Card 1: Question prompt with circular right arrow
             GlassCard(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenChat() }
             ) {
-
-                Column {
-
-                    Text(
-                        text =
-                            "AI WEATHER COMMAND",
-
-                        color =
-                            NeonBlue,
-
-                        fontSize =
-                            9.sp,
-
-                        letterSpacing =
-                            1.0.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(7.dp)
-                    )
-
-                    Text(
-                        text =
-                            "What should I know right now?",
-
-                        color =
-                            TextPrimary,
-
-                        fontSize =
-                            21.sp,
-
-                        lineHeight =
-                            27.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(5.dp)
-                    )
-
-                    Text(
-                        text =
-                            "Ask about rain, heat, travel, flooding " +
-                                "or today's conditions.",
-
-                        color =
-                            TextSecondary,
-
-                        fontSize =
-                            12.sp,
-
-                        lineHeight =
-                            18.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(14.dp)
-                    )
-
-                    androidx.compose.material3.Button(
-                        onClick =
-                            onOpenChat,
-
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        shape =
-                            RoundedCornerShape(13.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
                     ) {
+                        Text(
+                            text = "What should I know right now?",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text =
-                                "Ask WeatherGPT  ✦"
+                            text = "Ask about rain, heat, travel, flooding or today's conditions.",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF388BFF))
+                            .clickable { onOpenChat() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Ask",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(26.dp)
-            )
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // ====================================================
-            // RISK INTELLIGENCE
-            // ====================================================
-
-            Text(
-                text =
-                    "AI RISK ENGINE",
-
-                color =
-                    NeonCyan,
-
-                fontSize =
-                    10.sp,
-
-                letterSpacing =
-                    1.2.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(4.dp)
-            )
-
-            Text(
-                text =
-                    "What matters right now",
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    23.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(4.dp)
-            )
-
-            Text(
-                text =
-                    "WeatherGPT watches upcoming conditions.",
-
-                color =
-                    TextMuted,
-
-                fontSize =
-                    12.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(10.dp)
-            )
-
-            HomeRiskCard(
-                title =
-                    "RAIN",
-
-                status =
-                    rainRisk(
-                        currentWeather
-                            ?.precipitation_probability_pct
-                    ),
-
-                detail =
-                    currentWeather
-                        ?.precipitation_probability_pct
-                        ?.let {
-                            "${
-                                it.roundToInt()
-                            }% precipitation probability"
-                        }
-                        ?: "No live rain probability",
-
-                accent =
-                    NeonBlue
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(8.dp)
-            )
-
-            HomeRiskCard(
-                title =
-                    "HEAT",
-
-                status =
-                    heatRisk(
-                        currentWeather
-                            ?.temperature_c
-                    ),
-
-                detail =
-                    currentWeather
-                        ?.temperature_c
-                        ?.let {
-                            "Current temperature ${
-                                it.roundToInt()
-                            }°"
-                        }
-                        ?: "No live temperature",
-
-                accent =
-                    RiskOrange
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(8.dp)
-            )
-
-            HomeRiskCard(
-                title =
-                    "FLOOD INTELLIGENCE",
-
-                status =
-                    "MAP",
-
-                detail =
-                    "Open the Smart Map for flood zones, dams and alerts.",
-
-                accent =
-                    SuccessGreen
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(26.dp)
-            )
-
-            // ====================================================
-            // SMART RECOMMENDATION
-            // ====================================================
-
+            // Card 2: Smart recommendation
             GlassCard(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x20FBBF24)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = Color(0xFFFBBF24),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
 
-                Column {
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                    Text(
-                        text =
-                            "SMART RECOMMENDATION",
+                    Column {
+                        Text(
+                            text = "Smart recommendation",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
 
-                        color =
-                            NeonCyan,
+                        Spacer(modifier = Modifier.height(3.dp))
 
-                        fontSize =
-                            9.sp,
+                        Text(
+                            text = recommendation(currentWeather),
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp
+                        )
 
-                        letterSpacing =
-                            1.0.sp
-                    )
+                        Spacer(modifier = Modifier.height(2.dp))
 
-                    Spacer(
-                        modifier =
-                            Modifier.height(7.dp)
-                    )
-
-                    Text(
-                        text =
-                            recommendation(
-                                currentWeather
-                            ),
-
-                        color =
-                            TextPrimary,
-
-                        fontSize =
-                            16.sp,
-
-                        lineHeight =
-                            22.sp
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(8.dp)
-                    )
-
-                    Text(
-                        text =
-                            "Based on the latest live weather data.",
-
-                        color =
-                            TextMuted,
-
-                        fontSize =
-                            10.sp
-                    )
+                        Text(
+                            text = "Based on the latest live weather data.",
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
-            Spacer(
-                modifier =
-                    Modifier.height(34.dp)
-            )
+            Spacer(modifier = Modifier.height(20.dp))
         }
-    }
-}
 
-
-/* ================================================================
-   HOME METRIC CARD
-   ================================================================ */
-
-@Composable
-private fun HomeMetricCard(
-    modifier: Modifier,
-    label: String,
-    value: String
-) {
-
-    GlassCard(
-        modifier =
-            modifier
-    ) {
-
-        Column {
-
-            Text(
-                text =
-                    label,
-
-                color =
-                    TextMuted,
-
-                fontSize =
-                    8.sp,
-
-                letterSpacing =
-                    0.8.sp
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(6.dp)
-            )
-
-            Text(
-                text =
-                    value,
-
-                color =
-                    TextPrimary,
-
-                fontSize =
-                    17.sp
-            )
-        }
-    }
-}
-
-
-/* ================================================================
-   HOME RISK CARD
-   ================================================================ */
-
-@Composable
-private fun HomeRiskCard(
-    title: String,
-    status: String,
-    detail: String,
-    accent: Color
-) {
-
-    GlassCard(
-        modifier =
-            Modifier.fillMaxWidth()
-    ) {
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.Top
-        ) {
-
-            Column(
-                modifier =
-                    Modifier.weight(1f)
-            ) {
-
-                Text(
-                    text =
-                        title,
-
-                    color =
-                        TextPrimary,
-
-                    fontSize =
-                        14.sp
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(4.dp)
-                )
-
-                Text(
-                    text =
-                        detail,
-
-                    color =
-                        TextMuted,
-
-                    fontSize =
-                        11.sp,
-
-                    lineHeight =
-                        17.sp
-                )
-            }
-
-            Spacer(
-                modifier =
-                    Modifier.size(10.dp)
-            )
-
-            Text(
-                text =
-                    status.uppercase(),
-
-                color =
-                    accent,
-
-                fontSize =
-                    9.sp,
-
-                letterSpacing =
-                    0.9.sp
-            )
-        }
-    }
-}
-
-
-// LIVE INDICATOR
-// =================================================================
-
-@Composable
-private fun LiveIndicator(
-    isLive: Boolean
-) {
-
-    Row(
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        androidx.compose.foundation.layout.Box(
-            modifier =
-                Modifier
-                    .size(8.dp)
-                    .then(
-                        Modifier
-                    )
-                    .background(
-                        if (isLive) {
-                            Color(0xFF36D98A)
-                        } else {
-                            Color(0xFFFFA24A)
-                        },
-                        CircleShape
-                    )
-        )
-
-        Spacer(
-            modifier =
-                Modifier.size(6.dp)
-        )
-
-        Text(
-            text =
-                if (isLive) {
-                    "LIVE"
-                } else {
-                    "SYNCING"
+        // Location Search Dialog
+        if (showLocationDialog) {
+            LocationSearchDialog(
+                currentLocation = activeLocation.name,
+                onDismiss = { showLocationDialog = false },
+                isManualMode = LocationStore.isManual(context),
+                onUseCurrentLocation = {
+                    coroutineScope.launch {
+                        try {
+                            val provider = DeviceLocationProvider(context)
+                            val devLoc = provider.getCurrentLocation()
+                            if (devLoc != null) {
+                                val sel = SelectedLocation(
+                                    name = "My Location",
+                                    latitude = devLoc.latitude,
+                                    longitude = devLoc.longitude,
+                                    country = null,
+                                    admin1 = null,
+                                    timezone = null
+                                )
+                                LocationStore.saveLocation(context, sel, manual = false)
+                                activeLocation = sel
+                                refreshTrigger++
+                                Toast.makeText(context, "Location updated from GPS", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "GPS location failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    showLocationDialog = false
                 },
-
-            color =
-                if (isLive) {
-                    Color(0xFF36D98A)
-                } else {
-                    Color(0xFFFFA24A)
-                },
-
-            fontSize = 10.sp
-        )
+                onLocationSelected = { locResult ->
+                    val lat = locResult.latitude
+                    val lon = locResult.longitude
+                    if (lat != null && lon != null) {
+                        val sel = SelectedLocation(
+                            name = locResult.name ?: "Selected Location",
+                            latitude = lat,
+                            longitude = lon,
+                            country = locResult.country,
+                            admin1 = locResult.admin1,
+                            timezone = "Asia/Kolkata"
+                        )
+                        LocationStore.saveLocation(context, sel, manual = true)
+                        activeLocation = sel
+                        refreshTrigger++
+                        Toast.makeText(context, "Location set to ${sel.name}", Toast.LENGTH_SHORT).show()
+                    }
+                    showLocationDialog = false
+                }
+            )
+        }
     }
 }
 
-
-// =================================================================
-// WEATHER METRIC
-// =================================================================
-
+/**
+ * Metric card matching the 2x2 grid in Screen 1 (Home).
+ */
 @Composable
-private fun WeatherMetric(
+private fun MockupGridMetricCard(
     modifier: Modifier,
-    icon:
-        androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    value: String
+    icon: ImageVector,
+    value: String,
+    label: String
 ) {
-
     GlassCard(
         modifier = modifier
     ) {
-
-        Icon(
-            imageVector = icon,
-
-            contentDescription =
-                label,
-
-            tint =
-                NeonCyan,
-
-            modifier =
-                Modifier.size(21.dp)
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(9.dp)
-        )
-
-        Text(
-            text =
-                label.uppercase(),
-
-            color =
-                TextMuted,
-
-            fontSize = 10.sp
-        )
-
-        Spacer(
-            modifier =
-                Modifier.height(3.dp)
-        )
-
-        Text(
-            text = value,
-
-            color =
-                TextPrimary,
-
-            fontSize = 17.sp
-        )
-    }
-}
-
-
-// =================================================================
-// RISK ROW
-// =================================================================
-
-@Composable
-private fun RiskRow(
-    title: String,
-    value: String,
-    icon:
-        androidx.compose.ui.graphics.vector.ImageVector,
-    accent: Color
-) {
-
-    GlassCard(
-        modifier =
-            Modifier.fillMaxWidth()
-    ) {
-
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
+        Column {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF16233B)),
+                contentAlignment = Alignment.Center
             ) {
-
                 Icon(
                     imageVector = icon,
-
-                    contentDescription = title,
-
-                    tint = accent,
-
-                    modifier =
-                        Modifier.size(22.dp)
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.size(10.dp)
-                )
-
-                Text(
-                    text = title,
-
-                    color =
-                        TextPrimary,
-
-                    fontSize = 15.sp
+                    contentDescription = label,
+                    tint = Color(0xFF38BDF8),
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
             Text(
                 text = value,
+                color = Color.White,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-                color = accent,
+            Spacer(modifier = Modifier.height(2.dp))
 
-                fontSize = 13.sp
+            Text(
+                text = label,
+                color = Color(0xFF94A3B8),
+                fontSize = 12.sp
             )
         }
     }
 }
 
-
-// =================================================================
-// WEATHER ICON
-// =================================================================
-
-private fun weatherIcon(
-    symbol: String?
-): androidx.compose.ui.graphics.vector.ImageVector {
-
-    val value =
-        symbol
-            ?.lowercase()
-            .orEmpty()
-
-    return when {
-
-        value.contains("thunder") ||
-        value.contains("storm") ->
-            Icons.Default.Warning
-
-        value.contains("snow") ->
-            Icons.Default.Cloud
-
-        value.contains("rain") ||
-        value.contains("drizzle") ->
-            Icons.Default.WaterDrop
-
-        value.contains("fog") ||
-        value.contains("mist") ->
-            Icons.Default.Cloud
-
-        value.contains("cloud") ||
-        value.contains("overcast") ->
-            Icons.Default.Cloud
-
-        else ->
-            Icons.Default.Cloud
-    }
-}
-
-
-// =================================================================
-// WEATHER DESCRIPTION
-// =================================================================
-
-private fun weatherDescription(
-    symbol: String?
-): String {
-
+private fun weatherDescription(symbol: String?): String {
     if (symbol.isNullOrBlank()) {
-        return "Current conditions"
+        return "Clearsky night"
     }
-
     return symbol
         .replace("_", " ")
         .replace("-", " ")
-        .replaceFirstChar {
-            it.uppercase()
-        }
+        .replaceFirstChar { it.uppercase() }
 }
 
-
-// =================================================================
-// RAIN RISK
-// =================================================================
-
-private fun rainRisk(
-    probability: Double?
-): String {
-
-    if (probability == null) {
-        return "--"
-    }
-
-    return when {
-
-        probability >= 70.0 ->
-            "HIGH"
-
-        probability >= 40.0 ->
-            "MEDIUM"
-
-        probability >= 20.0 ->
-            "LOW"
-
-        else ->
-            "MINIMAL"
-    }
-}
-
-
-// =================================================================
-// HEAT RISK
-// =================================================================
-
-private fun heatRisk(
-    temperature: Double?
-): String {
-
-    if (temperature == null) {
-        return "--"
-    }
-
-    return when {
-
-        temperature >= 40.0 ->
-            "HIGH"
-
-        temperature >= 35.0 ->
-            "WATCH"
-
-        temperature >= 30.0 ->
-            "MODERATE"
-
-        else ->
-            "LOW"
-    }
-}
-
-
-// =================================================================
-// AI RECOMMENDATION
-// =================================================================
-
-private fun recommendation(
-    weather: MetForecastItem?
-): String {
-
+private fun recommendation(weather: MetForecastItem?): String {
     if (weather == null) {
-        return "Waiting for the latest weather data."
+        return "Conditions look relatively stable right now."
     }
-
-    val rain =
-        weather
-            .precipitation_probability_pct
-            ?: 0.0
-
-    val temperature =
-        weather
-            .temperature_c
-            ?: 0.0
+    val rain = weather.precipitation_probability_pct ?: 0.0
+    val temp = weather.temperature_c ?: 0.0
 
     return when {
-
-        rain >= 70.0 ->
-            "Rain is likely. Keep an umbrella ready and plan outdoor travel carefully."
-
-        temperature >= 38.0 ->
-            "High heat is expected. Stay hydrated and limit prolonged afternoon exposure."
-
-        temperature >= 35.0 ->
-            "Temperatures are elevated. Take precautions during the hottest part of the day."
-
-        rain >= 40.0 ->
-            "There is a meaningful chance of rain. Keep rain protection nearby."
-
-        else ->
-            "Conditions look relatively stable right now."
+        rain >= 70.0 -> "Rain is likely. Keep an umbrella ready and plan outdoor travel carefully."
+        temp >= 38.0 -> "High heat is expected. Stay hydrated and limit prolonged afternoon exposure."
+        temp >= 35.0 -> "Temperatures are elevated. Take precautions during the hottest part of the day."
+        rain >= 40.0 -> "There is a chance of rain. Keep rain protection nearby."
+        else -> "Conditions look relatively stable right now."
     }
 }

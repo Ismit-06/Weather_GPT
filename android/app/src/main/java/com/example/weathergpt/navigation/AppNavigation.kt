@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -273,103 +275,77 @@ private fun ModernHeader(
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit
 ) {
-
     Surface(
-        color =
-            MaterialTheme
-                .colorScheme
-                .surface.copy(alpha = 0.96f),
-
-        shadowElevation = 0.dp
+        color = Color(0xFF080C14),
+        shadowElevation = 0.dp,
+        modifier = Modifier.statusBarsPadding()
     ) {
-
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        horizontal = 20.dp,
-                        vertical = 10.dp
+                        horizontal = 18.dp,
+                        vertical = 8.dp
                     )
         ) {
-
             Row(
                 modifier =
                     Modifier.fillMaxWidth(),
-
                 horizontalArrangement =
                     Arrangement.SpaceBetween,
-
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
-
                 Row(
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
-
                     Box(
                         modifier =
                             Modifier
-                                .size(40.dp)
+                                .size(38.dp)
                                 .clip(
-                                    RoundedCornerShape(13.dp)
+                                    RoundedCornerShape(12.dp)
                                 )
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
-                                            Color(0xFF5BA7FF),
-                                            Color(0xFF7755FF)
+                                            Color(0xFF388BFF),
+                                            Color(0xFF2563EB)
                                         )
                                     )
                                 ),
-
                         contentAlignment =
                             Alignment.Center
                     ) {
-
                         Icon(
                             imageVector =
                                 Icons.Default.Cloud,
-
                             contentDescription = null,
-
                             tint =
                                 Color.White,
-
                             modifier =
-                                Modifier.size(23.dp)
+                                Modifier.size(22.dp)
                         )
                     }
 
                     Spacer(
                         modifier =
-                            Modifier.size(11.dp)
+                            Modifier.size(10.dp)
                     )
 
                     Column {
-
                         Text(
                             text = "WeatherGPT",
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurface,
-
-                            fontSize = 19.sp
+                            color = Color.White,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            fontSize = 18.sp
                         )
 
                         Text(
-                            text =
-                                "Weather intelligence",
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant,
-
+                            text = "Weather intelligence",
+                            color = Color(0xFF94A3B8),
                             fontSize = 11.sp
                         )
                     }
@@ -379,54 +355,44 @@ private fun ModernHeader(
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
-
                     Surface(
                         shape =
-                            RoundedCornerShape(20.dp),
-
+                            RoundedCornerShape(16.dp),
                         color =
-                            MaterialTheme
-                                .colorScheme
-                                .primary
-                                .copy(alpha = 0.10f)
+                            Color(0xFF132036)
                     ) {
-
                         Row(
                             modifier =
                                 Modifier.padding(
-                                    horizontal = 10.dp,
-                                    vertical = 6.dp
+                                    horizontal = 9.dp,
+                                    vertical = 5.dp
                                 ),
-
                             verticalAlignment =
                                 Alignment.CenterVertically
                         ) {
-
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(7.dp)
+                                        .size(6.dp)
                                         .clip(
                                             androidx.compose.foundation
                                                 .shape
                                                 .CircleShape
                                         )
                                         .background(
-                                            Color(0xFF39D98A)
+                                            Color(0xFF22C55E)
                                         )
                             )
 
                             Spacer(
                                 modifier =
-                                    Modifier.size(6.dp)
+                                    Modifier.size(5.dp)
                             )
 
                             Text(
                                 text = "LIVE",
-
-                                color =
-                                    Color(0xFF39D98A),
-
+                                color = Color(0xFF22C55E),
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                 fontSize = 10.sp
                             )
                         }
@@ -434,34 +400,28 @@ private fun ModernHeader(
 
                     Spacer(
                         modifier =
-                            Modifier.size(5.dp)
+                            Modifier.size(4.dp)
                     )
 
                     IconButton(
                         onClick =
                             onToggleDarkMode
                     ) {
-
                         Icon(
-
                             imageVector =
                                 if (darkMode) {
                                     Icons.Default.LightMode
                                 } else {
                                     Icons.Default.DarkMode
                                 },
-
                             contentDescription =
                                 if (darkMode) {
                                     "Light mode"
                                 } else {
                                     "Dark mode"
                                 },
-
                             tint =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
+                                Color(0xFFCBD5E1)
                         )
                     }
                 }
@@ -483,109 +443,81 @@ private fun ModernBottomBar(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
-
     Surface(
-        color =
-            MaterialTheme
-                .colorScheme
-                .surface,
-
-        shadowElevation = 14.dp
+        color = Color(0xFF090E1A),
+        shadowElevation = 8.dp,
+        modifier = Modifier
+            .background(Color(0xFF090E1A))
+            .navigationBarsPadding()
     ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color(0xFF172033))
+            )
+            NavigationBar(
+                containerColor = Color.Transparent,
+                tonalElevation = 0.dp,
+                modifier =
+                    Modifier.padding(
+                        horizontal = 4.dp,
+                        vertical = 2.dp
+                    )
+            ) {
+                screens.forEach { screen ->
+                    val selected =
+                        currentRoute == screen.route
 
-        NavigationBar(
-
-            containerColor =
-                Color.Transparent,
-
-            tonalElevation = 0.dp,
-
-            modifier =
-                Modifier.padding(
-                    horizontal = 10.dp,
-                    vertical = 7.dp
-                )
-        ) {
-
-            screens.forEach { screen ->
-
-                val selected =
-                    currentRoute ==
-                        screen.route
-
-                NavigationBarItem(
-
-                    selected =
-                        selected,
-
-                    onClick = {
-                        onNavigate(
-                            screen.route
-                        )
-                    },
-
-                    icon = {
-
-                        Icon(
-
-                            imageVector =
-                                navigationIcon(
-                                    screen
-                                ),
-
-                            contentDescription =
-                                screen.title,
-
-                            modifier =
-                                Modifier.size(
-                                    22.dp
-                                )
-                        )
-                    },
-
-                    label = {
-
-                        Text(
-                            text =
-                                screen.title,
-
-                            fontSize =
-                                10.sp
-                        )
-                    },
-
-                    colors =
-                        NavigationBarItemDefaults.colors(
-
-                            selectedIconColor =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary,
-
-                            selectedTextColor =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary,
-
-                            unselectedIconColor =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant,
-
-                            unselectedTextColor =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant,
-
-                            indicatorColor =
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
-                                    .copy(
-                                        alpha = 0.14f
+                    NavigationBarItem(
+                        selected =
+                            selected,
+                        onClick = {
+                            onNavigate(
+                                screen.route
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                imageVector =
+                                    navigationIcon(
+                                        screen
+                                    ),
+                                contentDescription =
+                                    screen.title,
+                                modifier =
+                                    Modifier.size(
+                                        22.dp
                                     )
-                        )
-                )
+                            )
+                        },
+                        label = {
+                            Text(
+                                text =
+                                    screen.title,
+                                fontSize =
+                                    10.sp,
+                                fontWeight =
+                                    if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold
+                                    else androidx.compose.ui.text.font.FontWeight.Normal
+                            )
+                        },
+                        colors =
+                            NavigationBarItemDefaults.colors(
+                                selectedIconColor =
+                                    Color(0xFF388BFF),
+                                selectedTextColor =
+                                    Color(0xFF388BFF),
+                                unselectedIconColor =
+                                    Color(0xFF64748B),
+                                unselectedTextColor =
+                                    Color(0xFF64748B),
+                                indicatorColor =
+                                    Color.Transparent
+                            )
+                    )
+                }
             }
         }
     }
