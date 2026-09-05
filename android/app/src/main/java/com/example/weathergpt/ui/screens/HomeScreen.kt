@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.data.MetWeatherClient
 import com.example.weathergpt.location.DeviceLocationProvider
@@ -104,6 +105,38 @@ fun HomeScreen(
                         if (deviceLocation != null) {
                             latitude = deviceLocation.latitude
                             longitude = deviceLocation.longitude
+                            var cityName = activeLocation.name
+                            var stateName = activeLocation.admin1
+                            var countryName = activeLocation.country
+                            try {
+                                val rev = LocationReverseClient.api.reverse(deviceLocation.latitude, deviceLocation.longitude)
+                                if (!rev.name.isNullOrBlank()) cityName = rev.name
+                                if (!rev.state.isNullOrBlank()) stateName = rev.state
+                                if (!rev.country.isNullOrBlank()) countryName = rev.country
+                            } catch (_: Exception) {
+                                try {
+                                    @Suppress("DEPRECATION")
+                                    val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                                    val addrs = geocoder.getFromLocation(deviceLocation.latitude, deviceLocation.longitude, 1)
+                                    val a = addrs?.firstOrNull()
+                                    if (a != null) {
+                                        val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                                        if (!n.isNullOrBlank()) cityName = n
+                                        if (!a.adminArea.isNullOrBlank()) stateName = a.adminArea
+                                        if (!a.countryName.isNullOrBlank()) countryName = a.countryName
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                            val updated = SelectedLocation(
+                                name = cityName,
+                                latitude = deviceLocation.latitude,
+                                longitude = deviceLocation.longitude,
+                                country = countryName,
+                                admin1 = stateName,
+                                timezone = "Asia/Kolkata"
+                            )
+                            LocationStore.useGps(context, updated)
+                            activeLocation = updated
                         }
                     } catch (_: Exception) {
                         // Fallback to saved location
@@ -450,18 +483,43 @@ fun HomeScreen(
                             val provider = DeviceLocationProvider(context)
                             val devLoc = provider.getCurrentLocation()
                             if (devLoc != null) {
+                                var cityName = "Current location"
+                                var stateName: String? = null
+                                var countryName: String? = null
+                                try {
+                                    val rev = LocationReverseClient.api.reverse(devLoc.latitude, devLoc.longitude)
+                                    if (!rev.name.isNullOrBlank()) cityName = rev.name
+                                    stateName = rev.state
+                                    countryName = rev.country
+                                } catch (_: Exception) {
+                                    try {
+                                        @Suppress("DEPRECATION")
+                                        val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                                        val addrs = geocoder.getFromLocation(devLoc.latitude, devLoc.longitude, 1)
+                                        val a = addrs?.firstOrNull()
+                                        if (a != null) {
+                                            val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                                            if (!n.isNullOrBlank()) cityName = n
+                                            stateName = a.adminArea
+                                            countryName = a.countryName
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+
                                 val sel = SelectedLocation(
-                                    name = "My Location",
+                                    name = cityName,
                                     latitude = devLoc.latitude,
                                     longitude = devLoc.longitude,
-                                    country = null,
-                                    admin1 = null,
-                                    timezone = null
+                                    country = countryName,
+                                    admin1 = stateName,
+                                    timezone = "Asia/Kolkata"
                                 )
-                                LocationStore.saveLocation(context, sel, manual = false)
+                                LocationStore.useGps(context, sel)
                                 activeLocation = sel
                                 refreshTrigger++
-                                Toast.makeText(context, "Location updated from GPS", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Location updated: $cityName", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Could not acquire location. Please check device location.", Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: Exception) {
                             Toast.makeText(context, "GPS location failed: ${e.message}", Toast.LENGTH_SHORT).show()

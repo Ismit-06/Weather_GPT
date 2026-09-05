@@ -159,6 +159,18 @@ fun ChatScreen(
                     countryName = rev.country
                 } catch (e: Exception) {
                     Log.w("ChatScreen", "Reverse geocode error: ${e.message}")
+                    try {
+                        @Suppress("DEPRECATION")
+                        val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
+                        val addrs = geocoder.getFromLocation(devLoc.latitude, devLoc.longitude, 1)
+                        val a = addrs?.firstOrNull()
+                        if (a != null) {
+                            val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                            if (!n.isNullOrBlank()) cityName = n
+                            stateName = a.adminArea
+                            countryName = a.countryName
+                        }
+                    } catch (_: Exception) {}
                 }
 
                 val newLoc = SelectedLocation(
@@ -170,9 +182,9 @@ fun ChatScreen(
                     timezone = "Asia/Kolkata"
                 )
                 LocationStore.useGps(context, newLoc)
-                Toast.makeText(context, "Location updated: $cityName", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Location: $cityName", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Could not acquire GPS. Using saved location.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Could not acquire location. Please check device location.", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Log.e("ChatScreen", "Location detection error", e)
