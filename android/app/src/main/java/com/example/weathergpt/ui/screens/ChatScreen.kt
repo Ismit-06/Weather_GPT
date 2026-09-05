@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -56,7 +57,9 @@ import androidx.core.content.ContextCompat
 import com.example.weathergpt.audio.VoiceAssistantManager
 import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.location.DeviceLocationProvider
+import com.example.weathergpt.location.LanguageStore
 import com.example.weathergpt.location.SelectedLocation
+import com.example.weathergpt.ui.theme.AIViolet
 import com.example.weathergpt.ui.theme.SurfaceDark
 import com.example.weathergpt.ui.theme.RiskRed
 import androidx.compose.material3.Text
@@ -128,6 +131,12 @@ fun ChatScreen(
     var showLocationDialog by remember { mutableStateOf(false) }
     var isDetectingLocation by remember { mutableStateOf(false) }
 
+    val selectedLanguage by
+        LanguageStore.languageFlow.collectAsState()
+
+    var showLanguageDialog by
+        remember { mutableStateOf(false) }
+
     suspend fun detectGpsLocation() {
         isDetectingLocation = true
         try {
@@ -185,6 +194,7 @@ fun ChatScreen(
     // Auto-detect location on launch if in GPS mode
     LaunchedEffect(Unit) {
         LocationStore.initialize(context)
+        LanguageStore.initialize(context)
         if (!LocationStore.isManual(context)) {
             val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
             val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -229,11 +239,16 @@ fun ChatScreen(
         }
     }
 
-    // Auto-speak new assistant responses like a real voice assistant
+    // Auto-speak new assistant responses like a real voice assistant in chosen language
     LaunchedEffect(uiState.messages.size) {
         val lastMessage = uiState.messages.lastOrNull()
         if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
-            voiceAssistant.speak(lastMessage.content, uiState.detectedLanguageCode)
+            val speechLang = if (!selectedLanguage.equals("Auto", ignoreCase = true)) {
+                selectedLanguage
+            } else {
+                uiState.detectedLanguageCode ?: "en-IN"
+            }
+            voiceAssistant.speak(lastMessage.content, speechLang)
         }
     }
 
@@ -247,6 +262,12 @@ fun ChatScreen(
             uiState.isLoading
         ) {
             return
+        }
+
+        val langToSend = if (selectedLanguage.equals("Auto", ignoreCase = true)) {
+            "auto"
+        } else {
+            selectedLanguage
         }
 
         chatViewModel.sendMessage(
@@ -263,7 +284,7 @@ fun ChatScreen(
                 activeLocation.name,
 
             language =
-                "en"
+                langToSend
         )
 
         message.value = ""
@@ -516,6 +537,86 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Select location",
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(
+            modifier =
+                Modifier.height(5.dp)
+        )
+
+        // ========================================================
+        // LANGUAGE SELECTOR BAR
+        // ========================================================
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp)
+                .clickable { showLanguageDialog = true },
+            shape = RoundedCornerShape(14.dp),
+            color = SurfaceDark.copy(alpha = 0.85f),
+            border = BorderStroke(
+                1.dp,
+                AIViolet.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Translate,
+                        contentDescription = null,
+                        tint = AIViolet,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        val currentAppLang = LanguageStore.SUPPORTED_LANGUAGES.find {
+                            it.code.equals(selectedLanguage, ignoreCase = true)
+                        } ?: LanguageStore.SUPPORTED_LANGUAGES.first()
+
+                        Text(
+                            text = "${currentAppLang.nativeLabel} (${currentAppLang.englishName})",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "AI Voice & Chat Language • Tap to change",
+                            color = TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = AIViolet.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = selectedLanguage.uppercase(),
+                            color = AIViolet,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Select language",
                         tint = TextMuted,
                         modifier = Modifier.size(18.dp)
                     )
@@ -1127,6 +1228,22 @@ fun ChatScreen(
                     Toast.makeText(context, "Location set to ${sel.name}", Toast.LENGTH_SHORT).show()
                 }
                 showLocationDialog = false
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguageCode = selectedLanguage,
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = { appLang ->
+                LanguageStore.saveLanguage(context, appLang.code)
+                Toast.makeText(
+                    context,
+                    "AI language set to ${appLang.nativeLabel} (${appLang.englishName})",
+                    Toast.LENGTH_SHORT
+                ).show()
+                showLanguageDialog = false
             }
         )
     }

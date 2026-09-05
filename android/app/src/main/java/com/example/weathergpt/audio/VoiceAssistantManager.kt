@@ -173,8 +173,36 @@ class VoiceAssistantManager(private val context: Context) {
         val cleanText = cleanMarkdownForSpeech(text)
 
         try {
-            if (!languageCode.isNullOrBlank()) {
-                val locale = Locale.forLanguageTag(languageCode)
+            val locale = when {
+                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
+                    Locale.getDefault()
+                languageCode.contains("-") ->
+                    Locale.forLanguageTag(languageCode)
+                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) ->
+                    Locale("hi", "IN")
+                languageCode.equals("Telugu", ignoreCase = true) ->
+                    Locale("te", "IN")
+                languageCode.equals("Tamil", ignoreCase = true) ->
+                    Locale("ta", "IN")
+                languageCode.equals("Kannada", ignoreCase = true) ->
+                    Locale("kn", "IN")
+                languageCode.equals("Bengali", ignoreCase = true) ->
+                    Locale("bn", "IN")
+                languageCode.equals("Marathi", ignoreCase = true) ->
+                    Locale("mr", "IN")
+                languageCode.equals("Gujarati", ignoreCase = true) ->
+                    Locale("gu", "IN")
+                languageCode.equals("Malayalam", ignoreCase = true) ->
+                    Locale("ml", "IN")
+                languageCode.equals("Punjabi", ignoreCase = true) ->
+                    Locale("pa", "IN")
+                languageCode.equals("English", ignoreCase = true) ->
+                    Locale.ENGLISH
+                else ->
+                    Locale.forLanguageTag(languageCode)
+            }
+            val avail = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+            if (avail >= TextToSpeech.LANG_AVAILABLE) {
                 tts?.language = locale
             }
 
