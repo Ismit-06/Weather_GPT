@@ -93,8 +93,10 @@ IMPORTANT GROUNDING RULES:
     but do not replace their weather values with values from
     conversation history.
 
-12. Keep the answer natural and concise. Explain the result
-    in the user's language.
+12. Keep the answer SHORT, CRISP, and POINT-TO-POINT (1 to 2 short sentences maximum).
+    This will be read aloud to the user by a voice assistant.
+    Never output your internal reasoning or analysis steps.
+    Never output raw data dumps.
 
 CURRENT WEATHER TOOL RESULT:
 {weather_context}
@@ -154,7 +156,7 @@ async def chat(
         "model": MODEL,
         "messages": messages,
         "temperature": 0.3,
-        "max_tokens": 600,
+        "max_tokens": 150,
     }
 
     headers = {

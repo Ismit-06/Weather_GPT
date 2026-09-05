@@ -1,4 +1,4 @@
-﻿package com.example.weathergpt.audio
+package com.example.weathergpt.audio
 
 import android.content.Context
 import android.content.Intent
@@ -192,8 +192,23 @@ class VoiceAssistantManager(private val context: Context) {
         _isSpeaking.value = false
     }
 
-    private fun cleanMarkdownForSpeech(markdown: String): String {
-        return markdown
+    fun cleanMarkdownForSpeech(markdown: String): String {
+        var text = markdown
+        if (text.contains("<think>")) {
+            text = text.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
+        }
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val filtered = lines.filterNot { line ->
+            val l = line.lowercase()
+            l.startsWith("the user is asking") ||
+            l.startsWith("let me look at") ||
+            l.startsWith("looking at the data") ||
+            l.startsWith("wait, let me reconsider") ||
+            l.startsWith("hmm, this is a bit confusing") ||
+            l.startsWith("the weather data provided is")
+        }
+        val content = if (filtered.isNotEmpty()) filtered.joinToString(" ") else text
+        return content
             .replace(Regex("[#*`_~>\\[\\]()\\-•]"), " ") // Remove markdown formatting chars
             .replace(Regex("\\bhttps?://\\S+"), "")       // Remove URLs
             .replace(Regex("\\s+"), " ")                  // Normalize spaces

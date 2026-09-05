@@ -1009,6 +1009,23 @@ private fun BotBubble(
     onSpeak: () -> Unit = {},
     isSpeaking: Boolean = false
 ) {
+    val cleanDisplayText = remember(text) {
+        var t = text
+        if (t.contains("<think>")) {
+            t = t.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
+        }
+        val lines = t.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val filtered = lines.filterNot { line ->
+            val l = line.lowercase()
+            l.startsWith("the user is asking") ||
+            l.startsWith("let me look at") ||
+            l.startsWith("looking at the data") ||
+            l.startsWith("wait, let me reconsider") ||
+            l.startsWith("hmm, this is a bit confusing") ||
+            l.startsWith("the weather data provided is")
+        }
+        if (filtered.isNotEmpty()) filtered.joinToString("\n\n") else t
+    }
 
     GlassCard(
         modifier =
@@ -1128,7 +1145,7 @@ private fun BotBubble(
 
                 Text(
                     text =
-                        text,
+                        cleanDisplayText,
 
                     color =
                         TextPrimary,

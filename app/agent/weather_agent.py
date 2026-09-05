@@ -1050,9 +1050,44 @@ class WeatherAgent:
             },
         }
 
-        import json
+        # -----------------------------------------------------
+        # Build clean summary for LLMs to prevent over-analyzing raw JSON
+        # -----------------------------------------------------
+        loc_name = requested_location.get("name") if requested_location else None
+        summary_lines = []
+        if loc_name:
+            summary_lines.append(f"Location: {loc_name}")
+        if self.context.intent:
+            summary_lines.append(f"User Intent: {self.context.intent}")
+        if self.context.activity:
+            summary_lines.append(f"User Activity: {self.context.activity}")
+        if self.context.target_local_time:
+            summary_lines.append(f"Target Time: {self.context.target_local_time}")
 
-        weather_text = json.dumps(
+        if isinstance(tool_result, dict):
+            if "rain_windows" in tool_result:
+                windows = tool_result["rain_windows"]
+                if windows:
+                    summary_lines.append("Rain Windows:")
+                    for w in windows:
+                        summary_lines.append(f"- {w}")
+                else:
+                    summary_lines.append("Rain Windows: No rain detected in the forecast period.")
+            if "recommendation" in tool_result:
+                summary_lines.append(f"Recommendation: {tool_result['recommendation']}")
+            if "assessment" in tool_result:
+                summary_lines.append(f"Assessment: {tool_result['assessment']}")
+            if "summary" in tool_result:
+                summary_lines.append(f"Weather Summary: {tool_result['summary']}")
+            if "current" in tool_result and isinstance(tool_result["current"], dict):
+                c = tool_result["current"]
+                summary_lines.append(
+                    f"Current: {c.get('temperature_c', c.get('temperature'))}°C, {c.get('condition', c.get('summary', 'clear'))}"
+                )
+
+        import json
+        weather_summary_text = "\n".join(summary_lines)
+        weather_text = f"{weather_summary_text}\n\nDATA:\n" + json.dumps(
             weather_context,
             indent=2,
             ensure_ascii=False,
