@@ -1282,16 +1282,16 @@ private fun LayerChip(
     val selected = selectedLayer == text
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(20.dp))
             .background(
-                if (selected) Color(0xFF388BFF)
-                else Color(0xDD101726)
+                if (selected) Color(0xFF4DA3FF)
+                else Color(0xFF0E1626)
             )
             .border(
                 1.dp,
-                if (selected) Color(0xFF388BFF)
-                else Color(0xFF1E2B45),
-                RoundedCornerShape(50)
+                if (selected) Color(0xFF4DA3FF)
+                else Color(0x2EFFFFFF),
+                RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 7.dp),
@@ -1299,9 +1299,9 @@ private fun LayerChip(
     ) {
         Text(
             text = text,
-            color = if (selected) Color.White else Color(0xFF94A3B8),
+            color = if (selected) Color.White else Color(0xFFAAB6C7),
             fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
         )
     }
 }

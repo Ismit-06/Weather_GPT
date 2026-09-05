@@ -929,69 +929,65 @@ fun ChatScreen(
         // QUICK QUESTIONS
         // ========================================================
 
-        if (
-            uiState.messages.isEmpty() &&
-            !uiState.isLoading
-        ) {
+        // ========================================================
+        // QUICK QUESTIONS (Screen 2 Mockup: 2x2 prompt chips)
+        // ========================================================
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 12.dp,
-                            vertical = 4.dp
-                        ),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        7.dp
-                    )
+        if (!uiState.isLoading) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    QuickChip(
+                        text = "Best time to travel",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            message.value = "Best time to travel"
+                            sendMessage()
+                        }
+                    )
+                    QuickChip(
+                        text = "What to pack?",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            message.value = "What to pack?"
+                            sendMessage()
+                        }
+                    )
+                }
 
-                QuickChip(
-                    text =
-                        "Rain today",
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    onClick = {
-                        message.value =
-                            "Will it rain today?"
-                    }
-                )
-
-                QuickChip(
-                    text =
-                        "Travel",
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    onClick = {
-                        message.value =
-                            "Is it good to travel today?"
-                    }
-                )
-
-                QuickChip(
-                    text =
-                        "Flood",
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    onClick = {
-                        message.value =
-                            "Is there any flood risk?"
-                    }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    QuickChip(
+                        text = "Will it rain?",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            message.value = "Will it rain today?"
+                            sendMessage()
+                        }
+                    )
+                    QuickChip(
+                        text = "Road conditions",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            message.value = "What are the current road and travel conditions?"
+                            sendMessage()
+                        }
+                    )
+                }
             }
         }
 
         // ========================================================
-        // COMPOSER
+        // COMPOSER (Screen 2 Mockup)
         // ========================================================
 
         Row(
@@ -1006,15 +1002,15 @@ fun ChatScreen(
                         RoundedCornerShape(28.dp)
                     )
                     .background(
-                        Color(0xFF101726)
+                        Color(0xFF0E1626)
                     )
                     .border(
                         1.dp,
-                        Color(0xFF1E2B45),
+                        Color(0x2EFFFFFF),
                         RoundedCornerShape(28.dp)
                     )
                     .padding(
-                        start = 14.dp,
+                        start = 16.dp,
                         end = 6.dp,
                         top = 4.dp,
                         bottom = 4.dp
@@ -1030,7 +1026,7 @@ fun ChatScreen(
                     .padding(vertical = 10.dp),
                 enabled = !uiState.isLoading,
                 textStyle = androidx.compose.ui.text.TextStyle(
-                    color = Color.White,
+                    color = Color(0xFFF5F7FA),
                     fontSize = 14.sp
                 ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -1038,8 +1034,8 @@ fun ChatScreen(
                 decorationBox = { innerTextField ->
                     if (message.value.isEmpty()) {
                         Text(
-                            text = if (isListening) "Listening... Speak now" else "Ask WeatherGPT...",
-                            color = if (isListening) Color(0xFF38BDF8) else Color(0xFF64748B),
+                            text = if (isListening) "Listening... Speak now" else "Ask anything...",
+                            color = if (isListening) Color(0xFF52D9FF) else Color(0xFFAAB6C7),
                             fontSize = 14.sp
                         )
                     }
@@ -1100,9 +1096,9 @@ fun ChatScreen(
                         },
                     tint =
                         if (isListening) {
-                            Color(0xFFEF4444)
+                            Color(0xFFFF6B6B)
                         } else {
-                            Color(0xFF94A3B8)
+                            Color(0xFFAAB6C7)
                         },
                     modifier =
                         if (isListening) {
@@ -1117,11 +1113,11 @@ fun ChatScreen(
 
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(
-                        if (message.value.isNotBlank() && !uiState.isLoading) Color(0xFF388BFF)
-                        else Color(0xFF1E2B45)
+                        if (message.value.isNotBlank() && !uiState.isLoading) Color(0xFF4DA3FF)
+                        else Color(0xFF16233B)
                     )
                     .clickable(
                         enabled = message.value.isNotBlank() && !uiState.isLoading
@@ -1133,8 +1129,8 @@ fun ChatScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF64748B),
-                    modifier = Modifier.size(22.dp)
+                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF7E8B9F),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
@@ -1437,31 +1433,26 @@ private fun CircularProgressIndicatorSmall() {
 @Composable
 private fun QuickChip(
     text: String,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-
-    androidx.compose.material3.AssistChip(
-        onClick =
-            onClick,
-
-        modifier =
-            modifier,
-
-        label = {
-
+    Surface(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xFF0E1626),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2EFFFFFF))
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                text =
-                    text,
-
-                fontSize =
-                    10.sp
+                text = text,
+                color = Color(0xFFF5F7FA),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-        },
-
-        shape =
-            RoundedCornerShape(
-                12.dp
-            )
-    )
+        }
+    }
 }

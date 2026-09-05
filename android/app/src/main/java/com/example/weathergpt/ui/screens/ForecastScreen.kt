@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -199,8 +200,9 @@ private fun ForecastContent(
     forecast: List<MetForecastItem>,
     onRefresh: () -> Unit
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) }
     val current = forecast.firstOrNull()
-    val nextHours = forecast.take(16)
+    val nextHours = forecast.take(12)
 
     Column(
         modifier = Modifier
@@ -209,191 +211,204 @@ private fun ForecastContent(
             .padding(horizontal = 18.dp, vertical = 12.dp)
     ) {
         // =========================================================
-        // CURRENT CONDITIONS HEADER
+        // LOCATION ROW (Screen 3 Mockup)
         // =========================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Current conditions",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = Color(0xFF4DA3FF),
+                    modifier = Modifier.size(16.dp)
                 )
 
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.width(5.dp))
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = Color(0xFF388BFF),
-                        modifier = Modifier.size(15.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    Text(
-                        text = locationName,
-                        color = Color(0xFF94A3B8),
-                        fontSize = 13.sp
-                    )
-                }
+                Text(
+                    text = locationName,
+                    color = Color(0xFFF5F7FA),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
 
             IconButton(
                 onClick = onRefresh,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
-                    tint = Color(0xFF388BFF),
-                    modifier = Modifier.size(18.dp)
+                    tint = Color(0xFF4DA3FF),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // =========================================================
-        // MAIN CONDITIONS CARD
+        // 3 SEGMENTED TAB SWITCHER (Screen 3 Mockup)
         // =========================================================
-        if (current != null) {
-            GlassCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = weatherDescription(current.symbol_code),
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 15.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = current.temperature_c?.roundToInt()?.let { "$it°" } ?: "29°",
-                                color = Color.White,
-                                fontSize = 52.sp,
-                                fontWeight = FontWeight.Bold,
-                                lineHeight = 56.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            val feelsLike = current.dew_point_c?.roundToInt()
-                                ?: current.temperature_c?.roundToInt()?.minus(2)
-                                ?: 27
-                            Text(
-                                text = "Feels like $feelsLike°",
-                                color = Color(0xFF94A3B8),
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        RealisticWeatherIllustration(
-                            symbolCode = current.symbol_code,
-                            modifier = Modifier.size(92.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf("Hourly", "Daily", "7 Days").forEachIndexed { index, label ->
+                val active = selectedTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (active) Color(0xFF4DA3FF) else Color(0xFF0E1626))
+                        .border(
+                            1.dp,
+                            if (active) Color(0xFF4DA3FF) else Color(0x2EFFFFFF),
+                            RoundedCornerShape(20.dp)
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // 3 metrics inside bottom of card
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ForecastPillMetric(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Default.WaterDrop,
-                            value = current.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%",
-                            label = "Humidity"
-                        )
-
-                        ForecastPillMetric(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Default.Air,
-                            value = current.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "6 km/h",
-                            label = "Wind"
-                        )
-
-                        ForecastPillMetric(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Default.Speed,
-                            value = current.pressure_hpa?.roundToInt()?.let { "$it hPa" } ?: "1010 hPa",
-                            label = "Pressure"
-                        )
-                    }
+                        .clickable { selectedTab = index }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        color = if (active) Color.White else Color(0xFFAAB6C7),
+                        fontSize = 13.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // =========================================================
-        // NEXT HOURS
-        // =========================================================
-        Text(
-            text = "Next hours",
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(nextHours) { item ->
-                HourlyItemCard(item = item)
+        if (selectedTab == 0) {
+            // =========================================================
+            // HOURLY STRIP (Screen 3 Mockup)
+            // =========================================================
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(nextHours) { item ->
+                    HourlyItemCard(item = item)
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-        // =========================================================
-        // 24-HOUR OUTLOOK / TEMPERATURE TREND
-        // =========================================================
-        Column {
-            Text(
-                text = "24-hour outlook",
-                color = Color(0xFF38BDF8),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
+            // =========================================================
+            // TEMPERATURE TREND (Screen 3 Mockup)
+            // =========================================================
             Text(
                 text = "Temperature trend",
-                color = Color.White,
-                fontSize = 18.sp,
+                color = Color(0xFFF5F7FA),
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
-        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-        GlassCard(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            SplineTemperatureChart(
-                forecastItems = forecast.take(24)
-            )
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                SplineTemperatureChart(
+                    forecastItems = forecast.take(24)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // =========================================================
+            // 2X2 METRICS GRID (Screen 3 Mockup)
+            // =========================================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ForecastGridCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.WaterDrop,
+                    title = "Precipitation",
+                    value = current?.precipitation_probability_pct?.roundToInt()?.let { "$it%" } ?: "10%"
+                )
+
+                ForecastGridCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Cloud,
+                    title = "UV Index",
+                    value = "Moderate"
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ForecastGridCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Air,
+                    title = "Wind",
+                    value = current?.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "6 km/h"
+                )
+
+                ForecastGridCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Speed,
+                    title = "Humidity",
+                    value = current?.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%"
+                )
+            }
+        } else {
+            // Daily / 7 Days view
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                forecast.take(7).forEach { item ->
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = formatDay(item.time),
+                                    color = Color(0xFFF5F7FA),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = weatherDescription(item.symbol_code),
+                                    color = Color(0xFFAAB6C7),
+                                    fontSize = 12.sp
+                                )
+                            }
+                            RealisticWeatherIllustration(
+                                symbolCode = item.symbol_code,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text(
+                                text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
+                                color = Color(0xFFF5F7FA),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -401,45 +416,53 @@ private fun ForecastContent(
 }
 
 /**
- * Metric chip used inside the Forecast Hero Card.
+ * 2x2 Metric card used under temperature trend in Screen 3 (Forecast).
  */
 @Composable
-private fun ForecastPillMetric(
+private fun ForecastGridCard(
     modifier: Modifier,
     icon: ImageVector,
-    value: String,
-    label: String
+    title: String,
+    value: String
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF141E33))
-            .border(1.dp, Color(0xFF1E2D4A), RoundedCornerShape(14.dp))
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center
+    GlassCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF16233B)),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = label,
-                    tint = Color(0xFF38BDF8),
-                    modifier = Modifier.size(13.dp)
+                    contentDescription = title,
+                    tint = Color(0xFF52D9FF),
+                    modifier = Modifier.size(17.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column {
+                Text(
+                    text = title,
+                    color = Color(0xFFAAB6C7),
+                    fontSize = 11.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = value,
-                    color = Color.White,
-                    fontSize = 12.sp,
+                    color = Color(0xFFF5F7FA),
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                color = Color(0xFF94A3B8),
-                fontSize = 10.sp
-            )
         }
     }
 }
@@ -457,10 +480,10 @@ private fun HourlyItemCard(
 
     Box(
         modifier = Modifier
-            .width(68.dp)
+            .width(66.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF101726))
-            .border(1.dp, Color(0xFF1E2B45), RoundedCornerShape(18.dp))
+            .background(Color(0xFF0E1626))
+            .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(18.dp))
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -469,7 +492,7 @@ private fun HourlyItemCard(
         ) {
             Text(
                 text = timeLabel,
-                color = Color(0xFF94A3B8),
+                color = Color(0xFFAAB6C7),
                 fontSize = 12.sp
             )
 
@@ -484,7 +507,7 @@ private fun HourlyItemCard(
 
             Text(
                 text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
-                color = Color.White,
+                color = Color(0xFFF5F7FA),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -553,7 +576,7 @@ private fun SplineTemperatureChart(
                 drawPath(
                     path = fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0x33388BFF), Color(0x05388BFF), Color.Transparent),
+                        colors = listOf(Color(0x334DA3FF), Color(0x054DA3FF), Color.Transparent),
                         startY = 0f,
                         endY = h
                     )
@@ -562,7 +585,7 @@ private fun SplineTemperatureChart(
                 // Draw curve stroke
                 drawPath(
                     path = path,
-                    color = Color(0xFF388BFF),
+                    color = Color(0xFF4DA3FF),
                     style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
 
@@ -575,7 +598,7 @@ private fun SplineTemperatureChart(
                         center = peakPoint
                     )
                     drawCircle(
-                        color = Color(0xFF388BFF),
+                        color = Color(0xFF4DA3FF),
                         radius = 2.dp.toPx(),
                         center = peakPoint
                     )
@@ -590,13 +613,13 @@ private fun SplineTemperatureChart(
             ) {
                 Text(
                     text = "${minTemp.roundToInt()}°",
-                    color = Color(0xFF94A3B8),
+                    color = Color(0xFFAAB6C7),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Tooltip callout pill at peak point
+            // Tooltip callout pill at peak point (Screen 3 Mockup)
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -604,14 +627,14 @@ private fun SplineTemperatureChart(
             ) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E293B))
-                        .border(1.dp, Color(0xFF334155), RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0E1626))
+                        .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "${maxTemp.roundToInt()}°\n18:00",
-                        color = Color.White,
+                        color = Color(0xFFF5F7FA),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 12.sp
@@ -622,15 +645,15 @@ private fun SplineTemperatureChart(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // X-axis timestamps: Now, +6H, +12H, +18H, +24H
+        // X-axis timestamps: Now, 6H, 12H, 18H, 24H (Screen 3 Mockup)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf("Now", "+6H", "+12H", "+18H", "+24H").forEach { label ->
+            listOf("Now", "6H", "12H", "18H", "24H").forEach { label ->
                 Text(
                     text = label,
-                    color = Color(0xFF64748B),
+                    color = Color(0xFFAAB6C7),
                     fontSize = 11.sp
                 )
             }
@@ -649,6 +672,16 @@ private fun formatHour(raw: String?): String {
         } else {
             raw.take(5)
         }
+    }
+}
+
+private fun formatDay(raw: String?): String {
+    if (raw.isNullOrBlank()) return "Today"
+    return try {
+        val parsed = ZonedDateTime.parse(raw)
+        parsed.format(DateTimeFormatter.ofPattern("EEEE"))
+    } catch (_: Exception) {
+        "Day"
     }
 }
 

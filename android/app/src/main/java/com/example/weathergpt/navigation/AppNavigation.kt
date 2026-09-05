@@ -276,7 +276,7 @@ private fun ModernHeader(
     onToggleDarkMode: () -> Unit
 ) {
     Surface(
-        color = Color(0xFF080C14),
+        color = Color(0xFF050A12),
         shadowElevation = 0.dp,
         modifier = Modifier.statusBarsPadding()
     ) {
@@ -311,7 +311,7 @@ private fun ModernHeader(
                                 .background(
                                     Brush.linearGradient(
                                         listOf(
-                                            Color(0xFF388BFF),
+                                            Color(0xFF4DA3FF),
                                             Color(0xFF2563EB)
                                         )
                                     )
@@ -338,14 +338,14 @@ private fun ModernHeader(
                     Column {
                         Text(
                             text = "WeatherGPT",
-                            color = Color.White,
+                            color = Color(0xFFF5F7FA),
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             fontSize = 18.sp
                         )
 
                         Text(
-                            text = "Weather intelligence",
-                            color = Color(0xFF94A3B8),
+                            text = "AI Weather Intelligence",
+                            color = Color(0xFFAAB6C7),
                             fontSize = 11.sp
                         )
                     }
@@ -359,7 +359,8 @@ private fun ModernHeader(
                         shape =
                             RoundedCornerShape(16.dp),
                         color =
-                            Color(0xFF132036)
+                            Color(0xFF0E1626),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2EFFFFFF))
                     ) {
                         Row(
                             modifier =
@@ -380,7 +381,7 @@ private fun ModernHeader(
                                                 .CircleShape
                                         )
                                         .background(
-                                            Color(0xFF22C55E)
+                                            Color(0xFF36E6A0)
                                         )
                             )
 
@@ -391,7 +392,7 @@ private fun ModernHeader(
 
                             Text(
                                 text = "LIVE",
-                                color = Color(0xFF22C55E),
+                                color = Color(0xFF36E6A0),
                                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                                 fontSize = 10.sp
                             )
@@ -421,7 +422,7 @@ private fun ModernHeader(
                                     "Dark mode"
                                 },
                             tint =
-                                Color(0xFFCBD5E1)
+                                Color(0xFFF5F7FA)
                         )
                     }
                 }
@@ -444,10 +445,10 @@ private fun ModernBottomBar(
     onNavigate: (String) -> Unit
 ) {
     Surface(
-        color = Color(0xFF090E1A),
+        color = Color(0xFF050A12),
         shadowElevation = 8.dp,
         modifier = Modifier
-            .background(Color(0xFF090E1A))
+            .background(Color(0xFF050A12))
             .navigationBarsPadding()
     ) {
         Column {
@@ -455,7 +456,7 @@ private fun ModernBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Color(0xFF172033))
+                    .background(Color(0x1AFFFFFF))
             )
             NavigationBar(
                 containerColor = Color.Transparent,
@@ -506,15 +507,15 @@ private fun ModernBottomBar(
                         colors =
                             NavigationBarItemDefaults.colors(
                                 selectedIconColor =
-                                    Color(0xFF388BFF),
+                                    Color(0xFF4DA3FF),
                                 selectedTextColor =
-                                    Color(0xFF388BFF),
+                                    Color(0xFF4DA3FF),
                                 unselectedIconColor =
-                                    Color(0xFF64748B),
+                                    Color(0xFFAAB6C7),
                                 unselectedTextColor =
-                                    Color(0xFF64748B),
+                                    Color(0xFFAAB6C7),
                                 indicatorColor =
-                                    Color.Transparent
+                                    Color(0x1A4DA3FF)
                             )
                     )
                 }

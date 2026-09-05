@@ -94,19 +94,20 @@ fun AiOrb(
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(22.dp),
     content: @Composable () -> Unit
 ) {
     Box(
         modifier =
             modifier
                 .background(
-                    color = Color(0xFF101726).copy(alpha = 0.96f),
-                    shape = RoundedCornerShape(22.dp)
+                    color = Color(0xFF111E2F),
+                    shape = shape
                 )
                 .border(
                     width = 1.dp,
-                    color = Color(0xFF1E2B45),
-                    shape = RoundedCornerShape(22.dp)
+                    color = Color(0x2EFFFFFF), // 1px solid rgba(255, 255, 255, 0.18)
+                    shape = shape
                 )
                 .padding(18.dp)
     ) {
@@ -152,7 +153,7 @@ fun RealisticWeatherIllustration(
             )
             // Cut out inner circle with dark sky color to form a clean crescent
             drawCircle(
-                color = Color(0xFF101726),
+                color = Color(0xFF111E2F),
                 radius = moonRadius * 0.82f,
                 center = androidx.compose.ui.geometry.Offset(moonCenter.x - moonRadius * 0.38f, moonCenter.y - moonRadius * 0.28f)
             )
