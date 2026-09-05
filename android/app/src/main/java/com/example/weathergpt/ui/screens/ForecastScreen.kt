@@ -1,5 +1,7 @@
 package com.example.weathergpt.ui.screens
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -218,8 +220,27 @@ private fun ForecastContent(
             .padding(horizontal = 18.dp, vertical = 10.dp)
     ) {
         // =========================================================
-        // LOCATION ROW
+        // LOCATION ROW & REFRESH
         // =========================================================
+        var isSpinning by remember { mutableStateOf(false) }
+        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "forecast_refresh")
+        val spinAngle by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(800, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "forecast_spin"
+        )
+
+        LaunchedEffect(isSpinning) {
+            if (isSpinning) {
+                kotlinx.coroutines.delay(800)
+                isSpinning = false
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -243,15 +264,25 @@ private fun ForecastContent(
                 )
             }
 
-            IconButton(
-                onClick = onRefresh,
-                modifier = Modifier.size(32.dp)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0E1626))
+                    .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                    .clickable {
+                        isSpinning = true
+                        onRefresh()
+                    },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(16.dp)
+                    contentDescription = "Refresh forecast",
+                    tint = if (isSpinning) SecondaryCyan else Color(0xFF8896AB),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .then(if (isSpinning) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
                 )
             }
         }

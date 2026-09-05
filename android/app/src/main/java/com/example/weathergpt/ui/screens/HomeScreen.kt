@@ -1,7 +1,10 @@
 package com.example.weathergpt.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -182,39 +185,80 @@ fun HomeScreen(
                 .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             // ====================================================
-            // LOCATION SELECTOR ROW
+            // LOCATION SELECTOR & REFRESH ROW
             // ====================================================
+            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "home_refresh")
+            val spinAngle by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+                ),
+                label = "home_spin"
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showLocationDialog = true }
                     .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = "Location",
-                    tint = PrimaryBlue,
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { showLocationDialog = true },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
 
-                Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
 
-                Text(
-                    text = activeLocation.name,
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                    Text(
+                        text = activeLocation.name,
+                        color = TextPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
 
-                Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = TextMuted,
-                    modifier = Modifier.size(16.dp)
-                )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Refresh Button
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0E1626))
+                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                        .clickable {
+                            refreshTrigger++
+                            Toast.makeText(context, "Updating weather for ${activeLocation.name}...", Toast.LENGTH_SHORT).show()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh weather",
+                        tint = if (isLoading) SecondaryCyan else Color(0xFF8896AB),
+                        modifier = Modifier
+                            .size(17.dp)
+                            .then(if (isLoading) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -356,120 +400,6 @@ fun HomeScreen(
                         ?: "0.0 mm",
                     label = "Rain chance"
                 )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // ====================================================
-            // FLOATING GLASS "ASK WEATHERGPT" CARD
-            // ====================================================
-            GlassCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenChat() },
-                shape = RoundedCornerShape(22.dp),
-                padding = 16.dp
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Ask WeatherGPT",
-                            color = TextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.height(3.dp))
-
-                        Text(
-                            text = "What would you like to know?",
-                            color = TextSecondary,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(PrimaryBlue, Color(0xFF2563EB))
-                                )
-                            )
-                            .clickable { onOpenChat() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "Ask",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ====================================================
-            // DECISION SUPPORT: SMART RECOMMENDATION PANEL
-            // ====================================================
-            GlassCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                padding = 16.dp
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(Color(0x26FFB84D)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Lightbulb,
-                            contentDescription = null,
-                            tint = WarningAmber,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column {
-                        Text(
-                            text = "Smart recommendation",
-                            color = TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = recommendation(currentWeather),
-                            color = TextSecondary,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Text(
-                            text = "Based on the latest live weather telemetry.",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

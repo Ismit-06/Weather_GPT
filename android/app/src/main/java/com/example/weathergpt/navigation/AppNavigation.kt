@@ -82,10 +82,7 @@ sealed class Screen(
 }
 
 @Composable
-fun AppNavigation(
-    darkMode: Boolean,
-    onToggleDarkMode: () -> Unit
-) {
+fun AppNavigation() {
     val navController = rememberNavController()
 
     val screens = listOf(
@@ -102,10 +99,7 @@ fun AppNavigation(
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            FloatingGlassHeader(
-                darkMode = darkMode,
-                onToggleDarkMode = onToggleDarkMode
-            )
+            FloatingGlassHeader()
         },
         bottomBar = {
             FloatingGlassBottomDock(
@@ -192,10 +186,7 @@ fun AppNavigation(
  */
 
 @Composable
-private fun FloatingGlassHeader(
-    darkMode: Boolean,
-    onToggleDarkMode: () -> Unit
-) {
+private fun FloatingGlassHeader() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,49 +257,30 @@ private fun FloatingGlassHeader(
                     }
                 }
 
-                // Status & Actions
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // LIVE Status Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x2636E6A0))
+                        .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 9.dp, vertical = 4.dp)
                 ) {
-                    // LIVE Status Pill
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0x2636E6A0))
-                            .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(5.dp)
-                                    .clip(CircleShape)
-                                    .background(SuccessGreen)
-                            )
-                            Text(
-                                text = "LIVE",
-                                color = SuccessGreen,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                    }
-
-                    // Theme Toggle
-                    IconButton(
-                        onClick = onToggleDarkMode,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (darkMode) "Light mode" else "Dark mode",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(19.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(SuccessGreen)
+                        )
+                        Text(
+                            text = "LIVE",
+                            color = SuccessGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }

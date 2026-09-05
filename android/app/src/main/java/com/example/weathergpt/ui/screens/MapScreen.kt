@@ -1,6 +1,8 @@
 package com.example.weathergpt.ui.screens
 
 import android.graphics.Color as AndroidColor
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polygon
 import android.view.View
@@ -953,6 +955,25 @@ fun MapScreen() {
         // RIGHT-SIDE FLOATING ACTION CONTROLS
         // =========================================================
 
+        var isMapRefreshing by remember { mutableStateOf(false) }
+        val mapInfiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "map_refresh")
+        val mapSpinAngle by mapInfiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(800, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            ),
+            label = "map_spin"
+        )
+
+        LaunchedEffect(isMapRefreshing) {
+            if (isMapRefreshing) {
+                kotlinx.coroutines.delay(800)
+                isMapRefreshing = false
+            }
+        }
+
         Surface(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -965,6 +986,28 @@ fun MapScreen() {
                 modifier = Modifier.padding(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Refresh Map Data Button
+                IconButton(
+                    onClick = {
+                        isMapRefreshing = true
+                        mapView?.invalidate()
+                        // Re-trigger layer load by updating selectedLayer state
+                        val current = selectedLayer
+                        selectedLayer = ""
+                        selectedLayer = current
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh map",
+                        tint = if (isMapRefreshing) Color(0xFF38BDF8) else Color(0xFFCBD5E1),
+                        modifier = Modifier
+                            .size(19.dp)
+                            .then(if (isMapRefreshing) Modifier.graphicsLayer { rotationZ = mapSpinAngle } else Modifier)
+                    )
+                }
+
                 IconButton(
                     onClick = {
                         val layers = listOf("Weather", "Rain", "Flood", "Alerts", "Dams", "Quakes")

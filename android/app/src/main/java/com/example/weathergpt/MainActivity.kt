@@ -36,35 +36,10 @@ class MainActivity : ComponentActivity() {
             )
 
         setContent {
-
-            var darkMode by remember {
-                mutableStateOf(
-                    preferences.getBoolean(
-                        "dark_mode",
-                        true
-                    )
-                )
-            }
-
             WeatherGPTTheme(
-                darkTheme = darkMode
+                darkTheme = true
             ) {
-
-                AppNavigation(
-                    darkMode = darkMode,
-                    onToggleDarkMode = {
-
-                        darkMode = !darkMode
-
-                        preferences
-                            .edit()
-                            .putBoolean(
-                                "dark_mode",
-                                darkMode
-                            )
-                            .apply()
-                    }
-                )
+                AppNavigation()
             }
         }
     }

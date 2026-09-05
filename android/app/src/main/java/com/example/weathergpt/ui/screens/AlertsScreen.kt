@@ -1,5 +1,7 @@
 package com.example.weathergpt.ui.screens
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -234,15 +236,44 @@ fun AlertsScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = { refreshKey++ },
-                    modifier = Modifier.size(34.dp)
+                var isSpinning by remember { mutableStateOf(false) }
+                val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "alerts_refresh")
+                val spinAngle by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        animation = androidx.compose.animation.core.tween(800, easing = androidx.compose.animation.core.LinearEasing),
+                        repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+                    ),
+                    label = "alerts_spin"
+                )
+
+                LaunchedEffect(isSpinning) {
+                    if (isSpinning) {
+                        kotlinx.coroutines.delay(800)
+                        isSpinning = false
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0E1626))
+                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                        .clickable {
+                            isSpinning = true
+                            refreshKey++
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh alerts",
-                        tint = PrimaryBlue,
-                        modifier = Modifier.size(18.dp)
+                        tint = if (isSpinning) SecondaryCyan else Color(0xFF8896AB),
+                        modifier = Modifier
+                            .size(17.dp)
+                            .then(if (isSpinning) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
                     )
                 }
             }
