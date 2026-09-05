@@ -54,6 +54,9 @@ import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.location.SelectedLocation
 import com.example.weathergpt.ui.components.GlassCard
 import com.example.weathergpt.ui.components.RealisticWeatherIllustration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -478,7 +481,7 @@ fun HomeScreen(
                 onDismiss = { showLocationDialog = false },
                 isManualMode = LocationStore.isManual(context),
                 onUseCurrentLocation = {
-                    coroutineScope.launch {
+                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
                         try {
                             val provider = DeviceLocationProvider(context)
                             val devLoc = provider.getCurrentLocation()
@@ -522,7 +525,8 @@ fun HomeScreen(
                                 Toast.makeText(context, "Could not acquire location. Please check device location.", Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: Exception) {
-                            Toast.makeText(context, "GPS location failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            if (e is kotlin.coroutines.cancellation.CancellationException) return@launch
+                            Toast.makeText(context, "GPS location unavailable: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                     showLocationDialog = false

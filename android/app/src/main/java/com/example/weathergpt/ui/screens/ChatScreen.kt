@@ -58,6 +58,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.example.weathergpt.audio.VoiceAssistantManager
 import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.location.DeviceLocationProvider
@@ -187,6 +191,7 @@ fun ChatScreen(
                 Toast.makeText(context, "Could not acquire location. Please check device location.", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
+            if (e is kotlin.coroutines.cancellation.CancellationException) throw e
             Log.e("ChatScreen", "Location detection error", e)
         } finally {
             isDetectingLocation = false
@@ -1144,7 +1149,7 @@ fun ChatScreen(
                 val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 if (fine || coarse) {
-                    coroutineScope.launch {
+                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
                         detectGpsLocation()
                     }
                 } else {
