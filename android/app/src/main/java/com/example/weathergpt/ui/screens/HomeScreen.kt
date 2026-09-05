@@ -19,9 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocationOn
@@ -55,6 +54,14 @@ import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.location.SelectedLocation
 import com.example.weathergpt.ui.components.GlassCard
 import com.example.weathergpt.ui.components.RealisticWeatherIllustration
+import com.example.weathergpt.ui.theme.BackgroundDark
+import com.example.weathergpt.ui.theme.BorderGlass
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
+import com.example.weathergpt.ui.theme.TextSecondary
+import com.example.weathergpt.ui.theme.WarningAmber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -166,13 +173,13 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF080C14))
+            .background(BackgroundDark)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 12.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             // ====================================================
             // LOCATION SELECTOR ROW
@@ -180,13 +187,14 @@ fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showLocationDialog = true },
+                    .clickable { showLocationDialog = true }
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = "Location",
-                    tint = Color(0xFF4DA3FF),
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(18.dp)
                 )
 
@@ -194,20 +202,30 @@ fun HomeScreen(
 
                 Text(
                     text = activeLocation.name,
-                    color = Color(0xFFF5F7FA),
+                    color = TextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(16.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // ====================================================
-            // HERO WEATHER CARD
+            // PRIMARY HERO GLASS WEATHER CARD
             // ====================================================
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(24.dp),
+                padding = 20.dp
             ) {
                 Column {
                     Row(
@@ -215,12 +233,10 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = weatherDescription(currentWeather?.symbol_code),
-                                color = Color(0xFFAAB6C7),
+                                color = TextSecondary,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Normal
                             )
@@ -229,7 +245,7 @@ fun HomeScreen(
 
                             Text(
                                 text = currentWeather?.temperature_c?.roundToInt()?.let { "$it°" } ?: "29°",
-                                color = Color(0xFFF5F7FA),
+                                color = TextPrimary,
                                 fontSize = 68.sp,
                                 fontWeight = FontWeight.Bold,
                                 lineHeight = 72.sp
@@ -242,18 +258,18 @@ fun HomeScreen(
                                 ?: 27
                             Text(
                                 text = "Feels like $feelsLikeTemp°",
-                                color = Color(0xFFAAB6C7),
+                                color = TextSecondary,
                                 fontSize = 13.sp
                             )
                         }
 
                         RealisticWeatherIllustration(
                             symbolCode = currentWeather?.symbol_code,
-                            modifier = Modifier.size(98.dp)
+                            modifier = Modifier.size(100.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -262,11 +278,11 @@ fun HomeScreen(
                     ) {
                         Text(
                             text = when {
-                                isLoading -> "Updating live conditions"
+                                isLoading -> "Updating live conditions..."
                                 hasError -> "Unable to refresh"
                                 else -> "Live conditions"
                             },
-                            color = Color(0xFF7E8B9F),
+                            color = TextMuted,
                             fontSize = 11.sp
                         )
 
@@ -278,7 +294,7 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = "Updated 2 min ago",
-                                color = Color(0xFF7E8B9F),
+                                color = TextMuted,
                                 fontSize = 11.sp
                             )
 
@@ -287,7 +303,7 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
-                                tint = Color(0xFF4DA3FF),
+                                tint = PrimaryBlue,
                                 modifier = Modifier.size(13.dp)
                             )
                         }
@@ -298,7 +314,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // ====================================================
-            // 2X2 METRICS GRID
+            // 2X2 SECONDARY METRICS GRID
             // ====================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -345,25 +361,24 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             // ====================================================
-            // ASK WEATHERGPT CARD (Screen 1 Mockup)
+            // FLOATING GLASS "ASK WEATHERGPT" CARD
             // ====================================================
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onOpenChat() },
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(22.dp),
+                padding = 16.dp
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Ask WeatherGPT",
-                            color = Color(0xFFF5F7FA),
+                            color = TextPrimary,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -372,7 +387,7 @@ fun HomeScreen(
 
                         Text(
                             text = "What would you like to know?",
-                            color = Color(0xFFAAB6C7),
+                            color = TextSecondary,
                             fontSize = 13.sp
                         )
                     }
@@ -381,14 +396,11 @@ fun HomeScreen(
 
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(
-                                        Color(0xFF4DA3FF),
-                                        Color(0xFF2563EB)
-                                    )
+                                    listOf(PrimaryBlue, Color(0xFF2563EB))
                                 )
                             )
                             .clickable { onOpenChat() },
@@ -398,7 +410,7 @@ fun HomeScreen(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = "Ask",
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -406,24 +418,26 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Card 2: Smart recommendation
+            // ====================================================
+            // DECISION SUPPORT: SMART RECOMMENDATION PANEL
+            // ====================================================
             GlassCard(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                padding = 16.dp
             ) {
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
+                Row(verticalAlignment = Alignment.Top) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color(0x20FBBF24)),
+                            .background(Color(0x26FFB84D)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lightbulb,
                             contentDescription = null,
-                            tint = Color(0xFFFBBF24),
+                            tint = WarningAmber,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -433,26 +447,26 @@ fun HomeScreen(
                     Column {
                         Text(
                             text = "Smart recommendation",
-                            color = Color.White,
+                            color = TextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        Spacer(modifier = Modifier.height(3.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
                             text = recommendation(currentWeather),
-                            color = Color(0xFFCBD5E1),
+                            color = TextSecondary,
                             fontSize = 12.sp,
-                            lineHeight = 17.sp
+                            lineHeight = 18.sp
                         )
 
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = "Based on the latest live weather data.",
-                            color = Color(0xFF64748B),
-                            fontSize = 11.sp
+                            text = "Based on the latest live weather telemetry.",
+                            color = TextMuted,
+                            fontSize = 10.sp
                         )
                     }
                 }
@@ -553,20 +567,22 @@ private fun MockupGridMetricCard(
     label: String
 ) {
     GlassCard(
-        modifier = modifier
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        padding = 14.dp
     ) {
         Column {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF16233B)),
+                    .background(Color(0x264DA3FF)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = Color(0xFF52D9FF),
+                    tint = SecondaryCyan,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -575,7 +591,7 @@ private fun MockupGridMetricCard(
 
             Text(
                 text = value,
-                color = Color(0xFFF5F7FA),
+                color = TextPrimary,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -584,7 +600,7 @@ private fun MockupGridMetricCard(
 
             Text(
                 text = label,
-                color = Color(0xFFAAB6C7),
+                color = TextSecondary,
                 fontSize = 12.sp
             )
         }

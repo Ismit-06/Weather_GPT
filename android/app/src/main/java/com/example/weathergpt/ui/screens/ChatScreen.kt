@@ -9,20 +9,20 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,28 +31,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -61,7 +63,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -76,7 +78,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,11 +89,21 @@ import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LanguageStore
 import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.location.SelectedLocation
+import com.example.weathergpt.ui.components.GlassCard
+import com.example.weathergpt.ui.theme.BackgroundDark
+import com.example.weathergpt.ui.theme.BorderGlass
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
+import com.example.weathergpt.ui.theme.TextSecondary
 import com.example.weathergpt.viewmodel.ChatViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -105,7 +116,6 @@ fun ChatScreen(
     val uiState by chatViewModel.uiState.collectAsState()
     val message = remember { mutableStateOf("") }
 
-    // Location state
     val storedLocation by LocationStore.location.collectAsState()
     val isManualFlow by LocationStore.isManualFlow.collectAsState()
     val activeLocation = storedLocation ?: remember { LocationStore.getLocation(context) }
@@ -115,13 +125,8 @@ fun ChatScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var isDetectingLocation by remember { mutableStateOf(false) }
 
-    // Language
     val selectedLanguage by LanguageStore.languageFlow.collectAsState()
-    var suggestionPageIndex by remember { mutableIntStateOf(0) }
 
-    // ----------------------------------------------------------------
-    // GPS helpers
-    // ----------------------------------------------------------------
     suspend fun detectGpsLocation() {
         isDetectingLocation = true
         try {
@@ -151,6 +156,7 @@ fun ChatScreen(
                         }
                     } catch (_: Exception) {}
                 }
+
                 val newLoc = SelectedLocation(
                     name = cityName,
                     latitude = devLoc.latitude,
@@ -178,9 +184,11 @@ fun ChatScreen(
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
         if (fine || coarse) {
-            coroutineScope.launch { detectGpsLocation() }
+            coroutineScope.launch {
+                detectGpsLocation()
+            }
         } else {
-            Toast.makeText(context, "Location permission denied.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Location permission denied. Using saved location.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -203,43 +211,23 @@ fun ChatScreen(
         }
     }
 
-    // ----------------------------------------------------------------
-    // Voice assistant
-    // ----------------------------------------------------------------
     val voiceAssistant = remember { VoiceAssistantManager(context) }
-    DisposableEffect(Unit) { onDispose { voiceAssistant.destroy() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceAssistant.destroy()
+        }
+    }
 
     val isListening by voiceAssistant.isListening.collectAsState()
     val isSpeaking by voiceAssistant.isSpeaking.collectAsState()
-    val rmsLevel by voiceAssistant.rmsLevel.collectAsState()
     var autoSpeakEnabled by remember { mutableStateOf(true) }
 
-    // ----------------------------------------------------------------
-    // Orb state — derived from app state
-    // ----------------------------------------------------------------
-    val orbState = when {
-        uiState.error?.contains("internet", ignoreCase = true) == true -> OrbState.OFFLINE
-        uiState.error?.contains("connection", ignoreCase = true) == true -> OrbState.OFFLINE
-        uiState.error?.contains("host", ignoreCase = true) == true -> OrbState.OFFLINE
-        uiState.error != null -> OrbState.ERROR
-        uiState.isLoading -> OrbState.PROCESSING
-        isSpeaking -> OrbState.AI_SPEAKING
-        isListening && rmsLevel > 0.04f -> OrbState.USER_SPEAKING
-        isListening -> OrbState.LISTENING
-        else -> OrbState.IDLE
-    }
-
-    // ----------------------------------------------------------------
-    // Single-turn messaging helper (clears previous query to keep instant answer)
-    // ----------------------------------------------------------------
     fun sendText(textToSend: String) {
         val value = textToSend.trim()
         if (value.isBlank() || uiState.isLoading) return
 
-        // Clear previous chat history so only the fresh instant answer is kept
-        chatViewModel.clearChat()
-
         val langToSend = if (selectedLanguage.equals("Auto", ignoreCase = true)) "auto" else selectedLanguage
+
         chatViewModel.sendMessage(
             question = value,
             latitude = activeLocation.latitude,
@@ -250,11 +238,15 @@ fun ChatScreen(
         message.value = ""
     }
 
-    fun sendMessage() { sendText(message.value) }
+    fun sendMessage() {
+        sendText(message.value)
+    }
 
     val onVoiceResult: (String) -> Unit = { spokenText ->
         val trimmed = spokenText.trim()
-        if (trimmed.isNotBlank()) sendText(trimmed)
+        if (trimmed.isNotBlank()) {
+            sendText(trimmed)
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -264,7 +256,9 @@ fun ChatScreen(
             voiceAssistant.startListening(
                 languageCode = selectedLanguage,
                 onResult = onVoiceResult,
-                onError = { err -> Toast.makeText(context, err, Toast.LENGTH_SHORT).show() }
+                onError = { err ->
+                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                }
             )
         } else {
             Toast.makeText(context, "Microphone permission is required for voice input", Toast.LENGTH_SHORT).show()
@@ -272,18 +266,24 @@ fun ChatScreen(
     }
 
     fun toggleVoiceListening() {
-        if (isSpeaking) voiceAssistant.stopSpeaking()
+        if (isSpeaking) {
+            voiceAssistant.stopSpeaking()
+        }
         if (isListening) {
             voiceAssistant.stopListening()
         } else {
             val hasPermission = ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
+                context,
+                Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
+
             if (hasPermission) {
                 voiceAssistant.startListening(
                     languageCode = selectedLanguage,
                     onResult = onVoiceResult,
-                    onError = { err -> Toast.makeText(context, err, Toast.LENGTH_SHORT).show() }
+                    onError = { err ->
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                    }
                 )
             } else {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -291,555 +291,398 @@ fun ChatScreen(
         }
     }
 
-    // Orb tap — state-specific behaviour
-    fun handleOrbTap() {
-        when (orbState) {
-            OrbState.IDLE, OrbState.PAUSED -> toggleVoiceListening()
-            OrbState.LISTENING,
-            OrbState.USER_SPEAKING -> voiceAssistant.stopListening()
-            OrbState.PROCESSING -> { /* intentionally no-op */ }
-            OrbState.AI_SPEAKING -> voiceAssistant.stopSpeaking()
-            OrbState.ERROR -> {
-                val lastUser = uiState.messages.lastOrNull { it.role == "user" }
-                if (lastUser != null) sendText(lastUser.content)
-            }
-            OrbState.OFFLINE ->
-                Toast.makeText(context, "No internet connection. Please check your connection.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Auto-speak assistant responses
+    // Auto-speak responses
     LaunchedEffect(uiState.messages.size) {
-        val lastMsg = uiState.messages.lastOrNull()
-        if (autoSpeakEnabled && lastMsg != null
-            && lastMsg.role.lowercase() != "user"
-            && !uiState.isLoading
-        ) {
+        val lastMessage = uiState.messages.lastOrNull()
+        if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
             val speechLang = if (!selectedLanguage.equals("Auto", ignoreCase = true)) {
                 selectedLanguage
             } else {
                 uiState.detectedLanguageCode ?: "en-IN"
             }
-            voiceAssistant.speak(lastMsg.content, speechLang)
+            voiceAssistant.speak(lastMessage.content, speechLang)
         }
     }
 
-    // Suggestions list
-    val allSuggestions = listOf(
-        listOf(
-            Triple("☂️", "Will it rain?", "Will it rain today in ${activeLocation.name}?"),
-            Triple("🧳", "What to pack?", "What should I pack for the weather in ${activeLocation.name}?"),
-            Triple("🛣️", "Road conditions", "Are roads safe in ${activeLocation.name}?")
-        ),
-        listOf(
-            Triple("🌡️", "Hourly forecast", "What is the hourly temperature in ${activeLocation.name}?"),
-            Triple("💨", "Wind & air", "What is the air quality and wind in ${activeLocation.name}?"),
-            Triple("🧭", "Radar map", "Give me a satellite radar summary for ${activeLocation.name}.")
-        )
-    )
-
-    // Orb state text & subtitles
-    val orbStateText = when (orbState) {
-        OrbState.IDLE -> "Tap to speak"
-        OrbState.LISTENING -> "Listening..."
-        OrbState.USER_SPEAKING -> "Listening..."
-        OrbState.PROCESSING -> "Thinking..."
-        OrbState.AI_SPEAKING -> "Speaking..."
-        OrbState.PAUSED -> "Paused"
-        OrbState.ERROR -> "Something went wrong"
-        OrbState.OFFLINE -> "Offline"
-    }
-    val orbStateSubtitle = when (orbState) {
-        OrbState.IDLE -> "Ask WeatherGPT anything"
-        OrbState.LISTENING -> "Speak naturally"
-        OrbState.USER_SPEAKING -> "I'm listening"
-        OrbState.PROCESSING -> "Synthesizing forecast"
-        OrbState.AI_SPEAKING -> "WeatherGPT is responding"
-        OrbState.PAUSED -> "Tap to resume"
-        OrbState.ERROR -> "Tap orb to retry"
-        OrbState.OFFLINE -> "Check your connection"
+    val currentAppLang = remember(selectedLanguage) {
+        LanguageStore.SUPPORTED_LANGUAGES.find {
+            it.code.equals(selectedLanguage, ignoreCase = true)
+        } ?: LanguageStore.SUPPORTED_LANGUAGES.first()
     }
 
-    // Status dot colour
-    val statusColor = when (orbState) {
-        OrbState.OFFLINE -> Color(0xFF7E8B9F)
-        OrbState.ERROR -> Color(0xFFFF6B6B)
-        OrbState.PROCESSING -> Color(0xFF52D9FF)
-        OrbState.AI_SPEAKING -> Color(0xFF8B7CFF)
-        OrbState.LISTENING,
-        OrbState.USER_SPEAKING -> Color(0xFF52D9FF)
-        else -> Color(0xFF36E6A0)
-    }
-    val statusText = when (orbState) {
-        OrbState.PROCESSING -> "Thinking"
-        OrbState.AI_SPEAKING -> "Speaking"
-        OrbState.LISTENING,
-        OrbState.USER_SPEAKING -> "Listening"
-        OrbState.ERROR -> "Error"
-        OrbState.OFFLINE -> "Offline"
-        else -> "AI Online"
+    // Determine current Orb state for the 220dp Living Orb
+    val orbState = when {
+        uiState.error != null -> OrbState.ERROR
+        uiState.isLoading -> OrbState.PROCESSING
+        isSpeaking -> OrbState.AI_SPEAKING
+        isListening -> OrbState.LISTENING
+        else -> OrbState.IDLE
     }
 
-    // Filtered latest query and response for the Instant Answer Tab
-    val latestUserMessage = uiState.messages.lastOrNull { it.role.lowercase() == "user" }
-    val latestAssistantMessage = uiState.messages.lastOrNull { it.role.lowercase() != "user" }
-    val hasActiveAnswer = latestAssistantMessage != null && !uiState.isLoading
-
-    // ================================================================
-    //  ROOT SINGLE-PAGE LAYOUT (No Multi-Bubble Scrolling)
-    // ================================================================
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF050A12))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .background(BackgroundDark)
     ) {
-
-        // ============================================================
-        // 1. TOP HEADER (Branding, Status, Controls)
-        // ============================================================
-        Row(
+        LazyColumn(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(
+                start = 18.dp,
+                end = 18.dp,
+                top = 8.dp,
+                bottom = 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Branding
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
+            // ----------------------------------------------------
+            // 1. CENTRAL INTERACTIVE 3D LIVING AI ORB (210dp)
+            // ----------------------------------------------------
+            item {
+                Column(
                     modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Brush.linearGradient(listOf(Color(0xFF4DA3FF), Color(0xFF2563EB)))),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.Cloud, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    WeatherAIOrb(
+                        orbState = orbState,
+                        audioAmplitude = if (isListening || isSpeaking) 0.65f else 0.05f,
+                        size = 210.dp,
+                        onTap = { toggleVoiceListening() }
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = when {
+                            isListening -> "Listening..."
+                            isSpeaking -> "Responding..."
+                            uiState.isLoading -> "Thinking..."
+                            else -> "Tap to speak"
+                        },
+                        color = TextPrimary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.2.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = when {
+                            isListening -> "Speak naturally"
+                            isSpeaking -> "Tap orb or mic to interrupt"
+                            uiState.isLoading -> "Analyzing atmospheric telemetry"
+                            else -> "Ask anything about the weather"
+                        },
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
                 }
-                Text("WeatherGPT", color = Color(0xFFF5F7FA), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp)
             }
 
-            // Right actions
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Status pill
+            // ----------------------------------------------------
+            // 2. LOCATION & LANGUAGE GLASS CAPSULE CARDS (Row of 2)
+            // ----------------------------------------------------
+            item {
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF0E1626))
-                        .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(50))
-                        .padding(horizontal = 9.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Location Card [ 📍 Amravati > ]
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(statusColor)
-                    )
-                    Text(statusText, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                // Auto-speak toggle
-                IconButton(onClick = { autoSpeakEnabled = !autoSpeakEnabled }, modifier = Modifier.size(30.dp)) {
-                    Icon(
-                        imageVector = if (autoSpeakEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                        contentDescription = "Toggle auto-speak",
-                        tint = if (autoSpeakEnabled) Color(0xFF52D9FF) else Color(0xFF7E8B9F),
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-
-                // Clear/Dismiss current answer
-                if (hasActiveAnswer || uiState.messages.isNotEmpty()) {
-                    IconButton(
-                        onClick = {
-                            voiceAssistant.stopSpeaking()
-                            voiceAssistant.stopListening()
-                            chatViewModel.clearChat()
-                        },
-                        modifier = Modifier.size(30.dp)
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xB30A1626))
+                            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+                            .clickable { showLocationDialog = true }
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "New query", tint = Color(0xFF7E8B9F), modifier = Modifier.size(17.dp))
-                    }
-                }
-            }
-        }
-
-        // ============================================================
-        // 2. CENTER STAGE: Living AI Orb + State Title
-        // ============================================================
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .padding(vertical = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Living AI Orb (Sized gracefully so it fits on all devices)
-            WeatherAIOrb(
-                orbState = orbState,
-                audioAmplitude = rmsLevel,
-                size = if (hasActiveAnswer) 150.dp else 175.dp,
-                onTap = { handleOrbTap() }
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            // State title & subtitle
-            Text(
-                text = orbStateText,
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = orbStateSubtitle,
-                color = Color(0xFF7E8B9F),
-                fontSize = 11.5.sp
-            )
-        }
-
-        // ============================================================
-        // 3. INSTANT ANSWER TAB OR IDLE CONTEXT CARDS
-        // ============================================================
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        ) {
-            AnimatedContent(
-                targetState = when {
-                    uiState.isLoading -> "loading"
-                    hasActiveAnswer -> "answer"
-                    uiState.error != null -> "error"
-                    else -> "idle"
-                },
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(220)) + slideInVertically { it / 4 }) togetherWith
-                    (fadeOut(animationSpec = tween(180)) + slideOutVertically { -it / 4 })
-                },
-                label = "center_content"
-            ) { state ->
-                when (state) {
-                    "loading" -> {
-                        // Instant Thinking Tab
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xFF0E1626))
-                                .border(1.dp, Color(0x3352D9FF), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = Color(0xFF52D9FF),
-                                    strokeWidth = 2.dp
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Location",
+                                    tint = PrimaryBlue,
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Column {
-                                    Text(
-                                        text = "WeatherGPT is analyzing telemetry...",
-                                        color = Color(0xFFF5F7FA),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    if (latestUserMessage != null) {
-                                        Text(
-                                            text = "\"${latestUserMessage.content}\"",
-                                            color = Color(0xFF7E8B9F),
-                                            fontSize = 11.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = activeLocation.name.take(12).let { if (activeLocation.name.length > 12) "$it…" else it },
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                        }
-                    }
-
-                    "answer" -> {
-                        // Instant Answer Tab (Latest Single Response)
-                        if (latestAssistantMessage != null) {
-                            InstantAnswerCard(
-                                question = latestUserMessage?.content,
-                                answer = latestAssistantMessage.content,
-                                isSpeaking = isSpeaking,
-                                onSpeak = {
-                                    if (isSpeaking) {
-                                        voiceAssistant.stopSpeaking()
-                                    } else {
-                                        voiceAssistant.speak(
-                                            latestAssistantMessage.content,
-                                            uiState.detectedLanguageCode
-                                        )
-                                    }
-                                },
-                                onCopy = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("WeatherGPT Response", latestAssistantMessage.content))
-                                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                                },
-                                onDismiss = {
-                                    voiceAssistant.stopSpeaking()
-                                    chatViewModel.clearChat()
-                                }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Select",
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
 
-                    "error" -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color(0xFF1F1010))
-                                .border(1.dp, Color(0x44FF6B6B), RoundedCornerShape(18.dp))
-                                .padding(14.dp)
+                    // Language Card [ 🌐 EN > ]
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xB30A1626))
+                            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+                            .clickable { showLanguageDialog = true }
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = uiState.error ?: "Unable to contact weather service.",
-                                    color = Color(0xFFFF8A8A),
-                                    fontSize = 12.5.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(onClick = { chatViewModel.clearChat() }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color(0xFFFF8A8A), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-                    }
-
-                    else -> {
-                        // Idle Mode: Location + Language Bar & Quick Action Chips
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // Location + Language Row
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Location Chip
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1.1f)
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Color(0xFF0E1626))
-                                        .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(18.dp))
-                                        .clickable { showLocationDialog = true }
-                                        .padding(horizontal = 12.dp, vertical = 9.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.LocationOn, contentDescription = "Location", tint = Color(0xFF4DA3FF), modifier = Modifier.size(18.dp))
-                                        Column {
-                                            Text(
-                                                text = activeLocation.name,
-                                                color = Color.White,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = if (isManual) "Custom" else "GPS Auto",
-                                                color = Color(0xFF7E8B9F),
-                                                fontSize = 10.sp
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Language Chip
-                                Box(
-                                    modifier = Modifier
-                                        .weight(0.9f)
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Color(0xFF0E1626))
-                                        .border(1.dp, Color(0x338B7CFF), RoundedCornerShape(18.dp))
-                                        .clickable { showLanguageDialog = true }
-                                        .padding(horizontal = 12.dp, vertical = 9.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Translate, contentDescription = "Language", tint = Color(0xFF8B7CFF), modifier = Modifier.size(18.dp))
-                                        Column {
-                                            val langDisplay = LanguageStore.SUPPORTED_LANGUAGES.find {
-                                                it.code.equals(selectedLanguage, ignoreCase = true)
-                                            }
-                                            Text(
-                                                text = langDisplay?.englishName ?: selectedLanguage,
-                                                color = Color.White,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Text(
-                                                text = "Language",
-                                                color = Color(0xFF7E8B9F),
-                                                fontSize = 10.sp
-                                            )
-                                        }
-                                    }
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = "Language",
+                                    tint = SecondaryCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = currentAppLang.englishName.take(10),
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-
-                            // Quick Suggestions Row
-                            val currentSuggestions = allSuggestions[suggestionPageIndex % allSuggestions.size]
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                currentSuggestions.forEach { (icon, title, query) ->
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0xFF0E1626))
-                                            .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(16.dp))
-                                            .clickable { sendText(query) }
-                                            .padding(horizontal = 6.dp, vertical = 9.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text(text = icon, fontSize = 11.sp)
-                                            Text(
-                                                text = title,
-                                                color = Color(0xFFF5F7FA),
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Next suggestions page button
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF0E1626))
-                                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
-                                        .clickable { suggestionPageIndex = (suggestionPageIndex + 1) % allSuggestions.size },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "More", tint = Color(0xFF8896AB), modifier = Modifier.size(16.dp))
-                                }
-                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Select",
+                                tint = TextMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
+                    }
+                }
+            }
+
+            // ----------------------------------------------------
+            // 3. 2x2 QUICK SUGGESTION GLASS CARDS
+            // ----------------------------------------------------
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Row 1
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🌧️",
+                            title = "Will it rain?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Will it rain today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🧳",
+                            title = "What to pack?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+
+                    // Row 2
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🛣️",
+                            title = "Road conditions",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "📖",
+                            title = "Show on map",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
+                                sendMessage()
+                            }
+                        )
+                    }
+                }
+            }
+
+            // ----------------------------------------------------
+            // 4. CONVERSATION MESSAGES (Translucent Glass Bubbles)
+            // ----------------------------------------------------
+            if (uiState.messages.isNotEmpty()) {
+                items(
+                    items = uiState.messages,
+                    key = { "${it.role}-${it.content.hashCode()}" }
+                ) { messageItem ->
+                    when (messageItem.role.lowercase()) {
+                        "user" -> GlassUserBubble(text = messageItem.content)
+                        else -> GlassAssistantBubble(
+                            text = messageItem.content,
+                            onSpeak = {
+                                if (isSpeaking) {
+                                    voiceAssistant.stopSpeaking()
+                                } else {
+                                    voiceAssistant.speak(
+                                        messageItem.content,
+                                        uiState.detectedLanguageCode
+                                    )
+                                }
+                            },
+                            isSpeaking = isSpeaking,
+                            onCopy = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("WeatherGPT Response", messageItem.content)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                }
+
+                if (uiState.isLoading) {
+                    item {
+                        GlassThinkingBubble()
                     }
                 }
             }
         }
 
-        // ============================================================
-        // 4. BOTTOM COMPOSER DOCK (Minimal text / voice bar)
-        // ============================================================
-        Row(
+        // ========================================================
+        // 5. FLOATING GLASS COMPOSER DOCK
+        // ========================================================
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF0E1626))
-                .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(32.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 18.dp, vertical = 8.dp)
         ) {
-            BasicTextField(
-                value = message.value,
-                onValueChange = { message.value = it },
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 8.dp),
-                enabled = !uiState.isLoading,
-                textStyle = TextStyle(color = Color(0xFFF5F7FA), fontSize = 13.5.sp),
-                cursorBrush = SolidColor(Color(0xFF4DA3FF)),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { sendMessage() }),
-                decorationBox = { innerTextField ->
-                    if (message.value.isEmpty()) {
-                        Text(
-                            text = when {
-                                isListening -> "Listening... Speak now"
-                                isSpeaking -> "WeatherGPT is speaking..."
-                                else -> "Ask anything or tap mic..."
-                            },
-                            color = when {
-                                isListening -> Color(0xFF52D9FF)
-                                isSpeaking -> Color(0xFF36E6A0)
-                                else -> Color(0xFF7E8B9F)
-                            },
-                            fontSize = 13.5.sp
-                        )
-                    }
-                    innerTextField()
-                }
-            )
-
-            // Mic Icon Button
-            IconButton(onClick = { toggleVoiceListening() }, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                    contentDescription = "Mic",
-                    tint = if (isListening) Color(0xFFFF6B6B) else Color(0xFF8896AB),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(Modifier.width(4.dp))
-
-            // Send Button
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (message.value.isNotBlank() && !uiState.isLoading) Color(0xFF4DA3FF)
-                        else Color(0xFF1E3A5F)
-                    )
-                    .clickable(enabled = message.value.isNotBlank() && !uiState.isLoading) { sendMessage() },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Color(0xD90A1626))
+                    .border(1.dp, BorderGlass, RoundedCornerShape(26.dp))
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
-                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF88A4C7),
-                    modifier = Modifier.size(16.dp)
+                BasicTextField(
+                    value = message.value,
+                    onValueChange = { message.value = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 8.dp),
+                    enabled = !uiState.isLoading,
+                    textStyle = TextStyle(
+                        color = TextPrimary,
+                        fontSize = 14.sp
+                    ),
+                    cursorBrush = SolidColor(PrimaryBlue),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                    decorationBox = { innerTextField ->
+                        if (message.value.isEmpty()) {
+                            Text(
+                                text = when {
+                                    isListening -> "Listening... Speak now"
+                                    isSpeaking -> "WeatherGPT is speaking..."
+                                    else -> "Type or speak..."
+                                },
+                                color = when {
+                                    isListening -> SecondaryCyan
+                                    isSpeaking -> Color(0xFF36E6A0)
+                                    else -> TextMuted
+                                },
+                                fontSize = 14.sp
+                            )
+                        }
+                        innerTextField()
+                    }
                 )
+
+                // Voice Mic Button
+                val micPulse = rememberInfiniteTransition(label = "pulse")
+                val micScale by micPulse.animateFloat(
+                    initialValue = 1.0f,
+                    targetValue = 1.2f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(500, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "scale"
+                )
+
+                IconButton(
+                    onClick = { toggleVoiceListening() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                        contentDescription = "Microphone",
+                        tint = if (isListening) Color(0xFFFF6B6B) else TextMuted,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .scale(if (isListening) micScale else 1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Circular Bright Blue Send Button
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (message.value.isNotBlank() && !uiState.isLoading) PrimaryBlue
+                            else Color(0xFF16253B)
+                        )
+                        .clickable(
+                            enabled = message.value.isNotBlank() && !uiState.isLoading
+                        ) {
+                            sendMessage()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF7E8B9F),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
 
-    // ================================================================
-    //  DIALOGS
-    // ================================================================
     if (showLocationDialog) {
         LocationSearchDialog(
             currentLocation = activeLocation.name,
@@ -849,7 +692,9 @@ fun ChatScreen(
                 val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 if (fine || coarse) {
-                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch { detectGpsLocation() }
+                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
+                        detectGpsLocation()
+                    }
                 } else {
                     locationPermissionLauncher.launch(
                         arrayOf(
@@ -883,29 +728,115 @@ fun ChatScreen(
         LanguageSelectionDialog(
             currentLanguageCode = selectedLanguage,
             onDismiss = { showLanguageDialog = false },
-            onLanguageSelected = { lang ->
-                LanguageStore.saveLanguage(context, lang.code)
+            onLanguageSelected = { appLang ->
+                LanguageStore.saveLanguage(context, appLang.code)
+                Toast.makeText(
+                    context,
+                    "Language set to ${appLang.nativeLabel} (${appLang.englishName})",
+                    Toast.LENGTH_SHORT
+                ).show()
                 showLanguageDialog = false
             }
         )
     }
 }
 
-// ================================================================
-//  INSTANT ANSWER CARD (Single-turn focused response tab)
-// ================================================================
+/**
+ * 20dp Corner Radius Glass Suggestion Card
+ */
+@Composable
+private fun SuggestionGlassCard(
+    icon: String,
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xB30A1626))
+            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = icon, fontSize = 16.sp)
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
 
 @Composable
-private fun InstantAnswerCard(
-    question: String?,
-    answer: String,
-    isSpeaking: Boolean,
+private fun GlassUserBubble(text: String) {
+    val timeString = remember { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date()) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xCC0E1A2D))
+            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1E3557)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "User",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = text,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            }
+
+            Text(
+                text = timeString,
+                color = TextMuted,
+                fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.Bottom)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassAssistantBubble(
+    text: String,
     onSpeak: () -> Unit,
-    onCopy: () -> Unit,
-    onDismiss: () -> Unit
+    isSpeaking: Boolean,
+    onCopy: () -> Unit
 ) {
-    val cleanDisplayText = remember(answer) {
-        var t = answer
+    val cleanDisplayText = remember(text) {
+        var t = text
         if (t.contains("<think>")) {
             t = t.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
         }
@@ -930,97 +861,144 @@ private fun InstantAnswerCard(
         if (filtered.isNotEmpty()) filtered.joinToString("\n\n") else t
     }
 
-    val scrollState = rememberScrollState()
+    var showMenu by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF0E1626))
+            .background(Color(0xD90A1626))
             .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(22.dp))
             .padding(14.dp)
     ) {
         Column {
-            // Header: Question + Dismiss
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(PrimaryBlue, Color(0xFF2563EB))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Brush.linearGradient(listOf(Color(0xFF4DA3FF), Color(0xFF2563EB)))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Cloud, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                    }
-                    Text(
-                        text = if (!question.isNullOrBlank()) "\"$question\"" else "Instant Answer",
-                        color = Color(0xFF52D9FF),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    Icon(
+                        imageVector = Icons.Default.Cloud,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
                     )
                 }
 
-                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, contentDescription = "Close answer", tint = Color(0xFF7E8B9F), modifier = Modifier.size(16.dp))
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Body: scrollable if long text, but compact container
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(115.dp)
-                    .verticalScroll(scrollState)
-            ) {
                 Text(
-                    text = cleanDisplayText,
-                    color = Color(0xFFF5F7FA),
-                    fontSize = 12.5.sp,
-                    lineHeight = 18.sp
+                    text = "WeatherGPT",
+                    color = SecondaryCyan,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Footer: Speak, Copy, Status
+            Text(
+                text = cleanDisplayText,
+                color = TextPrimary,
+                fontSize = 13.sp,
+                lineHeight = 19.sp
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    IconButton(onClick = onCopy, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color(0xFF7E8B9F), modifier = Modifier.size(15.dp))
-                    }
-                    IconButton(onClick = onSpeak, modifier = Modifier.size(24.dp)) {
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy",
+                        tint = TextMuted,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onSpeak,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = "Speak",
+                        tint = if (isSpeaking) SecondaryCyan else TextMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
                         Icon(
-                            imageVector = if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = "Speak",
-                            tint = if (isSpeaking) Color(0xFF52D9FF) else Color(0xFF7E8B9F),
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = TextMuted,
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                }
 
-                Text(
-                    text = "Single-Turn Weather AI",
-                    color = Color(0xFF536074),
-                    fontSize = 10.sp
-                )
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(Color(0xFF0E1A2D))
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Copy full response", color = Color.White) },
+                            onClick = {
+                                onCopy()
+                                showMenu = false
+                            }
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun GlassThinkingBubble() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.85f)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xB30A1626))
+            .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(18.dp))
+            .padding(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = SecondaryCyan,
+                strokeWidth = 2.dp
+            )
+            Text(
+                text = "WeatherGPT is analyzing telemetry...",
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
         }
     }
 }

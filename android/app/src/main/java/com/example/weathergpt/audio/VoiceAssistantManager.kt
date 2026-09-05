@@ -268,15 +268,42 @@ class VoiceAssistantManager(private val context: Context) {
             l.startsWith("let me look at") ||
             l.startsWith("looking at the data") ||
             l.startsWith("wait, let me reconsider") ||
-            l.startsWith("hmm, this is a bit confusing") ||
+            l.startsWith("hmm") ||
+            l.startsWith("i think i'm") ||
+            l.startsWith("let me just respond") ||
+            l.startsWith("i'll respond in") ||
+            l.startsWith("the user has been communicating") ||
+            l.contains("overthinking") ||
+            l.contains("respond naturally") ||
+            l.contains("weather advisory or committee") ||
+            (l.contains("could it be") && l.endsWith("?")) ||
             l.startsWith("the weather data provided is")
         }
-        val content = if (filtered.isNotEmpty()) filtered.joinToString(" ") else text
-        return content
-            .replace(Regex("[#*`_~>\\[\\]()\\-•]"), " ") // Remove markdown formatting chars
-            .replace(Regex("\\bhttps?://\\S+"), "")       // Remove URLs
-            .replace(Regex("\\s+"), " ")                  // Normalize spaces
-            .trim()
+        var content = if (filtered.isNotEmpty()) filtered.joinToString(". ") else text
+
+        // 1. Remove all Emoji unicode characters (Surrogate pairs & symbols) so TTS doesn't read out "sun behind small cloud emoji"
+        content = content.replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}\\x{1F300}-\\x{1F9FF}\\x{2600}-\\x{27BF}\\x{FE00}-\\x{FE0F}]"), "")
+        content = content.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]"), "")
+
+        // 2. Expand units phonetically for natural speech
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*C\\b"), "$1 degrees Celsius")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*F\\b"), "$1 degrees Fahrenheit")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\b"), "$1 degrees")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*km/h\\b"), "$1 kilometers per hour")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*m/s\\b"), "$1 meters per second")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*mm\\b"), "$1 millimeters")
+        content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*%\\b"), "$1 percent")
+
+        // 3. Remove markdown headers, bold labels, bullets
+        content = content.replace(Regex("(?m)^\\s*[-*•]\\s*"), "") // bullet points at start of line
+        content = content.replace(Regex("[#*`_~>\\[\\]()]"), " ")   // formatting symbols
+        content = content.replace(Regex("\\bhttps?://\\S+"), "")     // URLs
+
+        // 4. Clean up multiple punctuation and whitespace
+        content = content.replace(Regex("\\s+"), " ")
+        content = content.replace(Regex("\\.{2,}"), ".")
+        content = content.replace(Regex("\\s+([.,!?])"), "$1")
+        return content.trim()
     }
 
     fun destroy() {

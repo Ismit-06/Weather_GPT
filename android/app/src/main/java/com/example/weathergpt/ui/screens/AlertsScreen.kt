@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +44,16 @@ import androidx.compose.ui.unit.sp
 import com.example.weathergpt.data.DamClient
 import com.example.weathergpt.data.DamItem
 import com.example.weathergpt.ui.components.GlassCard
+import com.example.weathergpt.ui.theme.BackgroundDark
+import com.example.weathergpt.ui.theme.BorderGlass
+import com.example.weathergpt.ui.theme.DangerRed
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.SuccessGreen
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
+import com.example.weathergpt.ui.theme.TextSecondary
+import com.example.weathergpt.ui.theme.WarningAmber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -189,21 +197,20 @@ fun AlertsScreen(
     }
 
     val criticalDamsCount = damItems.count { (it.storage_percent ?: 0.0) >= 85.0 }
-    val highDamsCount = damItems.count { (it.storage_percent ?: 0.0) in 75.0..84.9 }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF080C14))
+            .background(BackgroundDark)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 12.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             // =========================================================
-            // HEADER (Screen 5 Mockup)
+            // HEADER (Safety Center)
             // =========================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -213,7 +220,7 @@ fun AlertsScreen(
                 Column {
                     Text(
                         text = "Safety Center",
-                        color = Color(0xFFF5F7FA),
+                        color = TextPrimary,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -222,7 +229,7 @@ fun AlertsScreen(
 
                     Text(
                         text = "Live warning intelligence",
-                        color = Color(0xFFAAB6C7),
+                        color = TextSecondary,
                         fontSize = 13.sp
                     )
                 }
@@ -234,20 +241,21 @@ fun AlertsScreen(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh alerts",
-                        tint = Color(0xFF4DA3FF),
+                        tint = PrimaryBlue,
                         modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // =========================================================
-            // OVERALL STATUS CARD (Screen 5 Mockup)
+            // OVERALL STATUS GLASS CARD
             // =========================================================
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(22.dp),
+                padding = 16.dp
             ) {
                 Column {
                     Row(
@@ -260,14 +268,14 @@ fun AlertsScreen(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF36E6A0))
+                                    .background(SuccessGreen)
                             )
 
-                            Spacer(modifier = Modifier.width(7.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Text(
-                                text = "Monitoring active",
-                                color = Color(0xFF36E6A0),
+                                text = "Warning network online",
+                                color = SuccessGreen,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -277,23 +285,23 @@ fun AlertsScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF0E1626))
-                                .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(12.dp))
+                                .background(Color(0x2636E6A0))
+                                .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(5.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF36E6A0))
+                                        .background(SuccessGreen)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = "LIVE",
-                                    color = Color(0xFF36E6A0),
+                                    color = SuccessGreen,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -305,35 +313,35 @@ fun AlertsScreen(
 
                     Text(
                         text = if (criticalDamsCount > 0) "$criticalDamsCount critical reservoirs detected" else "No critical warning detected",
-                        color = Color(0xFFF5F7FA),
+                        color = TextPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "WeatherGPT is monitoring official sources.",
-                        color = Color(0xFFAAB6C7),
+                        text = "WeatherGPT is monitoring official telemetry and national meteorological alerts.",
+                        color = TextSecondary,
                         fontSize = 12.sp,
-                        lineHeight = 16.sp
+                        lineHeight = 17.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // =========================================================
-            // WHAT NEEDS ATTENTION (Screen 5 Mockup)
+            // WHAT NEEDS ATTENTION (Semantic Alert Panels)
             // =========================================================
             Text(
                 text = "What needs attention",
-                color = Color(0xFFF5F7FA),
-                fontSize = 18.sp,
+                color = TextPrimary,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Alert 1: Moderate (Amber)
             MockupAlertCard(
@@ -342,19 +350,19 @@ fun AlertsScreen(
                 severity = "MODERATE",
                 explanation = "Periods of heavy rainfall may affect travel and low-lying areas.",
                 action = "Keep rain protection ready.",
-                accentColor = Color(0xFFFFB84D)
+                accentColor = WarningAmber
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Alert 2: Monitor (Blue) - Clicking opens dams/flood module
+            // Alert 2: Monitor (Blue/Cyan) - Clicking opens dams/flood module
             MockupAlertCard(
                 icon = Icons.Default.Warning,
                 title = "Flood intelligence",
                 severity = "MONITOR",
                 explanation = "Water-related risk should be checked using live flood modules.",
                 action = "Review flood conditions and nearby reservoir infrastructure.",
-                accentColor = Color(0xFF4DA3FF),
+                accentColor = SecondaryCyan,
                 onClick = onOpenDams
             )
 
@@ -365,12 +373,12 @@ fun AlertsScreen(
                 icon = Icons.Default.Cloud,
                 title = "Weather conditions",
                 severity = "NORMAL",
-                explanation = "No major severe-weather signal is currently displayed.",
+                explanation = "No major severe-weather signal is currently detected in your area.",
                 action = "Continue monitoring live conditions.",
-                accentColor = Color(0xFF36E6A0)
+                accentColor = SuccessGreen
             )
 
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // =========================================================
             // DAMS & RESERVOIRS DATA SECTION
@@ -385,14 +393,14 @@ fun AlertsScreen(
                         Icon(
                             imageVector = Icons.Default.WaterDrop,
                             contentDescription = null,
-                            tint = Color(0xFF388BFF),
+                            tint = PrimaryBlue,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Dam & reservoir alerts",
-                            color = Color.White,
-                            fontSize = 18.sp,
+                            color = TextPrimary,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -401,14 +409,14 @@ fun AlertsScreen(
 
                     Text(
                         text = "Central Water Commission (CWC) live storage",
-                        color = Color(0xFF94A3B8),
+                        color = TextSecondary,
                         fontSize = 12.sp
                     )
                 }
 
                 Text(
                     text = "View all →",
-                    color = Color(0xFF388BFF),
+                    color = PrimaryBlue,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
@@ -418,14 +426,14 @@ fun AlertsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             damItems.take(6).forEach { dam ->
                 DamAlertCard(
                     dam = dam,
                     onClick = onOpenDams
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -434,7 +442,7 @@ fun AlertsScreen(
 }
 
 /**
- * Alert card matching Screen 5 (Alerts) in the reference mockup.
+ * Alert card matching the semantic glass design system.
  */
 @Composable
 private fun MockupAlertCard(
@@ -450,7 +458,8 @@ private fun MockupAlertCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(20.dp),
+        padding = 14.dp
     ) {
         Column {
             Row(
@@ -478,17 +487,17 @@ private fun MockupAlertCard(
 
                     Text(
                         text = title,
-                        color = Color(0xFFF5F7FA),
+                        color = TextPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Severity pill (Screen 5 Mockup)
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
+                        .background(accentColor.copy(alpha = 0.18f))
+                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
@@ -504,9 +513,18 @@ private fun MockupAlertCard(
 
             Text(
                 text = explanation,
-                color = Color(0xFFAAB6C7),
+                color = TextSecondary,
                 fontSize = 12.sp,
                 lineHeight = 17.sp
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Recommendation: $action",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
@@ -518,25 +536,18 @@ private fun DamAlertCard(
     onClick: () -> Unit
 ) {
     val pct = dam.storage_percent ?: 0.0
-    val isCritical = pct >= 85.0
-    val isHigh = pct >= 75.0 && !isCritical
-
     val statusColor = when {
-        isCritical -> Color(0xFFFF4D4D)
-        isHigh -> Color(0xFFFFA500)
-        else -> Color(0xFF388BFF)
-    }
-
-    val statusText = when {
-        isCritical -> "CRITICAL"
-        isHigh -> "HIGH"
-        else -> "NORMAL"
+        pct >= 85.0 -> DangerRed
+        pct >= 70.0 -> WarningAmber
+        else -> SuccessGreen
     }
 
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable { onClick() },
+        shape = RoundedCornerShape(18.dp),
+        padding = 14.dp
     ) {
         Column {
             Row(
@@ -544,202 +555,35 @@ private fun DamAlertCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(statusColor.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WaterDrop,
-                            contentDescription = null,
-                            tint = statusColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Column {
-                        Text(
-                            text = dam.name ?: "Reservoir",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        val subInfo = listOfNotNull(dam.state, dam.basin).joinToString(" • ")
-                        if (subInfo.isNotBlank()) {
-                            Text(
-                                text = subInfo,
-                                color = Color(0xFF94A3B8),
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = dam.name ?: "Reservoir",
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${dam.state ?: ""} • ${dam.basin ?: ""}",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
                 }
 
-                // Status pill
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(statusColor.copy(alpha = 0.16f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .background(statusColor.copy(alpha = 0.15f))
+                        .border(1.dp, statusColor.copy(alpha = 0.30f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "$statusText ${String.format(java.util.Locale.US, "%.1f", pct)}%",
+                        text = "${"%.1f".format(pct)}%",
                         color = statusColor,
-                        fontSize = 10.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Storage progress bar
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Current Fill",
-                        color = Color(0xFF94A3B8),
-                        fontSize = 11.sp
-                    )
-                    Text(
-                        text = "${String.format(java.util.Locale.US, "%.1f", pct)}% of full capacity",
-                        color = statusColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(5.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(Color(0xFF1E293B))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth((pct / 100.0).coerceIn(0.0, 1.0).toFloat())
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(
-                                        statusColor.copy(alpha = 0.7f),
-                                        statusColor
-                                    )
-                                )
-                            )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Metrics Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Metric 1: Level
-                if (dam.current_level_m != null) {
-                    MetricChip(
-                        modifier = Modifier.weight(1f),
-                        label = "CURRENT LEVEL",
-                        value = "${dam.current_level_m}m" + if (dam.frl_m != null) " (FRL ${dam.frl_m}m)" else ""
-                    )
-                }
-
-                // Metric 2: Storage
-                if (dam.live_storage_bcm != null) {
-                    MetricChip(
-                        modifier = Modifier.weight(1f),
-                        label = "LIVE STORAGE",
-                        value = "${dam.live_storage_bcm} BCM"
-                    )
-                }
-
-                // Metric 3: Power
-                if (dam.hydel_mw != null && dam.hydel_mw > 0) {
-                    MetricChip(
-                        modifier = Modifier.weight(1f),
-                        label = "HYDEL POWER",
-                        value = "${dam.hydel_mw.toInt()} MW"
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Advisory line
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "STATUS:",
-                    color = Color(0xFF64748B),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (isCritical) {
-                        "Approaching Full Reservoir Level (FRL). Discharge gates under active watch."
-                    } else if (isHigh) {
-                        "High reservoir storage buffer. Inflow monitoring active."
-                    } else {
-                        "Normal seasonal water holding capacity."
-                    },
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetricChip(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF0F172A))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        Column {
-            Text(
-                text = label,
-                color = Color(0xFF64748B),
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                color = Color(0xFFE2E8F0),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
-            )
         }
     }
 }

@@ -59,6 +59,13 @@ import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.ui.components.GlassCard
 import com.example.weathergpt.ui.components.RealisticWeatherIllustration
+import com.example.weathergpt.ui.theme.BackgroundDark
+import com.example.weathergpt.ui.theme.BorderGlass
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
+import com.example.weathergpt.ui.theme.TextSecondary
 import com.example.weathergpt.viewmodel.ForecastState
 import com.example.weathergpt.viewmodel.ForecastViewModel
 import java.time.ZonedDateTime
@@ -110,7 +117,7 @@ fun ForecastScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF080C14))
+            .background(BackgroundDark)
     ) {
         when (val currentState = state) {
             ForecastState.Loading -> {
@@ -144,7 +151,7 @@ private fun ForecastLoading() {
     ) {
         Text(
             text = "Loading forecast",
-            color = Color.White,
+            color = TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
@@ -152,8 +159,8 @@ private fun ForecastLoading() {
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = "Fetching live weather intelligence...",
-            color = Color(0xFF94A3B8),
+            text = "Fetching live weather telemetry...",
+            color = TextMuted,
             fontSize = 13.sp
         )
     }
@@ -173,7 +180,7 @@ private fun ForecastError(
     ) {
         Text(
             text = "Forecast unavailable",
-            color = Color.White,
+            color = TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
@@ -182,7 +189,7 @@ private fun ForecastError(
 
         Text(
             text = message,
-            color = Color(0xFF94A3B8),
+            color = TextMuted,
             fontSize = 13.sp
         )
 
@@ -208,10 +215,10 @@ private fun ForecastContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .padding(horizontal = 18.dp, vertical = 10.dp)
     ) {
         // =========================================================
-        // LOCATION ROW (Screen 3 Mockup)
+        // LOCATION ROW
         // =========================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -222,15 +229,15 @@ private fun ForecastContent(
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
-                    tint = Color(0xFF4DA3FF),
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(16.dp)
                 )
 
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Text(
                     text = locationName,
-                    color = Color(0xFFF5F7FA),
+                    color = TextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -243,16 +250,16 @@ private fun ForecastContent(
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
-                    tint = Color(0xFF4DA3FF),
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(16.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // =========================================================
-        // 3 SEGMENTED TAB SWITCHER (Screen 3 Mockup)
+        // 3 SEGMENTED TAB SWITCHER (Glass Capsules)
         // =========================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -264,10 +271,10 @@ private fun ForecastContent(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (active) Color(0xFF4DA3FF) else Color(0xFF0E1626))
+                        .background(if (active) Color(0x334DA3FF) else Color(0xB30A1626))
                         .border(
                             1.dp,
-                            if (active) Color(0xFF4DA3FF) else Color(0x2EFFFFFF),
+                            if (active) Color(0x6652D9FF) else BorderGlass,
                             RoundedCornerShape(20.dp)
                         )
                         .clickable { selectedTab = index }
@@ -276,19 +283,19 @@ private fun ForecastContent(
                 ) {
                     Text(
                         text = label,
-                        color = if (active) Color.White else Color(0xFFAAB6C7),
+                        color = if (active) Color.White else TextSecondary,
                         fontSize = 13.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (selectedTab == 0) {
             // =========================================================
-            // HOURLY STRIP (Screen 3 Mockup)
+            // HOURLY STRIP CAROUSEL
             // =========================================================
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -299,14 +306,14 @@ private fun ForecastContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // =========================================================
-            // TEMPERATURE TREND (Screen 3 Mockup)
+            // TEMPERATURE TREND SPLINE CHART
             // =========================================================
             Text(
                 text = "Temperature trend",
-                color = Color(0xFFF5F7FA),
+                color = TextPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -315,7 +322,8 @@ private fun ForecastContent(
 
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(22.dp),
+                padding = 16.dp
             ) {
                 SplineTemperatureChart(
                     forecastItems = forecast.take(24)
@@ -325,7 +333,7 @@ private fun ForecastContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             // =========================================================
-            // 2X2 METRICS GRID (Screen 3 Mockup)
+            // 2X2 METRICS GRID
             // =========================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -375,7 +383,8 @@ private fun ForecastContent(
                 forecast.take(7).forEach { item ->
                     GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        padding = 14.dp
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -385,13 +394,13 @@ private fun ForecastContent(
                             Column {
                                 Text(
                                     text = formatDay(item.time),
-                                    color = Color(0xFFF5F7FA),
+                                    color = TextPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
                                     text = weatherDescription(item.symbol_code),
-                                    color = Color(0xFFAAB6C7),
+                                    color = TextSecondary,
                                     fontSize = 12.sp
                                 )
                             }
@@ -401,7 +410,7 @@ private fun ForecastContent(
                             )
                             Text(
                                 text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
-                                color = Color(0xFFF5F7FA),
+                                color = TextPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -416,7 +425,7 @@ private fun ForecastContent(
 }
 
 /**
- * 2x2 Metric card used under temperature trend in Screen 3 (Forecast).
+ * 2x2 Metric card used under temperature trend in ForecastScreen.
  */
 @Composable
 private fun ForecastGridCard(
@@ -427,7 +436,8 @@ private fun ForecastGridCard(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(20.dp),
+        padding = 12.dp
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically
@@ -436,13 +446,13 @@ private fun ForecastGridCard(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF16233B)),
+                    .background(Color(0x264DA3FF)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = Color(0xFF52D9FF),
+                    tint = SecondaryCyan,
                     modifier = Modifier.size(17.dp)
                 )
             }
@@ -452,13 +462,13 @@ private fun ForecastGridCard(
             Column {
                 Text(
                     text = title,
-                    color = Color(0xFFAAB6C7),
+                    color = TextSecondary,
                     fontSize = 11.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = value,
-                    color = Color(0xFFF5F7FA),
+                    color = TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -468,7 +478,7 @@ private fun ForecastGridCard(
 }
 
 /**
- * Next Hours hourly forecast card.
+ * Hourly forecast glass card.
  */
 @Composable
 private fun HourlyItemCard(
@@ -480,10 +490,10 @@ private fun HourlyItemCard(
 
     Box(
         modifier = Modifier
-            .width(66.dp)
+            .width(68.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xFF0E1626))
-            .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(18.dp))
+            .background(Color(0xB30A1626))
+            .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -492,7 +502,7 @@ private fun HourlyItemCard(
         ) {
             Text(
                 text = timeLabel,
-                color = Color(0xFFAAB6C7),
+                color = TextSecondary,
                 fontSize = 12.sp
             )
 
@@ -507,7 +517,7 @@ private fun HourlyItemCard(
 
             Text(
                 text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
-                color = Color(0xFFF5F7FA),
+                color = TextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -525,7 +535,7 @@ private fun SplineTemperatureChart(
 ) {
     val temps = forecastItems.mapNotNull { it.temperature_c }
     if (temps.size < 2) {
-        Text(text = "Not enough forecast data", color = Color(0xFF94A3B8), fontSize = 12.sp)
+        Text(text = "Not enough forecast data", color = TextMuted, fontSize = 12.sp)
         return
     }
 
@@ -533,7 +543,6 @@ private fun SplineTemperatureChart(
     val maxTemp = temps.maxOrNull() ?: 35.0
     val tempRange = (maxTemp - minTemp).coerceAtLeast(4.0)
 
-    // Find peak index for tooltip
     val peakIndex = temps.indexOf(maxTemp).coerceAtLeast(0)
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -555,7 +564,6 @@ private fun SplineTemperatureChart(
                     Offset(x, y)
                 }
 
-                // Create smooth cubic bezier curve
                 val path = Path()
                 path.moveTo(points.first().x, points.first().y)
                 for (i in 0 until points.size - 1) {
@@ -566,7 +574,6 @@ private fun SplineTemperatureChart(
                     path.cubicTo(cx1, p0.y, cx2, p1.y, p1.x, p1.y)
                 }
 
-                // Fill area below curve with gradient
                 val fillPath = Path()
                 fillPath.addPath(path)
                 fillPath.lineTo(w, h)
@@ -582,14 +589,12 @@ private fun SplineTemperatureChart(
                     )
                 )
 
-                // Draw curve stroke
                 drawPath(
                     path = path,
-                    color = Color(0xFF4DA3FF),
+                    color = PrimaryBlue,
                     style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // Peak point circle
                 if (peakIndex in points.indices) {
                     val peakPoint = points[peakIndex]
                     drawCircle(
@@ -598,7 +603,7 @@ private fun SplineTemperatureChart(
                         center = peakPoint
                     )
                     drawCircle(
-                        color = Color(0xFF4DA3FF),
+                        color = PrimaryBlue,
                         radius = 2.dp.toPx(),
                         center = peakPoint
                     )
@@ -613,13 +618,13 @@ private fun SplineTemperatureChart(
             ) {
                 Text(
                     text = "${minTemp.roundToInt()}°",
-                    color = Color(0xFFAAB6C7),
+                    color = TextSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Tooltip callout pill at peak point (Screen 3 Mockup)
+            // Tooltip callout pill at peak point
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -628,13 +633,13 @@ private fun SplineTemperatureChart(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF0E1626))
-                        .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(10.dp))
+                        .background(Color(0xD90A1626))
+                        .border(1.dp, BorderGlass, RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "${maxTemp.roundToInt()}°\n18:00",
-                        color = Color(0xFFF5F7FA),
+                        color = TextPrimary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         lineHeight = 12.sp
@@ -645,7 +650,6 @@ private fun SplineTemperatureChart(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // X-axis timestamps: Now, 6H, 12H, 18H, 24H (Screen 3 Mockup)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -653,7 +657,7 @@ private fun SplineTemperatureChart(
             listOf("Now", "6H", "12H", "18H", "24H").forEach { label ->
                 Text(
                     text = label,
-                    color = Color(0xFFAAB6C7),
+                    color = TextSecondary,
                     fontSize = 11.sp
                 )
             }

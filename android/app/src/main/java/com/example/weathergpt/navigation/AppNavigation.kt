@@ -1,6 +1,9 @@
 package com.example.weathergpt.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +16,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -23,22 +28,25 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
@@ -51,209 +59,123 @@ import com.example.weathergpt.ui.screens.DamScreen
 import com.example.weathergpt.ui.screens.ForecastScreen
 import com.example.weathergpt.ui.screens.HomeScreen
 import com.example.weathergpt.ui.screens.MapScreen
+import com.example.weathergpt.ui.theme.AccentPurple
+import com.example.weathergpt.ui.theme.BackgroundDark
+import com.example.weathergpt.ui.theme.BorderGlass
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.SuccessGreen
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
+import com.example.weathergpt.ui.theme.TextSecondary
 
 sealed class Screen(
     val route: String,
     val title: String
 ) {
-
-    data object Home : Screen(
-        route = "home",
-        title = "Home"
-    )
-
-    data object Chat : Screen(
-        route = "chat",
-        title = "Chat"
-    )
-
-    data object Forecast : Screen(
-        route = "forecast",
-        title = "Forecast"
-    )
-
-    data object Map : Screen(
-        route = "map",
-        title = "Map"
-    )
-
-    data object Alerts : Screen(
-        route = "alerts",
-        title = "Alerts"
-    )
-
-    data object Dams : Screen(
-        route = "dams",
-        title = "Dams"
-    )
+    data object Home : Screen("home", "Home")
+    data object Chat : Screen("chat", "Chat")
+    data object Forecast : Screen("forecast", "Forecast")
+    data object Map : Screen("map", "Map")
+    data object Alerts : Screen("alerts", "Alerts")
+    data object Dams : Screen("dams", "Dams")
 }
-
 
 @Composable
 fun AppNavigation(
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit
 ) {
+    val navController = rememberNavController()
 
-    val navController =
-        rememberNavController()
+    val screens = listOf(
+        Screen.Home,
+        Screen.Chat,
+        Screen.Forecast,
+        Screen.Map,
+        Screen.Alerts
+    )
 
-    val screens =
-        listOf(
-            Screen.Home,
-            Screen.Chat,
-            Screen.Forecast,
-            Screen.Map,
-            Screen.Alerts
-        )
-
-    val backStackEntry by
-        navController
-            .currentBackStackEntryAsState()
-
-    val currentRoute =
-        backStackEntry
-            ?.destination
-            ?.route
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
 
     Scaffold(
-
-        containerColor =
-            MaterialTheme.colorScheme.background,
-
+        containerColor = BackgroundDark,
         topBar = {
-
-            ModernHeader(
+            FloatingGlassHeader(
                 darkMode = darkMode,
                 onToggleDarkMode = onToggleDarkMode
             )
         },
-
         bottomBar = {
-
-            ModernBottomBar(
+            FloatingGlassBottomDock(
                 screens = screens,
                 currentRoute = currentRoute,
                 onNavigate = { route ->
-
                     if (currentRoute != route) {
-
                         navController.navigate(route) {
-
-                            popUpTo(
-                                Screen.Home.route
-                            ) {
+                            popUpTo(Screen.Home.route) {
                                 saveState = true
                             }
-
                             launchSingleTop = true
-
                             restoreState = true
                         }
                     }
                 }
             )
         }
-
     ) { innerPadding ->
-
         Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme
-                                    .colorScheme
-                                    .background,
-
-                                MaterialTheme
-                                    .colorScheme
-                                    .surface,
-
-                                MaterialTheme
-                                    .colorScheme
-                                    .background
-                            )
-                        )
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF0D1B2E), // Subtle dark blue atmospheric core
+                            Color(0xFF081220),
+                            BackgroundDark
+                        ),
+                        radius = 1600f
                     )
+                )
         ) {
-
             NavHost(
-
-                navController =
-                    navController,
-
-                startDestination =
-                    Screen.Home.route,
-
-                modifier =
-                    Modifier.fillMaxSize()
+                navController = navController,
+                startDestination = Screen.Home.route,
+                modifier = Modifier.fillMaxSize()
             ) {
-
-                composable(
-                    Screen.Home.route
-                ) {
-
+                composable(Screen.Home.route) {
                     HomeScreen(
                         onOpenChat = {
-
-                            navController.navigate(
-                                Screen.Chat.route
-                            )
+                            navController.navigate(Screen.Chat.route)
                         }
                     )
                 }
 
-
-                composable(
-                    Screen.Chat.route
-                ) {
-
+                composable(Screen.Chat.route) {
                     ChatScreen()
                 }
 
-
-                composable(
-                    Screen.Forecast.route
-                ) {
-
+                composable(Screen.Forecast.route) {
                     ForecastScreen()
                 }
 
-
-                composable(
-                    Screen.Map.route
-                ) {
-
+                composable(Screen.Map.route) {
                     MapScreen()
                 }
 
-
-                composable(
-                    Screen.Alerts.route
-                ) {
-
+                composable(Screen.Alerts.route) {
                     AlertsScreen(
                         onOpenDams = {
-
-                            navController.navigate(
-                                Screen.Dams.route
-                            )
+                            navController.navigate(Screen.Dams.route)
                         }
                     )
                 }
 
-
-                composable(
-                    Screen.Dams.route
-                ) {
-
+                composable(Screen.Dams.route) {
                     DamScreen(
                         onBack = {
-
                             navController.popBackStack()
                         }
                     )
@@ -263,166 +185,130 @@ fun AppNavigation(
     }
 }
 
-
 /*
  * ================================================================
- * MODERN HEADER
+ * SLIM FLOATING GLASS HEADER (56-64px height)
  * ================================================================
  */
 
 @Composable
-private fun ModernHeader(
+private fun FloatingGlassHeader(
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit
 ) {
-    Surface(
-        color = Color(0xFF050A12),
-        shadowElevation = 0.dp,
-        modifier = Modifier.statusBarsPadding()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(BackgroundDark)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 18.dp,
-                        vertical = 8.dp
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xD90A1626), // 85% opacity dark navy glass
+                            Color(0xBF0A1626)
+                        )
                     )
+                )
+                .border(
+                    width = 1.dp,
+                    color = BorderGlass,
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
             Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-                verticalAlignment =
-                    Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Logo + Title
                 Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
-                        modifier =
-                            Modifier
-                                .size(38.dp)
-                                .clip(
-                                    RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(PrimaryBlue, Color(0xFF2563EB))
                                 )
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            Color(0xFF4DA3FF),
-                                            Color(0xFF2563EB)
-                                        )
-                                    )
-                                ),
-                        contentAlignment =
-                            Alignment.Center
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector =
-                                Icons.Default.Cloud,
-                            contentDescription = null,
-                            tint =
-                                Color.White,
-                            modifier =
-                                Modifier.size(22.dp)
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = "WeatherGPT",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-
-                    Spacer(
-                        modifier =
-                            Modifier.size(10.dp)
-                    )
 
                     Column {
                         Text(
                             text = "WeatherGPT",
-                            color = Color(0xFFF5F7FA),
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = 18.sp
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
                         )
-
                         Text(
                             text = "AI Weather Intelligence",
-                            color = Color(0xFFAAB6C7),
-                            fontSize = 11.sp
+                            color = TextSecondary,
+                            fontSize = 10.sp
                         )
                     }
                 }
 
+                // Status & Actions
                 Row(
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(
-                        shape =
-                            RoundedCornerShape(16.dp),
-                        color =
-                            Color(0xFF0E1626),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2EFFFFFF))
+                    // LIVE Status Pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0x2636E6A0))
+                            .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
                     ) {
                         Row(
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = 9.dp,
-                                    vertical = 5.dp
-                                ),
-                            verticalAlignment =
-                                Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Box(
-                                modifier =
-                                    Modifier
-                                        .size(6.dp)
-                                        .clip(
-                                            androidx.compose.foundation
-                                                .shape
-                                                .CircleShape
-                                        )
-                                        .background(
-                                            Color(0xFF36E6A0)
-                                        )
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(SuccessGreen)
                             )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.size(5.dp)
-                            )
-
                             Text(
                                 text = "LIVE",
-                                color = Color(0xFF36E6A0),
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                fontSize = 10.sp
+                                color = SuccessGreen,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
                             )
                         }
                     }
 
-                    Spacer(
-                        modifier =
-                            Modifier.size(4.dp)
-                    )
-
+                    // Theme Toggle
                     IconButton(
-                        onClick =
-                            onToggleDarkMode
+                        onClick = onToggleDarkMode,
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector =
-                                if (darkMode) {
-                                    Icons.Default.LightMode
-                                } else {
-                                    Icons.Default.DarkMode
-                                },
-                            contentDescription =
-                                if (darkMode) {
-                                    "Light mode"
-                                } else {
-                                    "Dark mode"
-                                },
-                            tint =
-                                Color(0xFFF5F7FA)
+                            imageVector = if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (darkMode) "Light mode" else "Dark mode",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -431,122 +317,115 @@ private fun ModernHeader(
     }
 }
 
-
 /*
  * ================================================================
- * MODERN BOTTOM NAVIGATION
+ * FLOATING GLASS BOTTOM NAVIGATION DOCK (28dp radius)
  * ================================================================
  */
 
 @Composable
-private fun ModernBottomBar(
+private fun FloatingGlassBottomDock(
     screens: List<Screen>,
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
-    Surface(
-        color = Color(0xFF050A12),
-        shadowElevation = 8.dp,
+    Box(
         modifier = Modifier
-            .background(Color(0xFF050A12))
+            .fillMaxWidth()
+            .background(BackgroundDark)
             .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 8.dp)
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(Color(0x1AFFFFFF))
-            )
-            NavigationBar(
-                containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                modifier =
-                    Modifier.padding(
-                        horizontal = 4.dp,
-                        vertical = 2.dp
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xE60A1626), // 90% opacity dark glass
+                            Color(0xCC0A1626)
+                        )
                     )
+                )
+                .border(
+                    width = 1.dp,
+                    color = BorderGlass,
+                    shape = RoundedCornerShape(26.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 screens.forEach { screen ->
-                    val selected =
-                        currentRoute == screen.route
+                    val isSelected = currentRoute == screen.route
+                    val interactionSource = remember { MutableInteractionSource() }
 
-                    NavigationBarItem(
-                        selected =
-                            selected,
-                        onClick = {
-                            onNavigate(
-                                screen.route
-                            )
-                        },
-                        icon = {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null
+                            ) {
+                                onNavigate(screen.route)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) Color(0x2E4DA3FF) else Color.Transparent
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
-                                imageVector =
-                                    navigationIcon(
-                                        screen
-                                    ),
-                                contentDescription =
-                                    screen.title,
-                                modifier =
-                                    Modifier.size(
-                                        22.dp
-                                    )
+                                imageVector = if (isSelected) navIconFilled(screen) else navIconOutlined(screen),
+                                contentDescription = screen.title,
+                                tint = if (isSelected) SecondaryCyan else TextMuted,
+                                modifier = Modifier.size(20.dp)
                             )
-                        },
-                        label = {
-                            Text(
-                                text =
-                                    screen.title,
-                                fontSize =
-                                    10.sp,
-                                fontWeight =
-                                    if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold
-                                    else androidx.compose.ui.text.font.FontWeight.Normal
-                            )
-                        },
-                        colors =
-                            NavigationBarItemDefaults.colors(
-                                selectedIconColor =
-                                    Color(0xFF4DA3FF),
-                                selectedTextColor =
-                                    Color(0xFF4DA3FF),
-                                unselectedIconColor =
-                                    Color(0xFFAAB6C7),
-                                unselectedTextColor =
-                                    Color(0xFFAAB6C7),
-                                indicatorColor =
-                                    Color(0x1A4DA3FF)
-                            )
-                    )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Text(
+                            text = screen.title,
+                            color = if (isSelected) SecondaryCyan else TextMuted,
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-
-private fun navigationIcon(
-    screen: Screen
-): androidx.compose.ui.graphics.vector.ImageVector {
-
+private fun navIconFilled(screen: Screen): ImageVector {
     return when (screen) {
+        Screen.Home -> Icons.Default.Home
+        Screen.Chat -> Icons.AutoMirrored.Filled.Chat
+        Screen.Forecast -> Icons.Default.Cloud
+        Screen.Map -> Icons.Default.Map
+        Screen.Alerts -> Icons.Default.Warning
+        Screen.Dams -> Icons.Default.WaterDrop
+    }
+}
 
-        Screen.Home ->
-            Icons.Default.Home
-
-        Screen.Chat ->
-            Icons.AutoMirrored.Filled.Chat
-
-        Screen.Forecast ->
-            Icons.Default.Cloud
-
-        Screen.Map ->
-            Icons.Default.Map
-
-        Screen.Alerts ->
-            Icons.Default.Warning
-
-        Screen.Dams ->
-            Icons.Default.WaterDrop
+private fun navIconOutlined(screen: Screen): ImageVector {
+    return when (screen) {
+        Screen.Home -> Icons.Outlined.Home
+        Screen.Chat -> Icons.Outlined.Chat
+        Screen.Forecast -> Icons.Outlined.Cloud
+        Screen.Map -> Icons.Outlined.Map
+        Screen.Alerts -> Icons.Outlined.Warning
+        Screen.Dams -> Icons.Default.WaterDrop
     }
 }
