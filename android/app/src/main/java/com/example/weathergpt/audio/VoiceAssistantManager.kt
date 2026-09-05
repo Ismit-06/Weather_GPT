@@ -144,30 +144,30 @@ class VoiceAssistantManager(private val context: Context) {
             val speechLocale = when {
                 languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
                     Locale.getDefault()
+                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) ->
+                    Locale("or", "IN")
+                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) ->
+                    Locale("hi", "IN")
+                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) ->
+                    Locale("te", "IN")
+                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) ->
+                    Locale("ta", "IN")
+                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) ->
+                    Locale("kn", "IN")
+                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) ->
+                    Locale("bn", "IN")
+                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) ->
+                    Locale("mr", "IN")
+                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) ->
+                    Locale("gu", "IN")
+                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) ->
+                    Locale("ml", "IN")
+                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) ->
+                    Locale("pa", "IN")
+                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) ->
+                    Locale.ENGLISH
                 languageCode.contains("-") ->
                     Locale.forLanguageTag(languageCode)
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) ->
-                    Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) ->
-                    Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) ->
-                    Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) ->
-                    Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) ->
-                    Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) ->
-                    Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) ->
-                    Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) ->
-                    Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) ->
-                    Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) ->
-                    Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) ->
-                    Locale.ENGLISH
                 else ->
                     Locale.forLanguageTag(languageCode)
             }
@@ -178,6 +178,7 @@ class VoiceAssistantManager(private val context: Context) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLocale.toLanguageTag())
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("hi-IN", "or-IN", "te-IN", "ta-IN", "bn-IN", "en-IN"))
             }
 
             speechRecognizer?.startListening(intent)
@@ -209,30 +210,30 @@ class VoiceAssistantManager(private val context: Context) {
             val locale = when {
                 languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
                     Locale.getDefault()
+                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) ->
+                    Locale("or", "IN")
+                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) ->
+                    Locale("hi", "IN")
+                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) ->
+                    Locale("te", "IN")
+                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) ->
+                    Locale("ta", "IN")
+                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) ->
+                    Locale("kn", "IN")
+                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) ->
+                    Locale("bn", "IN")
+                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) ->
+                    Locale("mr", "IN")
+                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) ->
+                    Locale("gu", "IN")
+                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) ->
+                    Locale("ml", "IN")
+                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) ->
+                    Locale("pa", "IN")
+                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) ->
+                    Locale.ENGLISH
                 languageCode.contains("-") ->
                     Locale.forLanguageTag(languageCode)
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) ->
-                    Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) ->
-                    Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) ->
-                    Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) ->
-                    Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) ->
-                    Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) ->
-                    Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) ->
-                    Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) ->
-                    Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) ->
-                    Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) ->
-                    Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) ->
-                    Locale.ENGLISH
                 else ->
                     Locale.forLanguageTag(languageCode)
             }

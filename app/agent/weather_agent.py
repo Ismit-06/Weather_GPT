@@ -38,6 +38,76 @@ from app.tools.best_time import (
 from app.tools.location import (
     search_locations,
 )
+import re
+
+
+def resolve_language(question: str, requested_lang: str | None) -> tuple[str, str, str | None]:
+    """
+    Returns (detected_language, language_code, script_code)
+    Handles Auto-detection (Script-based + keywords + fallback) as well as explicitly chosen languages.
+    """
+    # If user explicitly selected a language from the UI:
+    if requested_lang and requested_lang.strip().lower() != "auto":
+        req = requested_lang.strip().lower()
+        if "odia" in req or "oriya" in req or req == "or" or req == "od-in" or req == "or-in":
+            return ("Odia", "or-IN", "Orya")
+        if "hinglish" in req:
+            return ("Hinglish", "hi-IN", "Latn")
+        if "hindi" in req or req == "hi" or req == "hi-in":
+            return ("Hindi", "hi-IN", "Deva")
+        if "telugu" in req or req == "te" or req == "te-in":
+            return ("Telugu", "te-IN", "Telu")
+        if "tamil" in req or req == "ta" or req == "ta-in":
+            return ("Tamil", "ta-IN", "Taml")
+        if "bengali" in req or req == "bn" or req == "bn-in":
+            return ("Bengali", "bn-IN", "Beng")
+        if "marathi" in req or req == "mr" or req == "mr-in":
+            return ("Marathi", "mr-IN", "Deva")
+        if "gujarati" in req or req == "gu" or req == "gu-in":
+            return ("Gujarati", "gu-IN", "Gujr")
+        if "kannada" in req or req == "kn" or req == "kn-in":
+            return ("Kannada", "kn-IN", "Knda")
+        if "malayalam" in req or req == "ml" or req == "ml-in":
+            return ("Malayalam", "ml-IN", "Mlym")
+        if "punjabi" in req or req == "pa" or req == "pa-in":
+            return ("Punjabi", "pa-IN", "Guru")
+        if "english" in req or req == "en" or req == "en-in":
+            return ("English", "en-IN", "Latn")
+        return (requested_lang.capitalize(), "en-IN", None)
+
+    # AUTO-DETECTION:
+    # 1. Check Unicode script in question
+    if re.search(r'[\u0B00-\u0B7F]', question):
+        return ("Odia", "or-IN", "Orya")
+    if re.search(r'[\u0C00-\u0C7F]', question):
+        return ("Telugu", "te-IN", "Telu")
+    if re.search(r'[\u0B80-\u0BFF]', question):
+        return ("Tamil", "ta-IN", "Taml")
+    if re.search(r'[\u0980-\u09FF]', question):
+        return ("Bengali", "bn-IN", "Beng")
+    if re.search(r'[\u0C80-\u0CFF]', question):
+        return ("Kannada", "kn-IN", "Knda")
+    if re.search(r'[\u0D00-\u0D7F]', question):
+        return ("Malayalam", "ml-IN", "Mlym")
+    if re.search(r'[\u0A80-\u0AFF]', question):
+        return ("Gujarati", "gu-IN", "Gujr")
+    if re.search(r'[\u0A00-\u0A7F]', question):
+        return ("Punjabi", "pa-IN", "Guru")
+    if re.search(r'[\u0900-\u097F]', question):
+        return ("Hindi", "hi-IN", "Deva")
+
+    # 2. Check Romanized keywords
+    lower_q = question.lower()
+    odia_keywords = ["barsa", "barsha", "aaji", "kete", "kemiti", "nahin", "heba", "pani", "tati", "bhitare", "kahinki", "bhubaneswar", "cuttack", "odisha"]
+    if any(re.search(r'\b' + re.escape(w) + r'\b', lower_q) for w in odia_keywords):
+        return ("Odia", "or-IN", "Latn")
+
+    hindi_keywords = ["kya", "aaj", "barish", "baarish", "hogi", "hoga", "mausam", "kaisa", "batao", "hai", "hain", "garmi", "thand", "dhoop", "kal", "parso"]
+    if any(re.search(r'\b' + re.escape(w) + r'\b', lower_q) for w in hindi_keywords):
+        return ("Hinglish", "hi-IN", "Latn")
+
+    # Default fallback to English
+    return ("English", "en-IN", "Latn")
 
 
 class WeatherAgent:
@@ -237,39 +307,26 @@ class WeatherAgent:
             )
 
         # -----------------------------------------------------
+
+
         # Language
         # -----------------------------------------------------
 
-        detected_language = None
-        language_code = None
-        script_code = None
+        detected_language, language_code, script_code = resolve_language(
+            question=question,
+            requested_lang=language,
+        )
 
-        if (
-            not language
-            or language.lower() == "auto"
-        ):
-
-            detection = await detect_language(
-                question
-            )
-
-            detected_language = detection.get(
-                "language",
-                "English",
-            )
-
-            language_code = detection.get(
-                "language_code",
-                "en-IN",
-            )
-
-            script_code = detection.get(
-                "script_code"
-            )
-
-        else:
-
-            detected_language = language
+        if (not language or language.lower() == "auto") and detected_language == "English":
+            try:
+                detection = await detect_language(question)
+                code = detection.get("language_code")
+                if code and code != "en-IN":
+                    language_code = code
+                    detected_language = detection.get("language", "English")
+                    script_code = detection.get("script_code")
+            except Exception:
+                pass
 
         # -----------------------------------------------------
         # Intent

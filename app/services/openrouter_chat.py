@@ -12,19 +12,50 @@ load_dotenv(
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = "inclusionai/ling-3.0-flash-fin:free"
 
+def get_language_instruction(language: str) -> tuple[str, str]:
+    """Returns (canonical_language_name, mandatory_instruction)"""
+    l = (language or "English").strip().lower()
+    if any(k in l for k in ["odia", "oriya", "od-in", "or-in", "or"]):
+        return "Odia", "CRITICAL: You MUST reply in authentic ODIA (ଓଡ଼ିଆ script or natural conversational Odia). Do NOT reply in English or Hindi. For yes/no questions, start with 'ହଁ' (Haan) or 'ନାହିଁ' (Naahin)."
+    if any(k in l for k in ["hinglish"]):
+        return "Hinglish", "CRITICAL: You MUST reply in conversational Romanized Hindi (Hinglish). Use simple Hindi words written in English alphabet. For yes/no questions, start with 'Haan' or 'Nahi'."
+    if any(k in l for k in ["hindi", "hi-in", "hi"]):
+        return "Hindi", "CRITICAL: You MUST reply in HINDI (हिन्दी or natural conversational Hinglish). Do NOT reply in English. For yes/no questions, start with 'हाँ' or 'नहीं'."
+    if any(k in l for k in ["telugu", "te-in", "te"]):
+        return "Telugu", "CRITICAL: You MUST reply in TELUGU (తెలుగు). Do NOT reply in English. For yes/no questions, start with 'అవును' or 'కాదు'."
+    if any(k in l for k in ["tamil", "ta-in", "ta"]):
+        return "Tamil", "CRITICAL: You MUST reply in TAMIL (தமிழ்). Do NOT reply in English. For yes/no questions, start with 'ஆம்' or 'இல்லை'."
+    if any(k in l for k in ["bengali", "bn-in", "bn"]):
+        return "Bengali", "CRITICAL: You MUST reply in BENGALI (বাংলা). Do NOT reply in English."
+    if any(k in l for k in ["marathi", "mr-in", "mr"]):
+        return "Marathi", "CRITICAL: You MUST reply in MARATHI (मराठी). Do NOT reply in English."
+    if any(k in l for k in ["gujarati", "gu-in", "gu"]):
+        return "Gujarati", "CRITICAL: You MUST reply in GUJARATI (ગુજરાતી). Do NOT reply in English."
+    if any(k in l for k in ["kannada", "kn-in", "kn"]):
+        return "Kannada", "CRITICAL: You MUST reply in KANNADA (ಕನ್ನಡ). Do NOT reply in English."
+    if any(k in l for k in ["malayalam", "ml-in", "ml"]):
+        return "Malayalam", "CRITICAL: You MUST reply in MALAYALAM (മലയാളം). Do NOT reply in English."
+    if any(k in l for k in ["punjabi", "pa-in", "pa"]):
+        return "Punjabi", "CRITICAL: You MUST reply in PUNJABI (ਪੰਜਾਬੀ). Do NOT reply in English."
+    if "auto" in l:
+        return "Auto-Detect", "CRITICAL: Detect the user's input language and reply in the EXACT SAME LANGUAGE and script (Odia, Hindi, Telugu, Tamil, Bengali, or English)."
+    return language.capitalize(), f"CRITICAL: You MUST reply in {language}."
+
 def build_system_prompt(language: str, weather_context: str) -> str:
-    return f"""You are WeatherGPT, an intelligent, real-time voice-friendly weather assistant.
+    lang_name, lang_mandate = get_language_instruction(language)
+    return f"""You are WeatherGPT, an intelligent, real-time voice-first weather assistant.
 Your responses will be read directly aloud to the user by a Text-to-Speech voice engine.
 
-Preferred response language: {language}
+RESPONSE LANGUAGE: {lang_name}
+{lang_mandate}
 
-STRICT ASSISTANT RULES:
-1. Keep your reply SHORT, CRISP, and POINT-TO-POINT (1 to 2 short sentences maximum).
-2. NEVER output your internal thinking, reasoning process, or monologue.
-3. NEVER say phrases like "The user is asking...", "Let me look at...", "Looking at the data...", "Wait, let me reconsider...", or "According to the JSON...".
-4. NEVER dump raw JSON, coordinate numbers, or internal technical timestamps.
-5. If the user asks in Hindi or Hinglish, reply in natural, conversational Romanized Hindi (Hinglish).
-6. For activity or yes/no questions (like playing cricket, rain, going outside), start with a clear YES or NO (or Haan / Nahi in Hindi) followed by a 1-sentence reason.
+STRICT VOICE ASSISTANT RULES:
+1. Speak directly to the user as a real-time voice assistant.
+2. Keep your reply SHORT, CRISP, and POINT-TO-POINT (1 to 2 short sentences maximum, under 35 words).
+3. Directly answer the user's question in the very first sentence (e.g. Yes/No, exact temperature, or rain timing).
+4. NEVER output your internal thinking, reasoning process, or monologue. Output ONLY the clean response to be spoken aloud.
+5. NEVER say phrases like "The user is asking...", "Let me look at...", "Looking at the data...", "Wait, let me reconsider...", or "According to the JSON...".
+6. NEVER dump raw JSON, coordinate numbers, or internal technical timestamps.
 7. Base your answer strictly on the weather intelligence provided below.
 
 WEATHER INTELLIGENCE:
@@ -111,7 +142,15 @@ async def chat(
             or lower.startswith("let me look at")
             or lower.startswith("looking at the data")
             or lower.startswith("wait, let me reconsider")
-            or lower.startswith("hmm, this is a bit confusing")
+            or lower.startswith("hmm")
+            or lower.startswith("i think i'm")
+            or lower.startswith("let me just respond")
+            or lower.startswith("i'll respond in")
+            or lower.startswith("the user has been communicating")
+            or "overthinking" in lower
+            or "respond naturally" in lower
+            or "weather advisory or committee" in lower
+            or ("could it be" in lower and lower.endswith("?"))
             or lower.startswith("the weather data provided is")
         ):
             continue
