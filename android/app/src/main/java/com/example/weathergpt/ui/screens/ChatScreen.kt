@@ -17,29 +17,44 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import android.app.Activity
-import android.content.Intent
-import android.speech.RecognizerIntent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.draw.scale
+import androidx.core.content.ContextCompat
+import com.example.weathergpt.audio.VoiceAssistantManager
+import com.example.weathergpt.ui.theme.RiskRed
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,19 +102,41 @@ fun ChatScreen(
             )
         }
 
-    val speechRecognizerLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.StartActivityForResult()
-        ) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                val spokenText = result.data
-                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                    ?.firstOrNull()
-                if (!spokenText.isNullOrBlank()) {
-                    message.value = spokenText
-                }
-            }
+    val voiceAssistant = remember { VoiceAssistantManager(context) }
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceAssistant.destroy()
         }
+    }
+
+    val isListening by voiceAssistant.isListening.collectAsState()
+    val isSpeaking by voiceAssistant.isSpeaking.collectAsState()
+    var autoSpeakEnabled by remember { mutableStateOf(true) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            voiceAssistant.startListening(
+                onResult = { text ->
+                    message.value = text
+                },
+                onError = { err ->
+                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            Toast.makeText(context, "Microphone permission is required for voice input", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Auto-speak new assistant responses like a real voice assistant
+    LaunchedEffect(uiState.messages.size) {
+        val lastMessage = uiState.messages.lastOrNull()
+        if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
+            voiceAssistant.speak(lastMessage.content, uiState.detectedLanguageCode)
+        }
+    }
 
     fun sendMessage() {
 
@@ -196,11 +233,29 @@ fun ChatScreen(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                IconButton(
+                    onClick = {
+                        autoSpeakEnabled = !autoSpeakEnabled
+                        if (!autoSpeakEnabled) {
+                            voiceAssistant.stopSpeaking()
+                        }
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (autoSpeakEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                        contentDescription = if (autoSpeakEnabled) "Voice output enabled" else "Voice output muted",
+                        tint = if (isSpeaking) NeonCyan else if (autoSpeakEnabled) NeonBlue else TextMuted,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
                 if (uiState.messages.isNotEmpty()) {
                     IconButton(
                         onClick = {
+                            voiceAssistant.stopSpeaking()
                             chatViewModel.clearChat()
                         },
                         modifier = Modifier.size(32.dp)
@@ -542,7 +597,18 @@ fun ChatScreen(
                     else ->
                         BotBubble(
                             text =
-                                messageItem.content
+                                messageItem.content,
+                            onSpeak = {
+                                if (isSpeaking) {
+                                    voiceAssistant.stopSpeaking()
+                                } else {
+                                    voiceAssistant.speak(
+                                        messageItem.content,
+                                        uiState.detectedLanguageCode
+                                    )
+                                }
+                            },
+                            isSpeaking = isSpeaking
                         )
                 }
             }
@@ -679,10 +745,18 @@ fun ChatScreen(
 
                     Text(
                         text =
-                            "Ask WeatherGPT...",
+                            if (isListening) {
+                                "Listening... Speak your weather question"
+                            } else {
+                                "Ask WeatherGPT..."
+                            },
 
                         color =
-                            TextMuted
+                            if (isListening) {
+                                NeonCyan
+                            } else {
+                                TextMuted
+                            }
                     )
                 },
 
@@ -707,39 +781,77 @@ fun ChatScreen(
                     )
             )
 
+            val pulseTransition = rememberInfiniteTransition(label = "pulse")
+            val pulseScale by pulseTransition.animateFloat(
+                initialValue = 1.0f,
+                targetValue = 1.25f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(600, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+
             IconButton(
                 onClick = {
-                    try {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(
-                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                            )
-                            putExtra(
-                                RecognizerIntent.EXTRA_PROMPT,
-                                "Speak your weather question..."
-                            )
-                        }
-                        speechRecognizerLauncher.launch(intent)
-                    } catch (e: Exception) {
-                        Toast.makeText(
+                    if (isListening) {
+                        voiceAssistant.stopListening()
+                    } else {
+                        val hasPermission = ContextCompat.checkSelfPermission(
                             context,
-                            "Voice recognition not available on this device",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasPermission) {
+                            voiceAssistant.startListening(
+                                onResult = { spokenText ->
+                                    message.value = spokenText
+                                },
+                                onError = { err ->
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
                     }
-                }
+                },
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .background(
+                        color = if (isListening) RiskRed.copy(alpha = 0.2f) else Color.Transparent,
+                        shape = RoundedCornerShape(12.dp)
+                    )
             ) {
 
                 Icon(
                     imageVector =
-                        Icons.Default.Mic,
+                        if (isListening) {
+                            Icons.Default.MicOff
+                        } else {
+                            Icons.Default.Mic
+                        },
 
                     contentDescription =
-                        "Voice input",
+                        if (isListening) {
+                            "Stop listening"
+                        } else {
+                            "Voice input"
+                        },
 
                     tint =
-                        NeonCyan
+                        if (isListening) {
+                            RiskRed
+                        } else {
+                            NeonCyan
+                        },
+
+                    modifier =
+                        if (isListening) {
+                            Modifier.scale(pulseScale)
+                        } else {
+                            Modifier
+                        }
                 )
             }
 
@@ -893,7 +1005,9 @@ private fun UserBubble(
 
 @Composable
 private fun BotBubble(
-    text: String
+    text: String,
+    onSpeak: () -> Unit = {},
+    isSpeaking: Boolean = false
 ) {
 
     GlassCard(
@@ -950,26 +1064,65 @@ private fun BotBubble(
                     )
             )
 
-            Column {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
 
-                Text(
-                    text =
-                        "WEATHERGPT",
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
 
-                    color =
-                        NeonCyan,
+                    Text(
+                        text =
+                            "WEATHERGPT",
 
-                    fontSize =
-                        9.sp,
+                        color =
+                            NeonCyan,
 
-                    letterSpacing =
-                        1.0.sp
-                )
+                        fontSize =
+                            9.sp,
+
+                        letterSpacing =
+                            1.0.sp
+                    )
+
+                    IconButton(
+                        onClick = onSpeak,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector =
+                                if (isSpeaking) {
+                                    Icons.Default.VolumeOff
+                                } else {
+                                    Icons.Default.VolumeUp
+                                },
+
+                            contentDescription =
+                                if (isSpeaking) {
+                                    "Stop reading"
+                                } else {
+                                    "Read aloud"
+                                },
+
+                            tint =
+                                if (isSpeaking) {
+                                    NeonCyan
+                                } else {
+                                    TextMuted
+                                },
+
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
 
                 Spacer(
                     modifier =
                         Modifier.height(
-                            6.dp
+                            4.dp
                         )
                 )
 
