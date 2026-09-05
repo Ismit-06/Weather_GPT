@@ -49,20 +49,7 @@ interface DamService {
 
 object DamClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
-    private val retrofit =
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(BackendConfig.okHttpClient)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-
-    val service: DamService =
-        retrofit.create(
-            DamService::class.java
-        )
+    val service: DamService by lazy {
+        BackendConfig.createRetrofit().create(DamService::class.java)
+    }
 }

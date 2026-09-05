@@ -1,10 +1,12 @@
 package com.example.weathergpt.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.weathergpt.data.AgentState
 import com.example.weathergpt.data.ChatClient
 import com.example.weathergpt.data.ChatMessage
+import com.example.weathergpt.data.ChatStore
 import com.example.weathergpt.data.ChatWeatherRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,20 +29,25 @@ data class ChatUiState(
 )
 
 
-class ChatViewModel : ViewModel() {
+class ChatViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val context =
+        application.applicationContext
 
     private val _uiState =
         MutableStateFlow(
-            ChatUiState()
+            ChatUiState(
+                messages = ChatStore.loadMessages(context)
+            )
         )
 
     val uiState: StateFlow<ChatUiState> =
         _uiState.asStateFlow()
 
     // Structured context returned by the backend.
-    // This survives across chat messages inside this ViewModel.
+    // This survives across chat messages and app sessions.
     private var agentState =
-        AgentState()
+        ChatStore.loadAgentState(context)
 
 
     fun sendMessage(
@@ -77,12 +84,15 @@ class ChatViewModel : ViewModel() {
                 error = null
             )
 
+        // Persist user question immediately
+        ChatStore.save(context, updatedMessages, agentState)
+
         viewModelScope.launch {
 
             try {
 
                 val history =
-                    currentMessages
+                    updatedMessages
                         .takeLast(12)
                         .map {
                             ChatMessage(
@@ -126,14 +136,16 @@ class ChatViewModel : ViewModel() {
                         }
                         ?: "I couldn't generate a response."
 
+                val finalMessages =
+                    updatedMessages +
+                        ChatUiMessage(
+                            role = "assistant",
+                            content = answer
+                        )
+
                 _uiState.value =
                     ChatUiState(
-                        messages =
-                            updatedMessages +
-                                ChatUiMessage(
-                                    role = "assistant",
-                                    content = answer
-                                ),
+                        messages = finalMessages,
                         isLoading = false,
                         error = null,
                         detectedLanguage =
@@ -142,15 +154,26 @@ class ChatViewModel : ViewModel() {
                             response.language_code
                     )
 
+                // Persist full conversation with response and state
+                ChatStore.save(context, finalMessages, agentState)
+
             } catch (e: Exception) {
+
+                val errorMessage = when (e) {
+                    is java.net.SocketTimeoutException ->
+                        "Connection timed out. The cloud server may be waking up, please tap Retry."
+                    is java.net.UnknownHostException ->
+                        "Unable to reach WeatherGPT. Please check your internet connection."
+                    else ->
+                        e.message
+                            ?: "Unable to contact WeatherGPT."
+                }
 
                 _uiState.value =
                     ChatUiState(
                         messages = updatedMessages,
                         isLoading = false,
-                        error =
-                            e.message
-                                ?: "Unable to contact WeatherGPT.",
+                        error = errorMessage,
                         detectedLanguage =
                             currentState.detectedLanguage,
                         detectedLanguageCode =
@@ -165,6 +188,8 @@ class ChatViewModel : ViewModel() {
 
         agentState =
             AgentState()
+
+        ChatStore.clear(context)
 
         _uiState.value =
             ChatUiState()

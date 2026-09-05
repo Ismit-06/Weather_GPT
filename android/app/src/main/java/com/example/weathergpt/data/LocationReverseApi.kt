@@ -25,16 +25,7 @@ interface LocationReverseApi {
 
 object LocationReverseClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
     val api: LocationReverseApi by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-            .create(LocationReverseApi::class.java)
+        BackendConfig.createRetrofit().create(LocationReverseApi::class.java)
     }
 }

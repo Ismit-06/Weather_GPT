@@ -172,17 +172,7 @@ interface WeatherApi {
 
 object WeatherApiClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
     val api: WeatherApi by lazy {
-
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-            .create(WeatherApi::class.java)
+        BackendConfig.createRetrofit().create(WeatherApi::class.java)
     }
 }

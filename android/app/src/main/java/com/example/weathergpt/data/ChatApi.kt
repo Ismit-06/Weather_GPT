@@ -114,17 +114,7 @@ interface ChatApi {
 
 object ChatClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
     val api: ChatApi by lazy {
-
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-            .create(ChatApi::class.java)
+        BackendConfig.createRetrofit().create(ChatApi::class.java)
     }
 }

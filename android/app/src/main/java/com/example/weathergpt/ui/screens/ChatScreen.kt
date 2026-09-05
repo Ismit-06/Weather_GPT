@@ -25,6 +25,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
@@ -193,16 +194,37 @@ fun ChatScreen(
                 )
             }
 
-            IntelligenceBadge(
-                text =
-                    if (
-                        uiState.isLoading
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (uiState.messages.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            chatViewModel.clearChat()
+                        },
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        "THINKING"
-                    } else {
-                        "AI ONLINE"
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Clear chat history",
+                            tint = TextMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-            )
+                }
+
+                IntelligenceBadge(
+                    text =
+                        if (
+                            uiState.isLoading
+                        ) {
+                            "THINKING"
+                        } else {
+                            "AI ONLINE"
+                        }
+                )
+            }
         }
 
         // ========================================================

@@ -109,17 +109,7 @@ interface GlobalWeatherApi {
 
 object GlobalWeatherClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
     val api: GlobalWeatherApi by lazy {
-
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-            .create(GlobalWeatherApi::class.java)
+        BackendConfig.createRetrofit().create(GlobalWeatherApi::class.java)
     }
 }

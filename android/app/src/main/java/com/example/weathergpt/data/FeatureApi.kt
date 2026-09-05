@@ -137,17 +137,7 @@ interface FeatureApi {
 
 object FeatureClient {
 
-    private const val BASE_URL =
-        BackendConfig.BASE_URL
-
     val api: FeatureApi by lazy {
-
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
-            .build()
-            .create(FeatureApi::class.java)
+        BackendConfig.createRetrofit().create(FeatureApi::class.java)
     }
 }
