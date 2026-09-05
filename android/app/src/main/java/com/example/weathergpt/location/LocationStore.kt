@@ -53,6 +53,12 @@ object LocationStore {
     val location: StateFlow<SelectedLocation?> =
         _location.asStateFlow()
 
+    private val _isManual =
+        MutableStateFlow<Boolean>(false)
+
+    val isManualFlow: StateFlow<Boolean> =
+        _isManual.asStateFlow()
+
 
     fun getLocation(
         context: Context
@@ -112,6 +118,10 @@ object LocationStore {
             getLocation(
                 context
             )
+        _isManual.value =
+            isManual(
+                context
+            )
     }
 
 
@@ -162,6 +172,8 @@ object LocationStore {
 
         _location.value =
             location
+        _isManual.value =
+            manual
     }
 
 

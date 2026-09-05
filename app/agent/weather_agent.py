@@ -488,6 +488,29 @@ class WeatherAgent:
                     self.context.location_admin1,
             }
 
+        # -----------------------------------------------------
+        # Fallback: Auto-reverse geocode coordinates if location name is missing
+        # -----------------------------------------------------
+        if requested_location is None or not requested_location.get("name"):
+            try:
+                from app.services.reverse_geocoding import reverse_geocode
+                geo = await reverse_geocode(active_latitude, active_longitude)
+                requested_location = {
+                    "name": geo.get("name") or "Current Location",
+                    "latitude": active_latitude,
+                    "longitude": active_longitude,
+                    "country": geo.get("country"),
+                    "admin1": geo.get("state"),
+                    "timezone": active_timezone,
+                }
+            except Exception:
+                requested_location = {
+                    "name": "Current Location",
+                    "latitude": active_latitude,
+                    "longitude": active_longitude,
+                    "timezone": active_timezone,
+                }
+
         # A short follow-up such as "What about 8 PM?"
         # may not contain a weather keyword. In that case,
         # inherit the previous conversational intent.

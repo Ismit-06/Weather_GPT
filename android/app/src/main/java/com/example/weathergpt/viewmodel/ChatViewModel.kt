@@ -54,6 +54,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         question: String,
         latitude: Double,
         longitude: Double,
+        locationName: String? = null,
         language: String
     ) {
 
@@ -84,8 +85,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 error = null
             )
 
+        val requestAgentState = if (!locationName.isNullOrBlank()) {
+            agentState.copy(
+                location_name = locationName,
+                location_latitude = latitude,
+                location_longitude = longitude
+            )
+        } else {
+            agentState
+        }
+
         // Persist user question immediately
-        ChatStore.save(context, updatedMessages, agentState)
+        ChatStore.save(context, updatedMessages, requestAgentState)
 
         viewModelScope.launch {
 
@@ -109,7 +120,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             longitude = longitude,
                             language = language,
                             history = history,
-                            agent_state = agentState
+                            agent_state = requestAgentState
                         )
                     )
 

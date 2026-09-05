@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,11 +29,17 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -43,8 +50,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.ContextCompat
 import com.example.weathergpt.audio.VoiceAssistantManager
+import com.example.weathergpt.data.LocationReverseClient
+import com.example.weathergpt.location.DeviceLocationProvider
+import com.example.weathergpt.location.SelectedLocation
+import com.example.weathergpt.ui.theme.SurfaceDark
 import com.example.weathergpt.ui.theme.RiskRed
 import androidx.compose.material3.Text
 import androidx.compose.material3.Surface
@@ -54,6 +67,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -75,6 +89,7 @@ import com.example.weathergpt.ui.theme.TextSecondary
 import com.example.weathergpt.viewmodel.ChatUiMessage
 import com.example.weathergpt.viewmodel.ChatViewModel
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 
 @Composable
@@ -84,6 +99,9 @@ fun ChatScreen(
 
     val context =
         LocalContext.current
+
+    val coroutineScope =
+        rememberCoroutineScope()
 
     val uiState by
         chatViewModel
@@ -95,12 +113,93 @@ fun ChatScreen(
             mutableStateOf("")
         }
 
-    val location =
-        remember {
-            LocationStore.getLocation(
-                context
-            )
+    val storedLocation by
+        LocationStore.location.collectAsState()
+
+    val isManualFlow by
+        LocationStore.isManualFlow.collectAsState()
+
+    val activeLocation =
+        storedLocation ?: remember { LocationStore.getLocation(context) }
+
+    val isManual =
+        isManualFlow || LocationStore.isManual(context)
+
+    var showLocationDialog by remember { mutableStateOf(false) }
+    var isDetectingLocation by remember { mutableStateOf(false) }
+
+    suspend fun detectGpsLocation() {
+        isDetectingLocation = true
+        try {
+            val provider = DeviceLocationProvider(context)
+            val devLoc = provider.getCurrentLocation()
+            if (devLoc != null) {
+                var cityName = "Current location"
+                var stateName: String? = null
+                var countryName: String? = null
+                try {
+                    val rev = LocationReverseClient.api.reverse(devLoc.latitude, devLoc.longitude)
+                    if (!rev.name.isNullOrBlank()) {
+                        cityName = rev.name
+                    }
+                    stateName = rev.state
+                    countryName = rev.country
+                } catch (e: Exception) {
+                    Log.w("ChatScreen", "Reverse geocode error: ${e.message}")
+                }
+
+                val newLoc = SelectedLocation(
+                    name = cityName,
+                    latitude = devLoc.latitude,
+                    longitude = devLoc.longitude,
+                    country = countryName,
+                    admin1 = stateName,
+                    timezone = "Asia/Kolkata"
+                )
+                LocationStore.useGps(context, newLoc)
+                Toast.makeText(context, "Location updated: $cityName", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Could not acquire GPS. Using saved location.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e("ChatScreen", "Location detection error", e)
+        } finally {
+            isDetectingLocation = false
         }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fine || coarse) {
+            coroutineScope.launch {
+                detectGpsLocation()
+            }
+        } else {
+            Toast.makeText(context, "Location permission denied. Using saved location.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Auto-detect location on launch if in GPS mode
+    LaunchedEffect(Unit) {
+        LocationStore.initialize(context)
+        if (!LocationStore.isManual(context)) {
+            val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (fine || coarse) {
+                detectGpsLocation()
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        }
+    }
 
     val voiceAssistant = remember { VoiceAssistantManager(context) }
     DisposableEffect(Unit) {
@@ -155,10 +254,13 @@ fun ChatScreen(
                 value,
 
             latitude =
-                location.latitude,
+                activeLocation.latitude,
 
             longitude =
-                location.longitude,
+                activeLocation.longitude,
+
+            locationName =
+                activeLocation.name,
 
             language =
                 "en"
@@ -347,7 +449,83 @@ fun ChatScreen(
 
         Spacer(
             modifier =
-                Modifier.height(10.dp)
+                Modifier.height(8.dp)
+        )
+
+        // ========================================================
+        // LOCATION BAR (Auto GPS / Manual Selection)
+        // ========================================================
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp)
+                .clickable { showLocationDialog = true },
+            shape = RoundedCornerShape(14.dp),
+            color = SurfaceDark.copy(alpha = 0.85f),
+            border = BorderStroke(
+                1.dp,
+                if (isManual) NeonBlue.copy(alpha = 0.4f) else NeonCyan.copy(alpha = 0.4f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = if (isManual) Icons.Default.LocationOn else Icons.Default.MyLocation,
+                        contentDescription = null,
+                        tint = if (isManual) NeonBlue else NeonCyan,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = activeLocation.name,
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (isDetectingLocation) "Detecting GPS location..." else if (isManual) "Manual Location • Tap to change" else "Auto-detected GPS • Tap to change",
+                            color = TextSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isManual) NeonBlue.copy(alpha = 0.15f) else NeonCyan.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = if (isManual) "MANUAL" else "AUTO GPS",
+                            color = if (isManual) NeonBlue else NeonCyan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Select location",
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(
+            modifier =
+                Modifier.height(8.dp)
         )
 
         // ========================================================
@@ -910,6 +1088,47 @@ fun ChatScreen(
                 )
             }
         }
+    }
+
+    if (showLocationDialog) {
+        LocationSearchDialog(
+            currentLocation = activeLocation.name,
+            onDismiss = { showLocationDialog = false },
+            isManualMode = isManual,
+            onUseCurrentLocation = {
+                val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                if (fine || coarse) {
+                    coroutineScope.launch {
+                        detectGpsLocation()
+                    }
+                } else {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            },
+            onLocationSelected = { locationResult ->
+                val lat = locationResult.latitude
+                val lon = locationResult.longitude
+                if (lat != null && lon != null) {
+                    val sel = SelectedLocation(
+                        name = locationResult.name ?: "Selected Location",
+                        latitude = lat,
+                        longitude = lon,
+                        country = locationResult.country,
+                        admin1 = locationResult.admin1,
+                        timezone = "Asia/Kolkata"
+                    )
+                    LocationStore.saveLocation(context, sel, manual = true)
+                    Toast.makeText(context, "Location set to ${sel.name}", Toast.LENGTH_SHORT).show()
+                }
+                showLocationDialog = false
+            }
+        )
     }
 }
 
