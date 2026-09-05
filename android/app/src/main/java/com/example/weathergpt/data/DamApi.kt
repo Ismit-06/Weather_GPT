@@ -55,6 +55,7 @@ object DamClient {
     private val retrofit =
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(BackendConfig.okHttpClient)
             .addConverterFactory(
                 GsonConverterFactory.create()
             )

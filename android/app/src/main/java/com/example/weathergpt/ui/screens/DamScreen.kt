@@ -51,6 +51,7 @@ import com.example.weathergpt.ui.theme.SurfaceDark
 import com.example.weathergpt.ui.theme.TextMuted
 import com.example.weathergpt.ui.theme.TextPrimary
 import com.example.weathergpt.ui.theme.TextSecondary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -101,13 +102,24 @@ fun DamScreen(
                 error =
                     result.message
                         ?: "Unable to load reservoir data."
+            } else {
+                error = null
             }
 
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (exception: Exception) {
 
             error =
-                exception.message
-                    ?: "Unable to connect to WeatherGPT."
+                when (exception) {
+                    is java.net.SocketTimeoutException ->
+                        "Connection timed out. The cloud server may be waking up, please tap Retry."
+                    is java.net.UnknownHostException ->
+                        "Unable to reach server. Please check your internet connection."
+                    else ->
+                        exception.message
+                            ?: "Unable to connect to WeatherGPT."
+                }
 
         } finally {
 
