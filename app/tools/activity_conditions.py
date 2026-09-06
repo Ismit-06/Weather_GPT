@@ -221,3 +221,159 @@ def assess_activity_conditions(
         "reasons": reasons,
         "weather": forecast,
     }
+
+
+def calculate_personal_comfort(forecast: dict) -> dict:
+    """
+    Computes a Personal Comfort Score from 0 to 100 based on:
+    - Temperature & Perceived Heat Index
+    - Relative Humidity
+    - Wind Speed
+    - Rain / Precipitation
+    - UV Index
+    - Air Quality Index (AQI)
+    """
+    temperature = forecast.get("temperature_c", forecast.get("temperature"))
+    humidity = forecast.get("humidity_pct", forecast.get("relative_humidity_pct"))
+    wind_speed = forecast.get("wind_speed_ms", forecast.get("wind_speed"))
+    rainfall = forecast.get("rainfall_mm", forecast.get("precipitation_mm", 0.0))
+    condition = (forecast.get("condition") or forecast.get("symbol_code") or "").lower()
+    uv = forecast.get("uv_index", 5.0)
+    aqi = forecast.get("aqi", 50.0)
+
+    score = 100.0
+    factors = []
+
+    # 1. Temperature & Heat Index Evaluation (Optimal: 21°C - 26°C)
+    heat_index = None
+    if isinstance(temperature, (int, float)):
+        temp_val = float(temperature)
+        if isinstance(humidity, (int, float)):
+            heat_index = calculate_heat_index(temp_val, float(humidity))
+        else:
+            heat_index = temp_val
+
+        effective_temp = heat_index if heat_index is not None else temp_val
+
+        if effective_temp > 40:
+            score -= 40
+            factors.append(f"Extreme thermal heat stress ({effective_temp:.1f}°C feels like).")
+        elif effective_temp > 35:
+            score -= 28
+            factors.append(f"Oppressive heat ({effective_temp:.1f}°C feels like).")
+        elif effective_temp > 30:
+            score -= 16
+            factors.append(f"Warm apparent temperature ({effective_temp:.1f}°C feels like).")
+        elif effective_temp < 10:
+            score -= 25
+            factors.append(f"Chilly temperatures ({effective_temp:.1f}°C).")
+        elif effective_temp < 16:
+            score -= 12
+            factors.append(f"Cool temperatures ({effective_temp:.1f}°C).")
+        else:
+            factors.append(f"Pleasant thermal range ({effective_temp:.1f}°C).")
+
+    # 2. Humidity Evaluation (Optimal: 40% - 60%)
+    if isinstance(humidity, (int, float)):
+        hum_val = float(humidity)
+        if hum_val > 80:
+            score -= 18
+            factors.append(f"Very high humidity ({hum_val:.0f}%) creates sticky feeling.")
+        elif hum_val > 65:
+            score -= 8
+            factors.append(f"Elevated humidity ({hum_val:.0f}%).")
+        elif hum_val < 30:
+            score -= 10
+            factors.append(f"Dry air ({hum_val:.0f}%) may cause dehydration.")
+
+    # 3. Wind Evaluation (Optimal: 2.0 - 5.0 m/s)
+    if isinstance(wind_speed, (int, float)):
+        wind_val = float(wind_speed)
+        if wind_val > 12.0:
+            score -= 20
+            factors.append(f"Strong gusty winds ({wind_val:.1f} m/s).")
+        elif wind_val > 8.0:
+            score -= 8
+            factors.append(f"Breezy conditions ({wind_val:.1f} m/s).")
+        elif wind_val < 1.0 and isinstance(temperature, (int, float)) and temperature > 28:
+            score -= 6
+            factors.append("Stagnant air increases perceived heat.")
+
+    # 4. Rain & Storms
+    if "thunder" in condition:
+        score -= 40
+        factors.append("Thunderstorms present.")
+    elif isinstance(rainfall, (int, float)) and rainfall > 0:
+        if rainfall >= 4.0:
+            score -= 35
+            factors.append("Heavy rain causing severe outdoor discomfort.")
+        elif rainfall >= 1.0:
+            score -= 20
+            factors.append("Moderate rain active.")
+        else:
+            score -= 10
+            factors.append("Light drizzle / showers.")
+
+    # 5. UV Index
+    if isinstance(uv, (int, float)) and uv >= 8.0:
+        score -= 10
+        factors.append(f"Very high UV Index ({uv:.0f}).")
+    elif isinstance(uv, (int, float)) and uv >= 6.0:
+        score -= 5
+
+    # 6. AQI
+    if isinstance(aqi, (int, float)):
+        if aqi > 200:
+            score -= 25
+            factors.append(f"Poor Air Quality ({aqi:.0f} AQI).")
+        elif aqi > 100:
+            score -= 10
+            factors.append(f"Moderate Air Quality ({aqi:.0f} AQI).")
+
+    score = max(5.0, min(100.0, score))
+    final_score = int(round(score))
+
+    if final_score >= 85:
+        level_label = "Highly comfortable"
+        level_tag = "HIGHLY_COMFORTABLE"
+        emoji = "🟢"
+        clothing = "Light, breathable cotton clothing recommended."
+        outdoor_advice = "Excellent time for outdoor walks and sports."
+    elif final_score >= 70:
+        level_label = "Moderately comfortable"
+        level_tag = "MODERATELY_COMFORTABLE"
+        emoji = "🟡"
+        clothing = "Light clothing recommended."
+        outdoor_advice = "Avoid prolonged outdoor activity between 12–3 PM."
+    elif final_score >= 50:
+        level_label = "Mildly uncomfortable"
+        level_tag = "MILDLY_UNCOMFORTABLE"
+        emoji = "🟡"
+        clothing = "Breathable loose fabrics recommended; carry water."
+        outdoor_advice = "Limit strenuous outdoor exertion and stay in shade."
+    else:
+        level_label = "Uncomfortable"
+        level_tag = "UNCOMFORTABLE"
+        emoji = "🔴"
+        clothing = "Protective indoor wear or rain gear depending on conditions."
+        outdoor_advice = "Stay indoors if possible; stay hydrated."
+
+    return {
+        "status": "success",
+        "score": final_score,
+        "level_label": level_label,
+        "level_tag": level_tag,
+        "emoji": emoji,
+        "clothing_recommendation": clothing,
+        "outdoor_advice": outdoor_advice,
+        "breakdown": {
+            "temperature_c": temperature,
+            "heat_index_c": heat_index,
+            "humidity_pct": humidity,
+            "wind_speed_ms": wind_speed,
+            "uv_index": uv,
+            "rainfall_mm": rainfall,
+            "aqi": aqi,
+        },
+        "factors": factors,
+    }

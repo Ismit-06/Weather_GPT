@@ -1115,6 +1115,15 @@ class WeatherAgent:
                 summary_lines.append(
                     f"Thermal Breakdown: Actual Temperature {ec.get('temperature_c')}°C, Relative Humidity {ec.get('humidity_pct')}%, Calculated Perceived Heat Index {ec.get('heat_index_c')}°C, Dew Point {ec.get('dew_point_c')}°C"
                 )
+            if "comfort_score" in tool_result:
+                cs = tool_result["comfort_score"]
+                bd = cs.get("breakdown", {})
+                summary_lines.append(
+                    f"Personal Comfort Score: {cs.get('score')} / 100 ({cs.get('emoji')} {cs.get('level_label')})\n"
+                    f"Comfort Factors: Temperature {bd.get('temperature_c')}°C, Heat Index {bd.get('heat_index_c')}°C, Humidity {bd.get('humidity_pct')}%, Wind {bd.get('wind_speed_ms')} m/s, Rain {bd.get('rainfall_mm')} mm, UV {bd.get('uv_index')}, AQI {bd.get('aqi')}\n"
+                    f"Clothing Advice: {cs.get('clothing_recommendation')}\n"
+                    f"Outdoor Advice: {cs.get('outdoor_advice')}"
+                )
             if "current" in tool_result and isinstance(tool_result["current"], dict):
                 c = tool_result["current"]
                 summary_lines.append(

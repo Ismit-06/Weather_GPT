@@ -595,11 +595,11 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
-                            icon = "🌧️",
-                            title = "Rain timeline?",
+                            icon = "🌡️",
+                            title = "Comfort score?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Show rain timeline for today in ${activeLocation.name}"
+                                message.value = "What is my personal comfort score today in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )

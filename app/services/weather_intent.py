@@ -16,6 +16,7 @@ INTENTS = {
     "ALERTS",
     "GENERAL_WEATHER",
     "EXPLAIN",
+    "COMFORT",
 }
 
 
@@ -38,6 +39,32 @@ def detect_weather_intent(
 ) -> str:
 
     text = question.lower().strip()
+
+    # ---------------------------------------------------------
+    # 0. PERSONAL COMFORT SCORE
+    # ---------------------------------------------------------
+
+    if has_any(
+        text,
+        [
+            r"\bcomfort\b",
+            r"\bcomfortable\b",
+            r"\bcomfort score\b",
+            r"\bcomfort level\b",
+            r"\bhow comfortable\b",
+            r"\bpersonal comfort\b",
+            r"\bcomfort index\b",
+            r"\bwear today\b",
+            r"\bwhat to wear\b",
+            r"\bclothing\b",
+            r"\bgarmi kitni\b",
+            r"\bchipchipahat\b",
+            r"\bsuffocating\b",
+            r"\bhumdrum\b",
+            r"\bpleasant\b",
+        ]
+    ):
+        return "COMFORT"
 
     # ---------------------------------------------------------
     # 0. EXPLANATION / "WHY" QUESTIONS (e.g. Why does it feel so hot? Why 34°C feels like 40°C?)
