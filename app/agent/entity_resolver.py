@@ -126,13 +126,63 @@ def extract_activity(
     lower = text.lower()
 
     activities = [
+        # Umbrella & Rain gear
+        ("carry umbrella", "carry_umbrella"),
+        ("carry an umbrella", "carry_umbrella"),
+        ("take umbrella", "carry_umbrella"),
+        ("take an umbrella", "carry_umbrella"),
+        ("need umbrella", "carry_umbrella"),
+        ("need an umbrella", "carry_umbrella"),
+        ("umbrella", "carry_umbrella"),
+        ("raincoat", "carry_umbrella"),
+        ("chhatri", "carry_umbrella"),
+        ("chhata", "carry_umbrella"),
+
+        # Laundry & Clothes
+        ("hang clothes", "drying_clothes"),
+        ("hanging clothes", "drying_clothes"),
+        ("dry clothes", "drying_clothes"),
+        ("drying clothes", "drying_clothes"),
+        ("clothes outside", "drying_clothes"),
+        ("wash clothes", "drying_clothes"),
+        ("laundry", "drying_clothes"),
+        ("kapde", "drying_clothes"),
+
+        # Vehicle washing
+        ("wash my bike", "wash_bike"),
+        ("wash bike", "wash_bike"),
+        ("bike wash", "wash_bike"),
+        ("wash my car", "wash_car"),
+        ("wash car", "wash_car"),
+        ("car wash", "wash_car"),
+        ("gaadi", "wash_car"),
+
+        # Commute & Leaving
+        ("leave college", "leaving_college"),
+        ("leaving college", "leaving_college"),
+        ("leave office", "leaving_office"),
+        ("leaving office", "leaving_office"),
+        ("commute", "commute"),
+        ("heading out", "commute"),
+        ("going out", "commute"),
+        ("safe to travel", "travel"),
+        ("travel", "travel"),
+        ("driving", "travel"),
+        ("drive", "travel"),
+        ("road trip", "travel"),
+
+        # Plants & Gardening
+        ("water plants", "gardening"),
+        ("water my plants", "gardening"),
+        ("watering plants", "gardening"),
+
+        # Sports & Fitness
         ("running", "running"),
         ("run", "running"),
         ("jogging", "running"),
         ("jog", "running"),
         ("cycling", "cycling"),
         ("cycle", "cycling"),
-        ("bike", "cycling"),
         ("walking", "walking"),
         ("walk", "walking"),
         ("hiking", "hiking"),
@@ -148,7 +198,6 @@ def extract_activity(
     ]
 
     for phrase, activity in activities:
-
         if phrase in lower:
             return activity
 

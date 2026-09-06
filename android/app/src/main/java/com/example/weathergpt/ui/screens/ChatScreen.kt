@@ -549,20 +549,20 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
-                            icon = "🌧️",
-                            title = "Will it rain?",
+                            icon = "☂️",
+                            title = "Carry umbrella?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Will it rain today in ${activeLocation.name}?"
+                                message.value = "Should I carry an umbrella today in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "🧳",
-                            title = "What to pack?",
+                            icon = "🏃",
+                            title = "Can I go for a run?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
+                                message.value = "Can I go for a run right now in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )
@@ -572,20 +572,43 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
-                            icon = "🛣️",
-                            title = "Road conditions",
+                            icon = "🏍️",
+                            title = "Wash my bike today?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
+                                message.value = "Should I wash my bike today in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "📖",
-                            title = "Show on map",
+                            icon = "👕",
+                            title = "Hang clothes outside?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
+                                message.value = "Can I hang clothes outside today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🚗",
+                            title = "Safe to travel?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Is it safe to travel right now in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🎓",
+                            title = "Rain when leaving?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Will it rain when I leave college or office today in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )

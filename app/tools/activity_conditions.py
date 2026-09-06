@@ -220,6 +220,45 @@ def assess_activity_conditions(
             "Heavy rain conditions are expected."
         )
 
+    # Specific real-life decisions
+    if activity in {"umbrella", "carry_umbrella", "raincoat"}:
+        if rainfall and rainfall > 0:
+            score = 10.0
+            reasons.append("Rain is likely. Definitely carry an umbrella or raincoat.")
+        else:
+            score = 95.0
+            reasons.append("No rain detected in the forecast. An umbrella is unlikely to be needed.")
+
+    elif activity in {"hanging_clothes", "drying_clothes", "clothes", "laundry"}:
+        if rainfall and rainfall > 0:
+            score = 15.0
+            reasons.append("Rain is expected. Hang clothes indoors or under a shed.")
+        elif humidity and humidity > 80:
+            score = 50.0
+            reasons.append("High humidity will slow down drying, but no rain is expected.")
+        else:
+            score = 95.0
+            reasons.append("Clear and breezy conditions make it ideal to hang clothes outside.")
+
+    elif activity in {"washing_bike", "washing_car", "bike_wash", "car_wash", "wash_bike", "wash_car"}:
+        if rainfall and rainfall > 0:
+            score = 10.0
+            reasons.append("Rain is predicted soon, which will make your vehicle dirty again. Hold off on washing.")
+        else:
+            score = 90.0
+            reasons.append("Dry weather ahead. It is a good time to wash your vehicle.")
+
+    elif activity in {"leaving_college", "leaving_office", "commute", "travel"}:
+        if rainfall and rainfall >= 2:
+            score = 30.0
+            reasons.append("Moderate to heavy rain during commute hours. Travel with rain gear.")
+        elif rainfall and rainfall > 0:
+            score = 60.0
+            reasons.append("Light rain possible during commute. Keep an umbrella handy.")
+        else:
+            score = 95.0
+            reasons.append("Clear road conditions for travel.")
+
     score = max(
         0.0,
         min(100.0, score),
