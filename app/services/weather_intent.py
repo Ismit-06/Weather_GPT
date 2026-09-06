@@ -17,6 +17,7 @@ INTENTS = {
     "GENERAL_WEATHER",
     "EXPLAIN",
     "COMFORT",
+    "OUTFIT",
 }
 
 
@@ -41,6 +42,37 @@ def detect_weather_intent(
     text = question.lower().strip()
 
     # ---------------------------------------------------------
+    # 0. AI OUTFIT / CLOTHING RECOMMENDATIONS
+    # ---------------------------------------------------------
+
+    if has_any(
+        text,
+        [
+            r"\boutfit\b",
+            r"\bwhat to wear\b",
+            r"\bwhat should i wear\b",
+            r"\bwear today\b",
+            r"\bclothing\b",
+            r"\bdress\b",
+            r"\bdressing\b",
+            r"\bgoing to college\b",
+            r"\bgoing to office\b",
+            r"\bgoing to work\b",
+            r"\bgoing to gym\b",
+            r"\bcollege ja raha\b",
+            r"\boffice ja raha\b",
+            r"\bcollege jaa raha\b",
+            r"\bkapde pehnu\b",
+            r"\bkya pehnu\b",
+            r"\bkya pehna\b",
+            r"\bshoes\b",
+            r"\bjacket\b",
+            r"\bshoes pehnu\b",
+        ]
+    ):
+        return "OUTFIT"
+
+    # ---------------------------------------------------------
     # 0. PERSONAL COMFORT SCORE
     # ---------------------------------------------------------
 
@@ -54,9 +86,6 @@ def detect_weather_intent(
             r"\bhow comfortable\b",
             r"\bpersonal comfort\b",
             r"\bcomfort index\b",
-            r"\bwear today\b",
-            r"\bwhat to wear\b",
-            r"\bclothing\b",
             r"\bgarmi kitni\b",
             r"\bchipchipahat\b",
             r"\bsuffocating\b",

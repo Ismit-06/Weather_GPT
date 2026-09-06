@@ -1124,6 +1124,15 @@ class WeatherAgent:
                     f"Clothing Advice: {cs.get('clothing_recommendation')}\n"
                     f"Outdoor Advice: {cs.get('outdoor_advice')}"
                 )
+            if "outfit_recommendation" in tool_result:
+                outfit = tool_result["outfit_recommendation"]
+                summary_lines.append(
+                    f"AI Outfit Recommendation:\n"
+                    f"👕 Wear: {outfit.get('wear')}\n"
+                    f"🧥 Optional: {outfit.get('optional') or 'None'}\n"
+                    f"☂️ Carry: {outfit.get('carry')}\n"
+                    f"👟 Shoes: {outfit.get('shoes')}"
+                )
             if "current" in tool_result and isinstance(tool_result["current"], dict):
                 c = tool_result["current"]
                 summary_lines.append(

@@ -377,3 +377,89 @@ def calculate_personal_comfort(forecast: dict) -> dict:
         },
         "factors": factors,
     }
+
+
+def generate_outfit_recommendation(
+    forecast: dict,
+    activity_context: str | None = None,
+) -> dict:
+    """
+    Generates intelligent contextual outfit recommendations:
+    - 👕 Wear: Tops & bottoms based on temp/humidity and context (college, office, gym, casual)
+    - 🧥 Optional / Layer: Jackets, sweaters, windbreakers based on evening temp drops or wind
+    - ☂️ Carry: Umbrella, sunglasses, sun hat, raincoat based on precipitation and UV
+    - 👟 Shoes: Footwear advice based on rain, mud, warmth, activity
+    """
+    temperature = forecast.get("temperature_c", forecast.get("temperature", 25.0)) or 25.0
+    humidity = forecast.get("humidity_pct", forecast.get("relative_humidity_pct", 50.0)) or 50.0
+    rainfall = forecast.get("rainfall_mm", forecast.get("precipitation_mm", 0.0)) or 0.0
+    wind = forecast.get("wind_speed_ms", forecast.get("wind_speed", 2.0)) or 2.0
+    uv = forecast.get("uv_index", 5.0) or 5.0
+    heat_index = calculate_heat_index(float(temperature), float(humidity))
+
+    ctx = (activity_context or "").lower()
+
+    # Determine Wear
+    if heat_index >= 32:
+        if "college" in ctx:
+            wear = "Light cotton T-shirt + lightweight breathable jeans or chinos"
+        elif "office" in ctx or "work" in ctx:
+            wear = "Lightweight formal linen or cotton shirt + breathable trousers"
+        elif "gym" in ctx or "run" in ctx:
+            wear = "Moisture-wicking athletic singlet/tee + running shorts"
+        else:
+            wear = "T-shirt + lightweight breathable shorts or cotton pants"
+    elif heat_index >= 24:
+        if "college" in ctx:
+            wear = "Comfortable T-shirt or polo + denim jeans"
+        elif "office" in ctx or "work" in ctx:
+            wear = "Smart casual button-down shirt + chinos"
+        elif "gym" in ctx or "run" in ctx:
+            wear = "Breathable gym tee + sweatpants or shorts"
+        else:
+            wear = "T-shirt + lightweight pants or jeans"
+    elif temperature >= 16:
+        wear = "Full-sleeve shirt or light sweatshirt + jeans"
+    elif temperature >= 10:
+        wear = "Warm sweater or fleece + jeans"
+    else:
+        wear = "Thermal innerwear + heavy woolen sweater / down jacket + warm trousers"
+
+    # Determine Layer / Optional
+    optional = None
+    if temperature < 20 or wind > 7.0:
+        optional = "Light jacket or windbreaker after sunset"
+    elif heat_index >= 30 and ("office" in ctx or "college" in ctx):
+        optional = "Light cardigan or overshirt (useful in air-conditioned halls)"
+    elif temperature < 14:
+        optional = "Fleece jacket or warm scarf for the evening"
+
+    # Determine Carry
+    carries = []
+    if rainfall > 0 or forecast.get("rain_probability_pct", 0) >= 30:
+        carries.append("Umbrella or compact raincoat")
+    if uv >= 6.0:
+        carries.append("Sunglasses / UV protection")
+    if heat_index >= 30:
+        carries.append("Water bottle for hydration")
+    carry = ", ".join(carries) if carries else "None needed"
+
+    # Determine Shoes
+    if rainfall > 0 or forecast.get("rain_probability_pct", 0) >= 30:
+        shoes = "Waterproof footwear or dark synthetic sneakers (avoid white canvas shoes — rain expected)"
+    elif heat_index >= 32:
+        shoes = "Breathable mesh sneakers, loafers, or sandals"
+    elif temperature < 12:
+        shoes = "Insulated shoes or boots with warm socks"
+    else:
+        shoes = "Comfortable everyday sneakers or casual shoes"
+
+    return {
+        "status": "success",
+        "context": activity_context or "General",
+        "wear": wear,
+        "optional": optional,
+        "carry": carry,
+        "shoes": shoes,
+        "weather_summary": f"Temp: {temperature}°C, Feels like: {heat_index}°C, Rain: {rainfall} mm, UV: {uv}",
+    }

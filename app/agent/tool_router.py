@@ -62,7 +62,7 @@ async def run_weather_tool(
         intent or "CURRENT_WEATHER"
     ).upper()
 
-    if intent in {"CURRENT_WEATHER", "EXPLAIN", "COMFORT"}:
+    if intent in {"CURRENT_WEATHER", "EXPLAIN", "COMFORT", "OUTFIT"}:
 
         res = await get_current_weather(
             latitude=latitude,
@@ -86,6 +86,10 @@ async def run_weather_tool(
             from app.tools.activity_conditions import calculate_personal_comfort
             comfort_res = calculate_personal_comfort(res)
             res["comfort_score"] = comfort_res
+        elif intent == "OUTFIT" and res.get("status") == "success":
+            from app.tools.activity_conditions import generate_outfit_recommendation
+            outfit_res = generate_outfit_recommendation(res, activity_context=activity)
+            res["outfit_recommendation"] = outfit_res
         return res
 
     # ---------------------------------------------------------
