@@ -91,32 +91,22 @@ fun ForecastScreen(
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
-        try {
-            if (LocationStore.isManual(context)) {
-                viewModel.loadForecast(
-                    selectedLocation.latitude,
-                    selectedLocation.longitude
-                )
-            } else {
+        val initialLoc = LocationStore.getLocation(context)
+        selectedLocation = initialLoc
+        viewModel.loadForecast(initialLoc.latitude, initialLoc.longitude)
+
+        if (!LocationStore.isManual(context)) {
+            try {
                 val provider = DeviceLocationProvider(context)
-                val location = provider.getCurrentLocation()
-                if (location != null) {
-                    viewModel.loadForecast(
-                        location.latitude,
-                        location.longitude
+                val gpsLoc = provider.getCurrentLocation()
+                if (gpsLoc != null) {
+                    selectedLocation = selectedLocation.copy(
+                        latitude = gpsLoc.latitude,
+                        longitude = gpsLoc.longitude
                     )
-                } else {
-                    viewModel.loadForecast(
-                        selectedLocation.latitude,
-                        selectedLocation.longitude
-                    )
+                    viewModel.loadForecast(gpsLoc.latitude, gpsLoc.longitude)
                 }
-            }
-        } catch (_: Exception) {
-            viewModel.loadForecast(
-                selectedLocation.latitude,
-                selectedLocation.longitude
-            )
+            } catch (_: Exception) {}
         }
     }
 

@@ -244,7 +244,7 @@ fun ChatScreen(
 
     fun sendText(textToSend: String) {
         val value = textToSend.trim()
-        if (value.isBlank() || uiState.isLoading || isProcessingVoice) return
+        if (value.isBlank() || uiState.isLoading) return
 
         val langToSend = if (selectedLanguage.equals("Auto", ignoreCase = true)) "auto" else selectedLanguage
 
@@ -262,15 +262,23 @@ fun ChatScreen(
         sendText(message.value)
     }
 
+    val onVoiceResult: (String) -> Unit = { spokenText ->
+        val trimmed = spokenText.trim()
+        if (trimmed.isNotBlank()) {
+            sendText(trimmed)
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            voiceAssistant.startRealtimeVoice(
-                latitude = activeLocation.latitude,
-                longitude = activeLocation.longitude,
-                locationName = activeLocation.name,
-                language = selectedLanguage
+            voiceAssistant.startListening(
+                languageCode = selectedLanguage,
+                onResult = onVoiceResult,
+                onError = { err ->
+                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                }
             )
         } else {
             Toast.makeText(context, "Microphone permission is required for voice assistant", Toast.LENGTH_SHORT).show()
@@ -279,11 +287,11 @@ fun ChatScreen(
 
     fun toggleVoiceListening() {
         if (isSpeaking) {
-            voiceAssistant.interrupt()
+            voiceAssistant.stopSpeaking()
             return
         }
         if (isListening) {
-            voiceAssistant.stopAudioRecording()
+            voiceAssistant.stopListening()
         } else {
             val hasPermission = ContextCompat.checkSelfPermission(
                 context,
@@ -291,15 +299,29 @@ fun ChatScreen(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasPermission) {
-                voiceAssistant.startRealtimeVoice(
-                    latitude = activeLocation.latitude,
-                    longitude = activeLocation.longitude,
-                    locationName = activeLocation.name,
-                    language = selectedLanguage
+                voiceAssistant.startListening(
+                    languageCode = selectedLanguage,
+                    onResult = onVoiceResult,
+                    onError = { err ->
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                    }
                 )
             } else {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
+        }
+    }
+
+    // Auto-speak responses in parallel with instant UI rendering
+    LaunchedEffect(uiState.messages.size) {
+        val lastMessage = uiState.messages.lastOrNull()
+        if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
+            val speechLang = if (!selectedLanguage.equals("Auto", ignoreCase = true)) {
+                selectedLanguage
+            } else {
+                uiState.detectedLanguageCode ?: "en-IN"
+            }
+            voiceAssistant.speak(lastMessage.content, speechLang)
         }
     }
 

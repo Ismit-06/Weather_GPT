@@ -11,13 +11,12 @@ load_dotenv(
 )
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "qwen/qwen3-235b-a22b"
+DEFAULT_MODEL = "qwen/qwen-2.5-72b-instruct"
 FALLBACK_MODELS = [
-    "qwen/qwen3-235b-a22b",
-    "qwen/qwen3-235b-a22b-2507",
-    "qwen/qwen3-30b-a3b",
     "qwen/qwen-2.5-72b-instruct",
-    "minimax/minimax-m2.7:free"
+    "meta-llama/llama-3.3-70b-instruct",
+    "qwen/qwen3-235b-a22b",
+    "qwen/qwen3-30b-a3b",
 ]
 
 def get_language_instruction(language: str) -> tuple[str, str]:
@@ -128,12 +127,12 @@ async def chat(
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.25,
-            "max_tokens": 120,
+            "temperature": 0.2,
+            "max_tokens": 75,
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            async with httpx.AsyncClient(timeout=12.0) as client:
                 response = await client.post(
                     OPENROUTER_URL,
                     headers=headers,
