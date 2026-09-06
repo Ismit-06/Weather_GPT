@@ -323,285 +323,256 @@ fun ChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
+            .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        LazyColumn(
+        // ----------------------------------------------------
+        // 1. CENTRAL INTERACTIVE 3D LIVING AI ORB (Compact & Focused)
+        // ----------------------------------------------------
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            WeatherAIOrb(
+                orbState = orbState,
+                audioAmplitude = if (isListening || isSpeaking) 0.65f else 0.05f,
+                size = 180.dp,
+                onTap = { toggleVoiceListening() }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = when {
+                    isListening -> "Listening..."
+                    isSpeaking -> "Responding..."
+                    uiState.isLoading -> "Thinking..."
+                    else -> "Tap to speak"
+                },
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = when {
+                    isListening -> "Speak naturally"
+                    isSpeaking -> "Tap orb or mic to interrupt"
+                    uiState.isLoading -> "Analyzing atmospheric telemetry"
+                    else -> "Ask anything about the weather"
+                },
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ----------------------------------------------------
+        // 2. LOCATION & LANGUAGE GLASS CAPSULE CARDS (Row of 2)
+        // ----------------------------------------------------
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Location Card [ 📍 Amravati > ]
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xB30A1626))
+                    .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+                    .clickable { showLocationDialog = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "Location",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = activeLocation.name.take(12).let { if (activeLocation.name.length > 12) "$it…" else it },
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Select",
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Language Card [ 🌐 EN > ]
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xB30A1626))
+                    .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+                    .clickable { showLanguageDialog = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Language",
+                            tint = SecondaryCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = currentAppLang.englishName.take(10),
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Select",
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ----------------------------------------------------
+        // 3. DYNAMIC CONTENT AREA (Answer Tab OR Quick Suggestions)
+        // ----------------------------------------------------
+        Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            contentPadding = PaddingValues(
-                start = 18.dp,
-                end = 18.dp,
-                top = 8.dp,
-                bottom = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            contentAlignment = Alignment.Center
         ) {
-            // ----------------------------------------------------
-            // 1. CENTRAL INTERACTIVE 3D LIVING AI ORB (210dp)
-            // ----------------------------------------------------
-            item {
-                Column(
+            if (uiState.isLoading) {
+                GlassThinkingBubble()
+            } else if (uiState.error != null) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x33FF4D4D))
+                        .border(1.dp, Color(0x66FF4D4D), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
                 ) {
-                    WeatherAIOrb(
-                        orbState = orbState,
-                        audioAmplitude = if (isListening || isSpeaking) 0.65f else 0.05f,
-                        size = 210.dp,
-                        onTap = { toggleVoiceListening() }
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
                     Text(
-                        text = when {
-                            isListening -> "Listening..."
-                            isSpeaking -> "Responding..."
-                            uiState.isLoading -> "Thinking..."
-                            else -> "Tap to speak"
-                        },
-                        color = TextPrimary,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.2.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = when {
-                            isListening -> "Speak naturally"
-                            isSpeaking -> "Tap orb or mic to interrupt"
-                            uiState.isLoading -> "Analyzing atmospheric telemetry"
-                            else -> "Ask anything about the weather"
-                        },
-                        color = TextSecondary,
+                        text = uiState.error ?: "An unexpected error occurred.",
+                        color = Color(0xFFFF9999),
                         fontSize = 13.sp
                     )
                 }
-            }
-
-            // ----------------------------------------------------
-            // 2. LOCATION & LANGUAGE GLASS CAPSULE CARDS (Row of 2)
-            // ----------------------------------------------------
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Location Card [ 📍 Amravati > ]
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xB30A1626))
-                            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
-                            .clickable { showLocationDialog = true }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = "Location",
-                                    tint = PrimaryBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = activeLocation.name.take(12).let { if (activeLocation.name.length > 12) "$it…" else it },
-                                    color = TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Select",
-                                tint = TextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    // Language Card [ 🌐 EN > ]
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xB30A1626))
-                            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
-                            .clickable { showLanguageDialog = true }
-                            .padding(horizontal = 14.dp, vertical = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Language,
-                                    contentDescription = "Language",
-                                    tint = SecondaryCyan,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = currentAppLang.englishName.take(10),
-                                    color = TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = "Select",
-                                tint = TextMuted,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ----------------------------------------------------
-            // 3. QUICK SUGGESTIONS (Shown when no current answer)
-            // ----------------------------------------------------
-            if (uiState.messages.isEmpty() && !uiState.isLoading && uiState.error == null) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Row 1
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            SuggestionGlassCard(
-                                icon = "🌧️",
-                                title = "Will it rain?",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    message.value = "Will it rain today in ${activeLocation.name}?"
-                                    sendMessage()
-                                }
-                            )
-                            SuggestionGlassCard(
-                                icon = "🧳",
-                                title = "What to pack?",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
-                                    sendMessage()
-                                }
-                            )
-                        }
-
-                        // Row 2
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            SuggestionGlassCard(
-                                icon = "🛣️",
-                                title = "Road conditions",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
-                                    sendMessage()
-                                }
-                            )
-                            SuggestionGlassCard(
-                                icon = "📖",
-                                title = "Show on map",
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
-                                    sendMessage()
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ----------------------------------------------------
-            // 4. INSTANT ANSWER CARD (Latest Question & Response)
-            // ----------------------------------------------------
-            if (uiState.messages.isNotEmpty()) {
-                val latestUser = uiState.messages.findLast { it.role.equals("user", ignoreCase = true) }
+            } else if (uiState.messages.isNotEmpty()) {
                 val latestAssistant = uiState.messages.findLast { !it.role.equals("user", ignoreCase = true) }
-
-                if (latestUser != null) {
-                    item(key = "user-latest-${latestUser.content.hashCode()}") {
-                        GlassUserBubble(text = latestUser.content)
-                    }
-                }
-
                 if (latestAssistant != null) {
-                    item(key = "assistant-latest-${latestAssistant.content.hashCode()}") {
-                        GlassAssistantBubble(
-                            text = latestAssistant.content,
-                            onSpeak = {
-                                if (isSpeaking) {
-                                    voiceAssistant.stopSpeaking()
-                                } else {
-                                    voiceAssistant.speak(
-                                        latestAssistant.content,
-                                        uiState.detectedLanguageCode
-                                    )
-                                }
-                            },
-                            isSpeaking = isSpeaking,
-                            onCopy = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("WeatherGPT Response", latestAssistant.content)
-                                clipboard.setPrimaryClip(clip)
-                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                    GlassAssistantBubble(
+                        text = latestAssistant.content,
+                        onSpeak = {
+                            if (isSpeaking) {
+                                voiceAssistant.stopSpeaking()
+                            } else {
+                                voiceAssistant.speak(
+                                    latestAssistant.content,
+                                    uiState.detectedLanguageCode
+                                )
+                            }
+                        },
+                        isSpeaking = isSpeaking,
+                        onCopy = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("WeatherGPT Response", latestAssistant.content)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            } else {
+                // Quick suggestions when idle
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🌧️",
+                            title = "Will it rain?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Will it rain today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🧳",
+                            title = "What to pack?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
+                                sendMessage()
                             }
                         )
                     }
-                }
-            }
-
-            if (uiState.isLoading) {
-                item(key = "loading-bubble") {
-                    GlassThinkingBubble()
-                }
-            }
-
-            if (uiState.error != null) {
-                item(key = "error-bubble") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0x33FF4D4D))
-                            .border(1.dp, Color(0x66FF4D4D), RoundedCornerShape(16.dp))
-                            .padding(14.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = uiState.error ?: "An unexpected error occurred.",
-                            color = Color(0xFFFF9999),
-                            fontSize = 13.sp
+                        SuggestionGlassCard(
+                            icon = "🛣️",
+                            title = "Road conditions",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "📖",
+                            title = "Show on map",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
+                                sendMessage()
+                            }
                         )
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // ========================================================
         // 5. FLOATING GLASS COMPOSER DOCK

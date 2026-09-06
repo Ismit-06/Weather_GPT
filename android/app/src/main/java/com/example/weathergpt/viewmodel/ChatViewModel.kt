@@ -37,7 +37,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState =
         MutableStateFlow(
             ChatUiState(
-                messages = ChatStore.loadMessages(context)
+                messages = emptyList()
             )
         )
 
@@ -45,9 +45,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.asStateFlow()
 
     // Structured context returned by the backend.
-    // This survives across chat messages and app sessions.
     private var agentState =
-        ChatStore.loadAgentState(context)
+        AgentState()
 
 
     fun sendMessage(
@@ -68,19 +67,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val currentState =
             _uiState.value
 
-        val currentMessages =
-            currentState.messages
-
-        val updatedMessages =
-            currentMessages +
-                ChatUiMessage(
-                    role = "user",
-                    content = text
-                )
+        // Only keep the current active question (no accumulating previous questions)
+        val currentQuestionList = listOf(
+            ChatUiMessage(
+                role = "user",
+                content = text
+            )
+        )
 
         _uiState.value =
             currentState.copy(
-                messages = updatedMessages,
+                messages = currentQuestionList,
                 isLoading = true,
                 error = null
             )
@@ -95,22 +92,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             agentState
         }
 
-        // Persist user question immediately
-        ChatStore.save(context, updatedMessages, requestAgentState)
-
         viewModelScope.launch {
 
             try {
-
-                val history =
-                    updatedMessages
-                        .takeLast(12)
-                        .map {
-                            ChatMessage(
-                                role = it.role,
-                                content = it.content
-                            )
-                        }
 
                 val response =
                     ChatClient.api.askWeather(
@@ -119,7 +103,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             latitude = latitude,
                             longitude = longitude,
                             language = language,
-                            history = history,
+                            history = emptyList(),
                             agent_state = requestAgentState
                         )
                     )
@@ -147,16 +131,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         ?: "I couldn't generate a response."
 
-                val finalMessages =
-                    updatedMessages +
-                        ChatUiMessage(
-                            role = "assistant",
-                            content = answer
-                        )
+                val instantMessages = listOf(
+                    ChatUiMessage(
+                        role = "user",
+                        content = text
+                    ),
+                    ChatUiMessage(
+                        role = "assistant",
+                        content = answer
+                    )
+                )
 
                 _uiState.value =
                     ChatUiState(
-                        messages = finalMessages,
+                        messages = instantMessages,
                         isLoading = false,
                         error = null,
                         detectedLanguage =
@@ -164,9 +152,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         detectedLanguageCode =
                             response.language_code
                     )
-
-                // Persist full conversation with response and state
-                ChatStore.save(context, finalMessages, agentState)
 
             } catch (e: Exception) {
 
@@ -182,7 +167,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 _uiState.value =
                     ChatUiState(
-                        messages = updatedMessages,
+                        messages = currentQuestionList,
                         isLoading = false,
                         error = errorMessage,
                         detectedLanguage =
