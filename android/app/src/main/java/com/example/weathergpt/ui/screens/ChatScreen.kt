@@ -595,20 +595,20 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
+                            icon = "🌧️",
+                            title = "Rain timeline?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Show rain timeline for today in ${activeLocation.name}"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
                             icon = "☂️",
                             title = "Carry umbrella?",
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 message.value = "Should I carry an umbrella today in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "👕",
-                            title = "Hang clothes outside?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Can I hang clothes outside today in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )

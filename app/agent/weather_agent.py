@@ -1056,12 +1056,24 @@ class WeatherAgent:
             summary_lines.append(f"Target Time: {self.context.target_local_time}")
 
         if isinstance(tool_result, dict):
-            if "rain_windows" in tool_result:
-                windows = tool_result["rain_windows"]
+            if "timeline" in tool_result and isinstance(tool_result["timeline"], list) and tool_result["timeline"]:
+                summary_lines.append("Rain Timeline:")
+                for tl in tool_result["timeline"]:
+                    summary_lines.append(tl)
+
+            if "rain_windows" in tool_result or "windows" in tool_result:
+                windows = tool_result.get("rain_windows") or tool_result.get("windows", [])
                 if windows:
                     summary_lines.append("Rain Windows:")
                     for w in windows:
-                        summary_lines.append(f"- {w}")
+                        if isinstance(w, dict):
+                            s = w.get("start_label", w.get("start"))
+                            e = w.get("end_label", w.get("end"))
+                            summary_lines.append(f"- {s} to {e} ({w.get('intensity', 'MODERATE')} rain, total {w.get('total_rainfall_mm')} mm, peak {w.get('peak_hourly_rainfall_mm')} mm)")
+                        else:
+                            summary_lines.append(f"- {w}")
+                    if tool_result.get("peak_time"):
+                        summary_lines.append(f"Rain Peak Time: around {tool_result.get('peak_time')}")
                 else:
                     summary_lines.append("Rain Windows: No rain detected in the forecast period.")
             if "recommendation" in tool_result:

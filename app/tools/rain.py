@@ -113,6 +113,47 @@ async def get_rain_window(
             ),
         }
 
+    timeline_items = []
+    for item in forecast[:12]:
+        raw_time = item.get("time")
+        if not raw_time:
+            continue
+        try:
+            local_time = _parse_time(raw_time).astimezone(timezone)
+        except Exception:
+            continue
+
+        rainfall = float(item.get("precipitation_mm") or 0.0)
+        prob = item.get("precipitation_probability_pct")
+        cond = (item.get("symbol_code") or "").lower()
+
+        # Pick matching weather emoji
+        if "thunder" in cond:
+            emoji = "⛈️"
+        elif "heavyrain" in cond or rainfall >= 3.0:
+            emoji = "🌧️"
+        elif "rain" in cond or rainfall > 0.0:
+            emoji = "🌦️"
+        elif "cloud" in cond:
+            emoji = "☁️"
+        elif "fog" in cond:
+            emoji = "🌫️"
+        else:
+            emoji = "☀️"
+
+        time_str = local_time.strftime("%I %p").lstrip("0")
+        prob_str = f" {int(prob)}%" if prob is not None and prob > 0 else (f" {int(rainfall*25)}%" if rainfall > 0 else "")
+
+        timeline_items.append({
+            "time": time_str,
+            "hour": local_time.hour,
+            "emoji": emoji,
+            "probability_pct": prob,
+            "rainfall_mm": rainfall,
+            "condition": cond,
+            "formatted_line": f"{time_str.ljust(5)} ─────────────── {emoji}{prob_str}"
+        })
+
     rain_points.sort(
         key=lambda x: x["local_time"]
     )
@@ -144,6 +185,8 @@ async def get_rain_window(
         windows.append(current)
 
     summaries = []
+    peak_time_str = None
+    peak_val = 0.0
 
     for window in windows:
 
@@ -159,6 +202,11 @@ async def get_rain_window(
             item["rainfall_mm"]
             for item in window
         )
+
+        for item in window:
+            if item["rainfall_mm"] > peak_val:
+                peak_val = item["rainfall_mm"]
+                peak_time_str = item["local_time"].strftime("%I %p").lstrip("0")
 
         if peak >= 5:
             intensity = "HEAVY"
@@ -178,6 +226,12 @@ async def get_rain_window(
                         + timedelta(hours=1)
                     ).isoformat(),
 
+                "start_label":
+                    start["local_time"].strftime("%I %p").lstrip("0"),
+
+                "end_label":
+                    (end["local_time"] + timedelta(hours=1)).strftime("%I %p").lstrip("0"),
+
                 "total_rainfall_mm":
                     round(total, 2),
 
@@ -191,8 +245,10 @@ async def get_rain_window(
 
     return {
         "status": "success",
-        "rain_expected": True,
+        "rain_expected": bool(rain_points),
         "windows": summaries,
+        "peak_time": peak_time_str,
+        "timeline": [t["formatted_line"] for t in timeline_items],
         "rain_points": [
             {
                 "time":
