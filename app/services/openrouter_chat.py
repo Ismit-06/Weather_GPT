@@ -221,7 +221,7 @@ async def chat(
                     cleaned_lines.append(line)
 
                 if cleaned_lines:
-                    content = " ".join(cleaned_lines)
+                    content = "\n".join(cleaned_lines)
 
                 final_text = content.strip()
 
