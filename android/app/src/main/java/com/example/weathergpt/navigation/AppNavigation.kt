@@ -54,11 +54,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.weathergpt.ui.screens.AlertsScreen
+import com.example.weathergpt.ui.screens.CameraScreen
 import com.example.weathergpt.ui.screens.ChatScreen
 import com.example.weathergpt.ui.screens.DamScreen
 import com.example.weathergpt.ui.screens.ForecastScreen
 import com.example.weathergpt.ui.screens.HomeScreen
 import com.example.weathergpt.ui.screens.MapScreen
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoCamera
 import com.example.weathergpt.ui.theme.AccentPurple
 import com.example.weathergpt.ui.theme.BackgroundDark
 import com.example.weathergpt.ui.theme.BorderGlass
@@ -76,6 +79,7 @@ sealed class Screen(
     data object Home : Screen("home", "Home")
     data object Chat : Screen("chat", "Chat")
     data object Forecast : Screen("forecast", "Forecast")
+    data object Camera : Screen("camera", "Sky AI")
     data object Map : Screen("map", "Map")
     data object Alerts : Screen("alerts", "Alerts")
     data object Dams : Screen("dams", "Dams")
@@ -89,6 +93,7 @@ fun AppNavigation() {
         Screen.Home,
         Screen.Chat,
         Screen.Forecast,
+        Screen.Camera,
         Screen.Map,
         Screen.Alerts
     )
@@ -153,6 +158,14 @@ fun AppNavigation() {
 
                 composable(Screen.Forecast.route) {
                     ForecastScreen()
+                }
+
+                composable(Screen.Camera.route) {
+                    CameraScreen(
+                        onNavigateToRadar = {
+                            navController.navigate(Screen.Map.route)
+                        }
+                    )
                 }
 
                 composable(Screen.Map.route) {
@@ -385,6 +398,7 @@ private fun navIconFilled(screen: Screen): ImageVector {
         Screen.Home -> Icons.Default.Home
         Screen.Chat -> Icons.AutoMirrored.Filled.Chat
         Screen.Forecast -> Icons.Default.Cloud
+        Screen.Camera -> Icons.Default.PhotoCamera
         Screen.Map -> Icons.Default.Map
         Screen.Alerts -> Icons.Default.Warning
         Screen.Dams -> Icons.Default.WaterDrop
@@ -396,6 +410,7 @@ private fun navIconOutlined(screen: Screen): ImageVector {
         Screen.Home -> Icons.Outlined.Home
         Screen.Chat -> Icons.Outlined.Chat
         Screen.Forecast -> Icons.Outlined.Cloud
+        Screen.Camera -> Icons.Outlined.PhotoCamera
         Screen.Map -> Icons.Outlined.Map
         Screen.Alerts -> Icons.Outlined.Warning
         Screen.Dams -> Icons.Default.WaterDrop

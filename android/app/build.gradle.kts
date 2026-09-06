@@ -86,6 +86,12 @@ android {
 dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
+    // CameraX for AI Weather from Camera
+    val cameraxVersion = "1.4.1"
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
     implementation(
         "com.maptiler:maptiler-sdk-kotlin:1.3.0"
     )
