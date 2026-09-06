@@ -477,12 +477,18 @@ fun CameraScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color(0xCC0A1626))
                             .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
-                            .clickable {
+                            .clickable(enabled = !isAnalyzing) {
                                 scope.launch {
                                     isAnalyzing = true
-                                    delay(1000)
-                                    analysisResult = performSkyAnalysis(null, currentWeather)
-                                    isAnalyzing = false
+                                    triggerCaptureAndAnalyze(
+                                        context = context,
+                                        imageCapture = imageCapture,
+                                        currentWeather = currentWeather,
+                                        onResult = { res ->
+                                            analysisResult = res
+                                            isAnalyzing = false
+                                        }
+                                    )
                                 }
                             }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -875,90 +881,152 @@ private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
 }
 
 private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyAnalysisResult {
-    var avgBrightness = 150f
-    var isDarkOvercast = false
-    var isHazy = false
+    if (bitmap == null) {
+        return SkyAnalysisResult(
+            title = "No Viewfinder Image",
+            icon = "📷",
+            cloudType = "Unknown",
+            cloudDescription = "Could not capture image from viewfinder frame",
+            visibilityStatus = "Indeterminate",
+            atmosphericCondition = "Sensor Offline",
+            confidenceScore = 0,
+            estimatedRainRisk = "N/A",
+            explanation = "Unable to process camera sensor data. Please ensure camera lens is unobstructed and point at the open sky.",
+            recommendation = "Point camera upwards towards the sky and try again.",
+            statusColor = WarningAmber
+        )
+    }
 
-    if (bitmap != null) {
-        try {
-            val sampleW = (bitmap.width / 8).coerceAtLeast(10)
-            val sampleH = (bitmap.height / 8).coerceAtLeast(10)
-            val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
-            var totalLum = 0L
-            var count = 0
+    // High-resolution multi-sampling across upper, center, and lower regions
+    val sampleW = 64
+    val sampleH = 64
+    val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
 
-            for (x in 0 until sampleW step 2) {
-                for (y in 0 until sampleH step 2) {
-                    val pixel = scaled.getPixel(x, y)
-                    val r = (pixel shr 16) and 0xff
-                    val g = (pixel shr 8) and 0xff
-                    val b = pixel and 0xff
-                    val lum = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
-                    totalLum += lum
-                    count++
-                }
+    var skyPixels = 0
+    var blueSkyPixels = 0
+    var brightCloudPixels = 0
+    var darkCloudPixels = 0
+    var indoorOrObjectPixels = 0
+    var highSaturationPixels = 0
+    var totalLum = 0.0
+
+    // Analyze upper 70% where sky/clouds dominate
+    val skyRegionH = (sampleH * 0.75).toInt()
+    val totalSamples = sampleW * skyRegionH
+
+    for (x in 0 until sampleW) {
+        for (y in 0 until skyRegionH) {
+            val pixel = scaled.getPixel(x, y)
+            val r = (pixel shr 16) and 0xff
+            val g = (pixel shr 8) and 0xff
+            val b = pixel and 0xff
+            val lum = 0.299 * r + 0.587 * g + 0.114 * b
+            totalLum += lum
+
+            val maxChannel = maxOf(r, maxOf(g, b))
+            val minChannel = minOf(r, minOf(g, b))
+            val delta = maxChannel - minChannel
+            val saturation = if (maxChannel == 0) 0f else (delta.toFloat() / maxChannel)
+
+            // Characteristics of Sky & Clouds:
+            // 1. Blue Sky: B > R + 15, B > G
+            val isBlue = (b > r + 15) && (b >= g)
+            // 2. White/Light Grey Clouds: Low saturation (< 0.22), lum > 140
+            val isWhiteCloud = saturation < 0.22f && lum >= 140
+            // 3. Dark Storm Clouds / Overcast: Low saturation (< 0.25), lum between 45 and 140, neutral grey (r, g, b close)
+            val isDarkCloud = saturation < 0.25f && lum in 45.0..140.0 && (delta < 28)
+
+            // Characteristics of Indoor / Desk / Furniture / Text / Objects:
+            // High warm saturation (Yellow sticky notes, wood, brown table, red/green objects)
+            val isWarmOrWoodOrTable = (r > b + 25 && g > b) || (saturation > 0.45f && !isBlue)
+            // Excessive high saturation
+            if (saturation > 0.50f && !isBlue) {
+                highSaturationPixels++
             }
-            if (count > 0) {
-                avgBrightness = (totalLum / count).toFloat()
+
+            if (isWarmOrWoodOrTable) {
+                indoorOrObjectPixels++
+            } else if (isBlue) {
+                skyPixels++
+                blueSkyPixels++
+            } else if (isWhiteCloud) {
+                skyPixels++
+                brightCloudPixels++
+            } else if (isDarkCloud) {
+                skyPixels++
+                darkCloudPixels++
             }
-            if (avgBrightness < 95f) {
-                isDarkOvercast = true
-            } else if (avgBrightness in 95f..160f) {
-                isHazy = true
-            }
-        } catch (e: Exception) {
-            Log.e("SkyAnalysis", "Error analyzing bitmap: ${e.message}")
         }
     }
 
-    val rainMm = weather?.precipitation_mm ?: 0.0
-    val tempC = weather?.temperature_c ?: 29.0
-    val humidity = weather?.relative_humidity_pct ?: 75.0
+    val avgLum = totalLum / totalSamples.coerceAtLeast(1)
+    val skyFraction = skyPixels.toFloat() / totalSamples.coerceAtLeast(1)
+    val indoorFraction = (indoorOrObjectPixels + highSaturationPixels).toFloat() / totalSamples.coerceAtLeast(1)
 
+    // REJECT INDOOR / NON-SKY SCENES (e.g. Desk, Monitor, Paper, Sticky Notes, Furniture, Walls)
+    if (indoorFraction > 0.28f || (skyFraction < 0.35f && blueSkyPixels == 0 && brightCloudPixels < (totalSamples * 0.20f))) {
+        return SkyAnalysisResult(
+            title = "No Sky Detected",
+            icon = "🚫",
+            cloudType = "Indoor / Non-Sky Surface",
+            cloudDescription = "Point camera directly at open sky, clouds, or the horizon",
+            visibilityStatus = "Obstructed / Indoor",
+            atmosphericCondition = "Camera Not Facing Sky",
+            confidenceScore = 98,
+            estimatedRainRisk = "N/A",
+            explanation = "WeatherGPT detected indoor objects, furniture, or a non-sky surface. The sky vision engine requires an unobstructed view of the open atmosphere or cloud layer.",
+            recommendation = "Step outside or point your camera through an open window towards the clouds.",
+            statusColor = WarningAmber
+        )
+    }
+
+    val rainMm = weather?.precipitation_mm ?: 0.0
+
+    // High Confidence Sky Classifications
     return when {
-        isDarkOvercast || rainMm > 4.0 -> {
+        darkCloudPixels > (skyPixels * 0.45f) || (avgLum < 90 && rainMm > 1.5) -> {
             SkyAnalysisResult(
                 title = "Storm Development Detected",
-                icon = "☁️",
+                icon = "⛈️",
                 cloudType = "Cumulonimbus / Mammatus",
-                cloudDescription = "Dense, towering storm clouds with dark low base",
+                cloudDescription = "Dense, towering storm clouds with low dark base",
                 visibilityStatus = "Low (Dark Overcast)",
                 atmosphericCondition = "Pre-Thunderstorm Convection",
-                confidenceScore = 92,
+                confidenceScore = 94,
                 estimatedRainRisk = "High ⚠️",
-                explanation = "The cloud structure appears consistent with developing cumulonimbus clouds with intense vertical buildup. Significant moisture and localized downdrafts detected.",
-                recommendation = "Check the latest radar before travelling. Heavy shower risk in 30–60 mins.",
+                explanation = "The cloud structure appears consistent with developing cumulonimbus clouds. Heavy localized moisture and low ambient luminance observed.",
+                recommendation = "Check the latest radar before travelling. High shower risk.",
                 statusColor = DangerRed
             )
         }
-        isHazy || humidity > 85.0 -> {
-            SkyAnalysisResult(
-                title = "Humid & Overcast Stratus",
-                icon = "🌫️",
-                cloudType = "Altostratus / Stratus",
-                cloudDescription = "Uniform grayish sheet cloud covering majority of the horizon",
-                visibilityStatus = "Moderate (Hazy / Foggy)",
-                atmosphericCondition = "Stable High Humidity",
-                confidenceScore = 88,
-                estimatedRainRisk = "Moderate 🌦️",
-                explanation = "Diffuse sunlight with high humidity layer. Typical of light drizzle or overcast maritime conditions with low turbulence.",
-                recommendation = "Carry a light umbrella. Roads may be slick with light drizzle.",
-                statusColor = WarningAmber
-            )
-        }
-        avgBrightness > 190f && rainMm == 0.0 -> {
+        blueSkyPixels > (skyPixels * 0.50f) && brightCloudPixels < (skyPixels * 0.35f) -> {
             SkyAnalysisResult(
                 title = "Clear Sky & High Solar UV",
                 icon = "☀️",
                 cloudType = "Cirrus / Clear Sky",
-                cloudDescription = "High-altitude wispy ice crystal filaments or minimal cloud cover",
+                cloudDescription = "High-altitude wispy ice filaments or minimal cloud cover",
                 visibilityStatus = "Excellent (>10 km)",
                 atmosphericCondition = "Dry Solar Dominant",
-                confidenceScore = 95,
+                confidenceScore = 96,
                 estimatedRainRisk = "Very Low 🟢",
-                explanation = "Direct solar penetration with scattered high-altitude cirrus clouds. No active storm convection in the immediate visual field.",
-                recommendation = "Ideal outdoor conditions. Use UV protection if outdoors between 11 AM–3 PM.",
+                explanation = "Dominant clear sky blue spectrum with minimal overcast. No active storm convection in the immediate visual field.",
+                recommendation = "Ideal outdoor conditions. Use UV protection if outdoors during midday.",
                 statusColor = SuccessGreen
+            )
+        }
+        brightCloudPixels > (skyPixels * 0.55f) -> {
+            SkyAnalysisResult(
+                title = "Overcast Stratus Layer",
+                icon = "☁️",
+                cloudType = "Altostratus / Stratus",
+                cloudDescription = "Uniform grayish-white sheet cloud covering the horizon",
+                visibilityStatus = "Moderate (Diffused Haze)",
+                atmosphericCondition = "Stable High Humidity",
+                confidenceScore = 91,
+                estimatedRainRisk = "Moderate 🌦️",
+                explanation = "Uniform light cloud sheet with diffuse sun illumination. Indicative of maritime stratus or high-altitude cloud sheets.",
+                recommendation = "Carry a light umbrella. Low turbulence but drizzle possible.",
+                statusColor = WarningAmber
             )
         }
         else -> {
@@ -966,13 +1034,13 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
                 title = "Scattered Fair-Weather Clouds",
                 icon = "⛅",
                 cloudType = "Cumulus Humilis / Stratocumulus",
-                cloudDescription = "Fluffy flat-based clouds with bright sun illumination",
+                cloudDescription = "Fluffy flat-based clouds with bright ambient illumination",
                 visibilityStatus = "Good (8–10 km)",
                 atmosphericCondition = "Mild Convection",
                 confidenceScore = 89,
                 estimatedRainRisk = "Low 🟢",
-                explanation = "Normal daytime thermal convection. Flat cloud bases indicate stable atmospheric boundary with minimal immediate precipitation risk.",
-                recommendation = "Good time for outdoor activities, walking, or sports.",
+                explanation = "Balanced blue sky and scattered cumulus clouds. Typical fair-weather convective clouds with minimal precipitation threat.",
+                recommendation = "Great time for running, cycling, or outdoor activities.",
                 statusColor = SecondaryCyan
             )
         }
