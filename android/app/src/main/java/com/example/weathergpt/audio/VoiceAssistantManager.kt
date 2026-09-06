@@ -2,6 +2,7 @@ package com.example.weathergpt.audio
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -9,19 +10,40 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import com.example.weathergpt.data.BackendConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
+import kotlin.random.Random
 
 class VoiceAssistantManager(private val context: Context) {
 
     private val tag = "WeatherVoiceAssistant"
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Speech Recognizer (In-App STT)
     private var speechRecognizer: SpeechRecognizer? = null
 
-    // Text to Speech (Speaker Output)
+    // Neural Audio Player (fish-audio/s2.1-pro-free:free via OpenRouter)
+    private var mediaPlayer: MediaPlayer? = null
+    private var rmsSimulationJob: Job? = null
+
+    // Text to Speech (Fallback Engine)
     private var tts: TextToSpeech? = null
     private var isTtsInitialized = false
 
@@ -49,27 +71,30 @@ class VoiceAssistantManager(private val context: Context) {
                     tts?.setPitch(1.0f)
                     tts?.setSpeechRate(0.96f)
                     isTtsInitialized = true
-                    Log.d(tag, "TTS initialized successfully")
+                    Log.d(tag, "Fallback TTS initialized successfully")
                 } else {
-                    Log.w(tag, "TTS initialization failed status=$status")
+                    Log.w(tag, "Fallback TTS initialization failed status=$status")
                 }
             }
 
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     _isSpeaking.value = true
+                    startRmsSimulation()
                 }
 
                 override fun onDone(utteranceId: String?) {
                     _isSpeaking.value = false
+                    stopRmsSimulation()
                 }
 
                 override fun onError(utteranceId: String?) {
                     _isSpeaking.value = false
+                    stopRmsSimulation()
                 }
             })
         } catch (e: Exception) {
-            Log.e(tag, "Error setting up TTS", e)
+            Log.e(tag, "Error setting up fallback TTS", e)
         }
     }
 
@@ -119,10 +144,8 @@ class VoiceAssistantManager(private val context: Context) {
                             SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network error."
                             else -> "Could not hear audio clearly."
                         }
-                        Log.d(tag, "SpeechRecognizer error: $error ($msg)")
-                        if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                            onError(msg)
-                        }
+                        Log.w(tag, "Speech recognition error: $error -> $msg")
+                        onError(msg)
                     }
 
                     override fun onResults(results: Bundle?) {
@@ -130,63 +153,58 @@ class VoiceAssistantManager(private val context: Context) {
                         _rmsLevel.value = 0f
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()?.trim()
-                        if (!text.isNullOrBlank()) {
-                            Log.d(tag, "Transcribed: $text")
+                        if (!text.isNullOrEmpty()) {
+                            Log.d(tag, "Recognized speech: $text")
                             onResult(text)
+                        } else {
+                            onError("Could not understand audio.")
                         }
                     }
 
-                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull()
+                        if (!text.isNullOrEmpty()) {
+                            Log.v(tag, "Partial speech: $text")
+                        }
+                    }
+
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
 
-            val speechLocale = when {
-                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
-                    Locale.getDefault()
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) ->
-                    Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) ->
-                    Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) ->
-                    Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) ->
-                    Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) ->
-                    Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) ->
-                    Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) ->
-                    Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) ->
-                    Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) ->
-                    Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) ->
-                    Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) ->
-                    Locale.ENGLISH
-                languageCode.contains("-") ->
-                    Locale.forLanguageTag(languageCode)
-                else ->
-                    Locale.forLanguageTag(languageCode)
-            }
-
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLocale.toLanguageTag())
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLocale.toLanguageTag())
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("hi-IN", "or-IN", "te-IN", "ta-IN", "bn-IN", "en-IN"))
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+
+                val recognitionLocale = when {
+                    languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> "en-IN"
+                    languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) -> "or-IN"
+                    languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) -> "hi-IN"
+                    languageCode.equals("Telugu", ignoreCase = true) -> "te-IN"
+                    languageCode.equals("Tamil", ignoreCase = true) -> "ta-IN"
+                    languageCode.equals("Kannada", ignoreCase = true) -> "kn-IN"
+                    languageCode.equals("Bengali", ignoreCase = true) -> "bn-IN"
+                    languageCode.equals("Marathi", ignoreCase = true) -> "mr-IN"
+                    languageCode.equals("Gujarati", ignoreCase = true) -> "gu-IN"
+                    languageCode.equals("Malayalam", ignoreCase = true) -> "ml-IN"
+                    languageCode.equals("Punjabi", ignoreCase = true) -> "pa-IN"
+                    languageCode.equals("English", ignoreCase = true) -> "en-IN"
+                    languageCode.contains("-") -> languageCode
+                    else -> "en-IN"
+                }
+
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLocale)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLocale)
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-IN", "hi-IN", "or-IN", "te-IN", "ta-IN"))
             }
 
             speechRecognizer?.startListening(intent)
-            _isListening.value = true
-
         } catch (e: Exception) {
+            Log.e(tag, "Error starting speech recognition", e)
             _isListening.value = false
-            Log.e(tag, "Failed to start listening", e)
+            _rmsLevel.value = 0f
             onError("Could not access microphone: ${e.message}")
         }
     }
@@ -199,43 +217,96 @@ class VoiceAssistantManager(private val context: Context) {
         _rmsLevel.value = 0f
     }
 
+    /**
+     * Synthesizes and speaks text using OpenRouter's neural Fish Audio model
+     * (fish-audio/s2.1-pro-free:free) with automatic fallback to local TTS.
+     */
     fun speak(text: String, languageCode: String? = null) {
         stopListening()
+        stopSpeaking()
 
-        if (text.isBlank() || tts == null) return
-
+        if (text.isBlank()) return
         val cleanText = cleanMarkdownForSpeech(text)
+        if (cleanText.isBlank()) return
 
+        coroutineScope.launch {
+            try {
+                _isSpeaking.value = true
+                startRmsSimulation()
+
+                // 1. Fetch neural audio from Backend / OpenRouter TTS endpoint
+                val audioFile = withContext(Dispatchers.IO) {
+                    val jsonBody = JSONObject().apply {
+                        put("text", cleanText)
+                        put("language", languageCode)
+                        put("format", "mp3")
+                    }
+
+                    val request = Request.Builder()
+                        .url("${BackendConfig.BASE_URL_NO_SLASH}/api/v1/tts")
+                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+
+                    val response = BackendConfig.okHttpClient.newCall(request).execute()
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException("Backend TTS returned code ${response.code}")
+                    }
+
+                    val bytes = response.body?.bytes()
+                    if (bytes == null || bytes.isEmpty()) {
+                        throw IllegalStateException("Empty TTS audio received")
+                    }
+
+                    val tempFile = File(context.cacheDir, "neural_speech_${System.currentTimeMillis()}.mp3")
+                    FileOutputStream(tempFile).use { it.write(bytes) }
+                    tempFile
+                }
+
+                // 2. Play with Android MediaPlayer
+                withContext(Dispatchers.Main) {
+                    mediaPlayer?.release()
+                    mediaPlayer = MediaPlayer().apply {
+                        setDataSource(audioFile.absolutePath)
+                        setOnCompletionListener {
+                            _isSpeaking.value = false
+                            stopRmsSimulation()
+                            try { audioFile.delete() } catch (_: Exception) {}
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            _isSpeaking.value = false
+                            stopRmsSimulation()
+                            try { audioFile.delete() } catch (_: Exception) {}
+                            speakFallbackTts(cleanText, languageCode)
+                            true
+                        }
+                        prepare()
+                        start()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(tag, "Neural TTS failed (${e.message}), falling back to local TTS engine")
+                speakFallbackTts(cleanText, languageCode)
+            }
+        }
+    }
+
+    private fun speakFallbackTts(cleanText: String, languageCode: String?) {
         try {
             val locale = when {
-                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) ->
-                    Locale.getDefault()
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) ->
-                    Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) ->
-                    Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) ->
-                    Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) ->
-                    Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) ->
-                    Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) ->
-                    Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) ->
-                    Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) ->
-                    Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) ->
-                    Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) ->
-                    Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) ->
-                    Locale.ENGLISH
-                languageCode.contains("-") ->
-                    Locale.forLanguageTag(languageCode)
-                else ->
-                    Locale.forLanguageTag(languageCode)
+                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> Locale.getDefault()
+                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) -> Locale("or", "IN")
+                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) -> Locale("hi", "IN")
+                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) -> Locale("te", "IN")
+                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) -> Locale("ta", "IN")
+                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) -> Locale("kn", "IN")
+                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) -> Locale("bn", "IN")
+                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) -> Locale("mr", "IN")
+                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) -> Locale("gu", "IN")
+                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) -> Locale("ml", "IN")
+                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) -> Locale("pa", "IN")
+                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) -> Locale.ENGLISH
+                languageCode.contains("-") -> Locale.forLanguageTag(languageCode)
+                else -> Locale.forLanguageTag(languageCode)
             }
             val avail = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
             if (avail >= TextToSpeech.LANG_AVAILABLE) {
@@ -244,15 +315,45 @@ class VoiceAssistantManager(private val context: Context) {
 
             tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "WeatherGPT_Speak_${System.currentTimeMillis()}")
             _isSpeaking.value = true
+            startRmsSimulation()
         } catch (e: Exception) {
-            Log.e(tag, "TTS speak failed", e)
+            Log.e(tag, "Fallback TTS speak failed", e)
+            _isSpeaking.value = false
+            stopRmsSimulation()
         }
+    }
+
+    private fun startRmsSimulation() {
+        rmsSimulationJob?.cancel()
+        rmsSimulationJob = coroutineScope.launch {
+            while (isActive && _isSpeaking.value) {
+                // Natural speaking cadence fluctuation (0.15 to 0.75 range)
+                val base = 0.35f + Random.nextFloat() * 0.40f
+                _rmsLevel.value = base
+                delay(90)
+            }
+            _rmsLevel.value = 0f
+        }
+    }
+
+    private fun stopRmsSimulation() {
+        rmsSimulationJob?.cancel()
+        rmsSimulationJob = null
+        _rmsLevel.value = 0f
     }
 
     fun stopSpeaking() {
         try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+        } catch (_: Exception) {}
+
+        try {
             tts?.stop()
         } catch (_: Exception) {}
+
+        stopRmsSimulation()
         _isSpeaking.value = false
     }
 
@@ -281,7 +382,7 @@ class VoiceAssistantManager(private val context: Context) {
         }
         var content = if (filtered.isNotEmpty()) filtered.joinToString(". ") else text
 
-        // 1. Remove all Emoji unicode characters (Surrogate pairs & symbols) so TTS doesn't read out "sun behind small cloud emoji"
+        // 1. Remove all Emoji unicode characters (Surrogate pairs & symbols)
         content = content.replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}\\x{1F300}-\\x{1F9FF}\\x{2600}-\\x{27BF}\\x{FE00}-\\x{FE0F}]"), "")
         content = content.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]"), "")
 
@@ -295,9 +396,9 @@ class VoiceAssistantManager(private val context: Context) {
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*%\\b"), "$1 percent")
 
         // 3. Remove markdown headers, bold labels, bullets
-        content = content.replace(Regex("(?m)^\\s*[-*•]\\s*"), "") // bullet points at start of line
-        content = content.replace(Regex("[#*`_~>\\[\\]()]"), " ")   // formatting symbols
-        content = content.replace(Regex("\\bhttps?://\\S+"), "")     // URLs
+        content = content.replace(Regex("(?m)^\\s*[-*•]\\s*"), "")
+        content = content.replace(Regex("[#*`_~>\\[\\]()]"), " ")
+        content = content.replace(Regex("\\bhttps?://\\S+"), "")
 
         // 4. Clean up multiple punctuation and whitespace
         content = content.replace(Regex("\\s+"), " ")
@@ -310,7 +411,7 @@ class VoiceAssistantManager(private val context: Context) {
         try {
             speechRecognizer?.destroy()
             speechRecognizer = null
-            tts?.stop()
+            stopSpeaking()
             tts?.shutdown()
             tts = null
         } catch (_: Exception) {}
