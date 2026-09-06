@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 import httpx
 from dotenv import load_dotenv
+from app.services.sarvam_language import translate_with_sarvam, detect_language, resolve_sarvam_code
 
 load_dotenv(
     dotenv_path=Path(__file__).resolve().parents[2] / ".env",
@@ -10,46 +11,48 @@ load_dotenv(
 )
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "minimax/minimax-m2.7:free"
+DEFAULT_MODEL = "qwen/qwen3-235b-a22b"
 FALLBACK_MODELS = [
-    "minimax/minimax-m2.7:free",
-    "google/gemma-4-31b-it:free",
-    "inclusionai/ling-3.0-flash-fin:free"
+    "qwen/qwen3-235b-a22b",
+    "qwen/qwen3-235b-a22b-2507",
+    "qwen/qwen3-30b-a3b",
+    "qwen/qwen-2.5-72b-instruct",
+    "minimax/minimax-m2.7:free"
 ]
 
 def get_language_instruction(language: str) -> tuple[str, str]:
     """Returns (canonical_language_name, mandatory_instruction)"""
     l = (language or "English").strip().lower()
     if any(k in l for k in ["odia", "oriya", "od-in", "or-in", "or"]):
-        return "Odia", "CRITICAL: You MUST reply in authentic ODIA (ଓଡ଼ିଆ script or natural conversational Odia). Do NOT reply in English or Hindi. For yes/no questions, start with 'ହଁ' (Haan) or 'ନାହିଁ' (Naahin)."
+        return "Odia", "CRITICAL: You MUST reply in authentic ODIA (ଓଡ଼ିଆ script). For yes/no questions, start with 'ହଁ' (Haan) or 'ନାହିଁ' (Naahin)."
     if any(k in l for k in ["hinglish"]):
-        return "Hinglish", "CRITICAL: You MUST reply in conversational Romanized Hindi (Hinglish). Use simple Hindi words written in English alphabet. For yes/no questions, start with 'Haan' or 'Nahi'."
+        return "Hinglish", "CRITICAL: You MUST reply in conversational Romanized Hindi (Hinglish). Use simple Hindi words written in English alphabet."
     if any(k in l for k in ["hindi", "hi-in", "hi"]):
-        return "Hindi", "CRITICAL: You MUST reply in HINDI (हिन्दी or natural conversational Hinglish). Do NOT reply in English. For yes/no questions, start with 'हाँ' or 'नहीं'."
+        return "Hindi", "CRITICAL: You MUST reply in HINDI (हिन्दी). For yes/no questions, start with 'हाँ' or 'नहीं'."
     if any(k in l for k in ["telugu", "te-in", "te"]):
-        return "Telugu", "CRITICAL: You MUST reply in TELUGU (తెలుగు). Do NOT reply in English. For yes/no questions, start with 'అవును' or 'కాదు'."
+        return "Telugu", "CRITICAL: You MUST reply in TELUGU (తెలుగు)."
     if any(k in l for k in ["tamil", "ta-in", "ta"]):
-        return "Tamil", "CRITICAL: You MUST reply in TAMIL (தமிழ்). Do NOT reply in English. For yes/no questions, start with 'ஆம்' or 'இல்லை'."
+        return "Tamil", "CRITICAL: You MUST reply in TAMIL (தமிழ்)."
     if any(k in l for k in ["bengali", "bn-in", "bn"]):
-        return "Bengali", "CRITICAL: You MUST reply in BENGALI (বাংলা). Do NOT reply in English."
+        return "Bengali", "CRITICAL: You MUST reply in BENGALI (বাংলা)."
     if any(k in l for k in ["marathi", "mr-in", "mr"]):
-        return "Marathi", "CRITICAL: You MUST reply in MARATHI (मराठी). Do NOT reply in English."
+        return "Marathi", "CRITICAL: You MUST reply in MARATHI (मराठी)."
     if any(k in l for k in ["gujarati", "gu-in", "gu"]):
-        return "Gujarati", "CRITICAL: You MUST reply in GUJARATI (ગુજરાતી). Do NOT reply in English."
+        return "Gujarati", "CRITICAL: You MUST reply in GUJARATI (ગુજરાતી)."
     if any(k in l for k in ["kannada", "kn-in", "kn"]):
-        return "Kannada", "CRITICAL: You MUST reply in KANNADA (ಕನ್ನಡ). Do NOT reply in English."
+        return "Kannada", "CRITICAL: You MUST reply in KANNADA (ಕನ್ನಡ)."
     if any(k in l for k in ["malayalam", "ml-in", "ml"]):
-        return "Malayalam", "CRITICAL: You MUST reply in MALAYALAM (മലയാളം). Do NOT reply in English."
+        return "Malayalam", "CRITICAL: You MUST reply in MALAYALAM (മലയാളം)."
     if any(k in l for k in ["punjabi", "pa-in", "pa"]):
-        return "Punjabi", "CRITICAL: You MUST reply in PUNJABI (ਪੰਜਾਬੀ). Do NOT reply in English."
+        return "Punjabi", "CRITICAL: You MUST reply in PUNJABI (ਪੰਜਾਬੀ)."
     if "auto" in l:
-        return "Auto-Detect", "CRITICAL: Detect the user's input language and reply in the EXACT SAME LANGUAGE and script (Odia, Hindi, Telugu, Tamil, Bengali, or English)."
+        return "Auto-Detect", "CRITICAL: Reply in the exact same language and script as the user's question."
     return language.capitalize(), f"CRITICAL: You MUST reply in {language}."
 
 def build_system_prompt(language: str, weather_context: str) -> str:
     lang_name, lang_mandate = get_language_instruction(language)
-    return f"""You are WeatherGPT, a real-time conversational AI voice assistant.
-Your response will be read aloud to the user by a Text-to-Speech voice engine.
+    return f"""You are WeatherGPT, an intelligent, real-time conversational AI weather assistant powered by Qwen3 235B.
+Your response will be synthesized and read directly aloud to the user by a Text-to-Speech voice engine.
 
 RESPONSE LANGUAGE: {lang_name}
 {lang_mandate}
@@ -84,11 +87,17 @@ async def chat(
         if fm not in candidate_models:
             candidate_models.append(fm)
 
+    # Detect language if set to auto
+    target_lang = language
+    if not language or language.lower() == "auto":
+        detected = await detect_language(question)
+        target_lang = detected.get("language_code", "en-IN")
+
     messages = [
         {
             "role": "system",
             "content": build_system_prompt(
-                language=language,
+                language=target_lang,
                 weather_context=weather_context,
             ),
         }
@@ -119,9 +128,8 @@ async def chat(
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.3,
+            "temperature": 0.25,
             "max_tokens": 120,
-            "reasoning": {"effort": "none"},
         }
 
         try:
@@ -182,7 +190,23 @@ async def chat(
                 if cleaned_lines:
                     content = " ".join(cleaned_lines)
 
-                return content.strip()
+                final_text = content.strip()
+
+                # Multi-language verification via Sarvam AI
+                sarvam_code = resolve_sarvam_code(target_lang)
+                if sarvam_code != "en-IN":
+                    # Check if text contains non-English characters or needs translation
+                    is_english_only = all(ord(c) < 128 for c in final_text if c.isalpha())
+                    if is_english_only:
+                        translated = await translate_with_sarvam(
+                            text=final_text,
+                            target_language=sarvam_code,
+                            source_language="en-IN",
+                        )
+                        if translated and translated.strip():
+                            final_text = translated.strip()
+
+                return final_text
 
         except Exception as e:
             last_error = str(e)
