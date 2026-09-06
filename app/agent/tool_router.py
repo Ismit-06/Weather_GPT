@@ -169,13 +169,34 @@ async def run_weather_tool(
             return result
 
         if target_local_time is None:
+            # If no time is specified (e.g. "Can I go for a run in Mumbai?"),
+            # automatically evaluate the best window for today / current weather
+            best_res = await get_best_activity_time(
+                latitude=latitude,
+                longitude=longitude,
+                activity=activity,
+                date_text=date_text or "today",
+                timezone_name=timezone_name,
+            )
+            if best_res.get("status") == "success":
+                best_res["intent"] = intent
+                return best_res
+
+            # Fallback to current weather snapshot assessment
+            curr = await get_current_weather(latitude=latitude, longitude=longitude)
+            if curr.get("status") == "success":
+                curr["activity_assessment"] = assess_activity_conditions(
+                    activity=activity,
+                    forecast=curr.get("current", {}),
+                )
+                curr["intent"] = intent
+                return curr
 
             return {
                 "status": "needs_clarification",
                 "intent": intent,
                 "message": (
-                    "A specific time is required "
-                    "for this activity assessment."
+                    "A specific time or date is helpful for this activity assessment."
                 ),
             }
 
