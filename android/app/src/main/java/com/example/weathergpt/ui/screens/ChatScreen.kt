@@ -549,6 +549,52 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
+                            icon = "🏃",
+                            title = "Can I go for a run?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Can I go for a run right now in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🚴",
+                            title = "Good time for cycling?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Is it a good time for cycling today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🏏",
+                            title = "Play cricket today?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Should we play cricket this evening in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🏖️",
+                            title = "Beach & Outdoor trip?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Is it a good time to visit the beach or go outdoors in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
                             icon = "☂️",
                             title = "Carry umbrella?",
                             modifier = Modifier.weight(1f),
@@ -558,57 +604,11 @@ fun ChatScreen(
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "🏃",
-                            title = "Can I go for a run?",
+                            icon = "📸",
+                            title = "Outdoor photography?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Can I go for a run right now in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SuggestionGlassCard(
-                            icon = "🏍️",
-                            title = "Wash my bike today?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Should I wash my bike today in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "👕",
-                            title = "Hang clothes outside?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Can I hang clothes outside today in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SuggestionGlassCard(
-                            icon = "🚗",
-                            title = "Safe to travel?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Is it safe to travel right now in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "🎓",
-                            title = "Rain when leaving?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Will it rain when I leave college or office today in ${activeLocation.name}?"
+                                message.value = "Is it good for outdoor photography in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )

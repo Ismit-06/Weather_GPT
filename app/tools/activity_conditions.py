@@ -1,3 +1,16 @@
+def calculate_heat_index(temperature_c: float, humidity_pct: float) -> float:
+    """Computes approximate Heat Index / Apparent Temperature in Celsius."""
+    if temperature_c < 20 or humidity_pct < 40:
+        return temperature_c
+    # Rothfusz regression equation converted to Celsius
+    t = temperature_c * 9.0 / 5.0 + 32.0
+    r = humidity_pct
+    hi = (-42.379 + 2.04901523 * t + 10.14333127 * r - 0.22475541 * t * r
+          - 0.00683783 * t * t - 0.05481717 * r * r + 0.00122874 * t * t * r
+          + 0.00085282 * t * r * r - 0.00000199 * t * t * r * r)
+    return round((hi - 32.0) * 5.0 / 9.0, 1)
+
+
 def assess_activity_conditions(
     activity: str,
     forecast: dict,
@@ -7,227 +20,150 @@ def assess_activity_conditions(
         activity or "outdoor"
     ).lower().strip()
 
-    temperature = forecast.get(
-        "temperature_c"
-    )
-    humidity = forecast.get(
-        "humidity_pct"
-    )
-    rainfall = forecast.get(
-        "rainfall_mm"
-    )
-    wind = forecast.get(
-        "wind_speed_ms"
-    )
-    condition = (
-        forecast.get("condition")
-        or ""
-    ).lower()
+    temperature = forecast.get("temperature_c")
+    humidity = forecast.get("humidity_pct")
+    rainfall = forecast.get("rainfall_mm")
+    wind = forecast.get("wind_speed_ms")
+    condition = (forecast.get("condition") or "").lower()
+    uv = forecast.get("uv_index")
+    aqi = forecast.get("aqi")
 
     score = 100.0
     reasons = []
 
-    # Rain.
-    if isinstance(
-        rainfall,
-        (int, float),
-    ):
+    # Calculate heat index if temp and humidity present
+    heat_index = None
+    if isinstance(temperature, (int, float)) and isinstance(humidity, (int, float)):
+        heat_index = calculate_heat_index(temperature, humidity)
 
+    # 1. Rain Evaluation
+    if isinstance(rainfall, (int, float)):
         if rainfall >= 5:
-            score -= 50
-            reasons.append(
-                "Heavy rainfall is expected."
-            )
-
+            score -= 60
+            reasons.append("Heavy rainfall is expected.")
         elif rainfall >= 2:
-            score -= 35
-            reasons.append(
-                "Moderate rainfall is expected."
-            )
-
-        elif rainfall >= 1:
+            score -= 40
+            reasons.append("Moderate rainfall is expected.")
+        elif rainfall >= 0.5:
             score -= 25
-            reasons.append(
-                "Rainfall is expected."
-            )
-
+            reasons.append("Light rain / drizzle is expected.")
         elif rainfall > 0:
-            score -= 12
-            reasons.append(
-                "Some rainfall is expected."
-            )
-
+            score -= 10
+            reasons.append("Slight chance of rain.")
         else:
-            reasons.append(
-                "No rainfall is expected."
-            )
+            reasons.append("Dry conditions with no rain expected.")
 
-    exercise_activities = {
-        "running",
-        "cycling",
-        "football",
-        "cricket",
-        "exercise",
-    }
+    # 2. Thunderstorm & Severe Weather
+    if "thunder" in condition:
+        score -= 65
+        reasons.append("Thunderstorm conditions make outdoor activity unsafe.")
+    elif "heavyrain" in condition or "storm" in condition:
+        score -= 45
+        reasons.append("Severe rain/storm conditions expected.")
 
-    # Temperature.
-    if isinstance(
-        temperature,
-        (int, float),
-    ):
-
-        if activity in exercise_activities:
-
-            if temperature >= 40:
-                score -= 40
-                reasons.append(
-                    "Extreme heat."
-                )
-
-            elif temperature >= 36:
-                score -= 28
-                reasons.append(
-                    "Very hot conditions."
-                )
-
-            elif temperature >= 33:
-                score -= 18
-                reasons.append(
-                    "Hot conditions."
-                )
-
+    # 3. Activity specific rules
+    # Sports & High Exertion (Running, Cycling, Football, Cricket, Walking, Gym)
+    if activity in {"running", "jogging", "cycling", "football", "cricket", "walking", "gym", "exercise", "workout"}:
+        if isinstance(temperature, (int, float)):
+            if temperature >= 38:
+                score -= 45
+                reasons.append("Dangerous heat conditions for strenuous physical exertion.")
+            elif temperature >= 34:
+                score -= 25
+                reasons.append("Very hot conditions; high risk of dehydration.")
             elif temperature >= 30:
-                score -= 8
-                reasons.append(
-                    "Warm conditions."
-                )
+                score -= 12
+                reasons.append("Warm and humid; stay well hydrated.")
+            elif 16 <= temperature <= 25:
+                score += 5
+                reasons.append("Pleasant and ideal temperature for workouts.")
+            elif temperature < 8:
+                score -= 20
+                reasons.append("Cold temperatures; warm athletic layers recommended.")
 
-            elif 15 <= temperature <= 24:
+        if isinstance(humidity, (int, float)):
+            if humidity >= 88:
+                score -= 20
+                reasons.append("High humidity will make perspiration evaporate slowly.")
+            elif humidity <= 65:
                 score += 3
 
-            elif temperature < 10:
+        if isinstance(wind, (int, float)):
+            if activity == "cycling" and wind >= 10:
+                score -= 25
+                reasons.append("Strong headwinds may make cycling difficult.")
+            elif activity in {"cricket", "football"} and wind >= 12:
                 score -= 20
-                reasons.append(
-                    "Cold conditions."
-                )
+                reasons.append("Gusty winds may affect ball trajectory.")
+            elif wind >= 15:
+                score -= 20
+                reasons.append("Strong wind gusts present.")
 
-        elif activity in {
-            "walking",
-            "hiking",
-            "picnic",
-            "outdoor",
-        }:
-
-            if temperature >= 38:
-                score -= 30
-                reasons.append(
-                    "Very warm outdoor conditions."
-                )
-
-    # Humidity.
-    if isinstance(
-        humidity,
-        (int, float),
-    ):
-
-        if activity in exercise_activities:
-
-            if humidity >= 90:
-                score -= 25
-                reasons.append(
-                    "Very high humidity may make exercise uncomfortable."
-                )
-
-            elif humidity >= 85:
-                score -= 18
-                reasons.append(
-                    "High humidity may make exercise feel harder."
-                )
-
-            elif humidity >= 75:
-                score -= 10
-                reasons.append(
-                    "Moderately high humidity."
-                )
-
-            elif humidity >= 65:
-                score -= 5
-                reasons.append(
-                    "Some humidity is present."
-                )
-
-        elif humidity >= 90:
-
+    # Photography
+    elif activity in {"photography", "photoshoot", "photo"}:
+        if "fog" in condition or "mist" in condition:
             score -= 10
-            reasons.append(
-                "High humidity."
-            )
+            reasons.append("Foggy/misty atmospheric lighting.")
+        elif "cloud" in condition:
+            score += 5
+            reasons.append("Diffused soft cloud lighting, great for outdoor portraits.")
+        elif isinstance(rainfall, (int, float)) and rainfall > 0:
+            score -= 40
+            reasons.append("Rain will endanger camera equipment outdoors.")
+        else:
+            score += 5
+            reasons.append("Good natural light and dry conditions for photography.")
 
-    # Wind.
-    if isinstance(
-        wind,
-        (int, float),
-    ):
+    # Beach & Water activities
+    elif activity in {"beach", "swimming", "swim"}:
+        if "thunder" in condition:
+            score = 0.0
+            reasons.append("Never go to the beach or water during lightning or thunderstorms.")
+        elif isinstance(rainfall, (int, float)) and rainfall >= 2:
+            score -= 40
+            reasons.append("Rainy beach conditions.")
+        elif isinstance(wind, (int, float)) and wind >= 12:
+            score -= 30
+            reasons.append("Rough surf and strong beach winds.")
+        elif isinstance(temperature, (int, float)) and 24 <= temperature <= 33:
+            score += 5
+            reasons.append("Warm and sunny beach weather.")
 
-        if activity == "cycling":
+    # Hiking & Trekking
+    elif activity in {"hiking", "hike", "trekking", "trek"}:
+        if isinstance(rainfall, (int, float)) and rainfall > 0.5:
+            score -= 45
+            reasons.append("Trails will be muddy and slippery due to rain.")
+        if "thunder" in condition:
+            score = 0.0
+            reasons.append("High lightning risk on elevated mountain trails.")
+        if isinstance(temperature, (int, float)) and temperature >= 35:
+            score -= 30
+            reasons.append("High heat exhaustion risk on hiking trails.")
 
-            if wind >= 12:
-                score -= 30
-                reasons.append(
-                    "Strong wind may make cycling difficult."
-                )
-
-            elif wind >= 8:
-                score -= 15
-                reasons.append(
-                    "Moderate wind may affect cycling."
-                )
-
-        elif activity == "running":
-
-            if wind >= 15:
-                score -= 25
-                reasons.append(
-                    "Strong wind may affect running comfort."
-                )
-
-            elif wind >= 10:
-                score -= 12
-                reasons.append(
-                    "Moderate wind may affect running comfort."
-                )
-
-        elif wind >= 15:
-
+    # Driving & Travel
+    elif activity in {"driving", "drive", "travel", "road_trip", "commute", "leaving_college", "leaving_office"}:
+        if isinstance(rainfall, (int, float)) and rainfall >= 3:
+            score -= 35
+            reasons.append("Heavy rain reduces road visibility and creates waterlogging risks.")
+        elif isinstance(rainfall, (int, float)) and rainfall > 0:
+            score -= 15
+            reasons.append("Wet road surfaces; drive with caution.")
+        elif "fog" in condition:
             score -= 25
-            reasons.append(
-                "Strong winds are expected."
-            )
+            reasons.append("Dense fog reduces driving visibility.")
+        else:
+            score += 5
+            reasons.append("Clear roads and good driving visibility.")
 
-    # Severe conditions.
-    if "thunder" in condition:
-
-        score -= 50
-        reasons.append(
-            "Thunderstorm conditions are unsuitable "
-            "for outdoor activity."
-        )
-
-    elif "heavyrain" in condition:
-
-        score -= 30
-        reasons.append(
-            "Heavy rain conditions are expected."
-        )
-
-    # Specific real-life decisions
-    if activity in {"umbrella", "carry_umbrella", "raincoat"}:
+    # Vehicle washing & Laundry & Umbrella
+    elif activity in {"washing_bike", "washing_car", "bike_wash", "car_wash", "wash_bike", "wash_car"}:
         if rainfall and rainfall > 0:
             score = 10.0
-            reasons.append("Rain is likely. Definitely carry an umbrella or raincoat.")
+            reasons.append("Rain is predicted soon, which will make your vehicle dirty again. Hold off on washing.")
         else:
-            score = 95.0
-            reasons.append("No rain detected in the forecast. An umbrella is unlikely to be needed.")
+            score = 90.0
+            reasons.append("Dry weather ahead. It is a good time to wash your vehicle.")
 
     elif activity in {"hanging_clothes", "drying_clothes", "clothes", "laundry"}:
         if rainfall and rainfall > 0:
@@ -240,46 +176,48 @@ def assess_activity_conditions(
             score = 95.0
             reasons.append("Clear and breezy conditions make it ideal to hang clothes outside.")
 
-    elif activity in {"washing_bike", "washing_car", "bike_wash", "car_wash", "wash_bike", "wash_car"}:
+    elif activity in {"umbrella", "carry_umbrella", "raincoat"}:
         if rainfall and rainfall > 0:
             score = 10.0
-            reasons.append("Rain is predicted soon, which will make your vehicle dirty again. Hold off on washing.")
-        else:
-            score = 90.0
-            reasons.append("Dry weather ahead. It is a good time to wash your vehicle.")
-
-    elif activity in {"leaving_college", "leaving_office", "commute", "travel"}:
-        if rainfall and rainfall >= 2:
-            score = 30.0
-            reasons.append("Moderate to heavy rain during commute hours. Travel with rain gear.")
-        elif rainfall and rainfall > 0:
-            score = 60.0
-            reasons.append("Light rain possible during commute. Keep an umbrella handy.")
+            reasons.append("Rain is likely. Definitely carry an umbrella or raincoat.")
         else:
             score = 95.0
-            reasons.append("Clear road conditions for travel.")
+            reasons.append("No rain detected in the forecast. An umbrella is unlikely to be needed.")
 
-    score = max(
-        0.0,
-        min(100.0, score),
-    )
+    # UV Index adjustment
+    if isinstance(uv, (int, float)) and uv >= 8:
+        if activity in {"running", "cycling", "beach", "hiking", "walking", "cricket", "football"}:
+            score -= 10
+            reasons.append(f"Very High UV Index ({uv}); sunscreen and sun protection recommended.")
 
-    if score >= 90:
+    # AQI adjustment
+    if isinstance(aqi, (int, float)) and aqi > 200:
+        if activity in {"running", "cycling", "walking", "cricket", "football", "hiking"}:
+            score -= 25
+            reasons.append(f"Poor Air Quality Index ({aqi}); outdoor strenuous exertion not recommended.")
+
+    score = max(0.0, min(100.0, score))
+
+    if score >= 85:
         level = "EXCELLENT"
-    elif score >= 75:
+        decision = f"🟢 Good time for {activity}"
+    elif score >= 65:
         level = "GOOD"
-    elif score >= 55:
+        decision = f"🟢 Favorable conditions for {activity}"
+    elif score >= 45:
         level = "MODERATE"
-    elif score >= 35:
-        level = "POOR"
+        decision = f"🟡 Moderate conditions for {activity}"
     else:
-        level = "UNFAVORABLE"
+        level = "POOR"
+        decision = f"🔴 Not recommended for {activity}"
 
     return {
         "status": "success",
         "activity": activity,
         "score": round(score, 1),
         "level": level,
+        "decision": decision,
+        "heat_index_c": heat_index,
         "reasons": reasons,
         "weather": forecast,
     }
