@@ -861,12 +861,18 @@ private fun triggerCaptureAndAnalyze(
 
 private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
     return try {
-        val planeProxy = image.planes[0]
-        val buffer = planeProxy.buffer
-        val bytes = ByteArray(buffer.remaining())
-        buffer.get(bytes)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        val bitmap = image.toBitmap()
+        val rotationDegrees = image.imageInfo.rotationDegrees
+        if (rotationDegrees != 0) {
+            val matrix = android.graphics.Matrix().apply {
+                postRotate(rotationDegrees.toFloat())
+            }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } else {
+            bitmap
+        }
     } catch (e: Exception) {
+        Log.e("CameraScreen", "imageProxyToBitmap error: ${e.message}")
         null
     }
 }
@@ -908,9 +914,10 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
     var darkCloudPixels = 0
     var indoorOrObjectPixels = 0
     var highSaturationPixels = 0
+    var highContrastEdgePixels = 0
     var totalLum = 0.0
 
-    // Analyze upper 70% where sky/clouds dominate
+    // Analyze upper 75%
     val skyRegionH = (sampleH * 0.75).toInt()
     val totalSamples = sampleW * skyRegionH
 
@@ -928,23 +935,27 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
             val delta = maxChannel - minChannel
             val saturation = if (maxChannel == 0) 0f else (delta.toFloat() / maxChannel)
 
-            // Characteristics of Sky & Clouds:
-            // 1. Blue Sky: B > R + 15, B > G
-            val isBlue = (b > r + 15) && (b >= g)
-            // 2. White/Light Grey Clouds: Low saturation (< 0.22), lum > 140
-            val isWhiteCloud = saturation < 0.22f && lum >= 140
-            // 3. Dark Storm Clouds / Overcast: Low saturation (< 0.25), lum between 45 and 140, neutral grey (r, g, b close)
-            val isDarkCloud = saturation < 0.25f && lum in 45.0..140.0 && (delta < 28)
+            // Local gradient / edge check for terrain, cliffs, text, screens, keyboards
+            if (x < sampleW - 1 && y < skyRegionH - 1) {
+                val rightPixel = scaled.getPixel(x + 1, y)
+                val rightLum = 0.299 * ((rightPixel shr 16) and 0xff) + 0.587 * ((rightPixel shr 8) and 0xff) + 0.114 * (rightPixel and 0xff)
+                if (kotlin.math.abs(lum - rightLum) > 32.0) {
+                    highContrastEdgePixels++
+                }
+            }
 
-            // Characteristics of Indoor / Desk / Furniture / Text / Objects:
-            // High warm saturation (Yellow sticky notes, wood, brown table, red/green objects)
-            val isWarmOrWoodOrTable = (r > b + 25 && g > b) || (saturation > 0.45f && !isBlue)
-            // Excessive high saturation
-            if (saturation > 0.50f && !isBlue) {
+            // Real Sky & Cloud Signatures:
+            val isBlue = (b > r + 15) && (b >= g)
+            val isWhiteCloud = saturation < 0.18f && lum >= 150
+            val isDarkCloud = saturation < 0.22f && lum in 45.0..145.0 && (delta < 24)
+
+            // Rocks, Terrain, Brown mountains, Wood, Desk, Furniture, Screens:
+            val isTerrainOrWoodOrWarm = (r > b + 20 && r > 50) || (g > b + 15 && g > 50) || (saturation > 0.40f && !isBlue)
+            if (saturation > 0.45f && !isBlue) {
                 highSaturationPixels++
             }
 
-            if (isWarmOrWoodOrTable) {
+            if (isTerrainOrWoodOrWarm) {
                 indoorOrObjectPixels++
             } else if (isBlue) {
                 skyPixels++
@@ -961,21 +972,23 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
 
     val avgLum = totalLum / totalSamples.coerceAtLeast(1)
     val skyFraction = skyPixels.toFloat() / totalSamples.coerceAtLeast(1)
-    val indoorFraction = (indoorOrObjectPixels + highSaturationPixels).toFloat() / totalSamples.coerceAtLeast(1)
+    val indoorOrTerrainFraction = (indoorOrObjectPixels + highSaturationPixels).toFloat() / totalSamples.coerceAtLeast(1)
+    val edgeFraction = highContrastEdgePixels.toFloat() / totalSamples.coerceAtLeast(1)
 
-    // REJECT INDOOR / NON-SKY SCENES (e.g. Desk, Monitor, Paper, Sticky Notes, Furniture, Walls)
-    if (indoorFraction > 0.28f || (skyFraction < 0.35f && blueSkyPixels == 0 && brightCloudPixels < (totalSamples * 0.20f))) {
+    // REJECT NON-SKY / WALLPAPER / TERRAIN / SCREEN / INDOOR SCENES
+    // Clouds are diffuse and soft without sharp high-contrast rock/texture edges (>18% edge density)
+    if (indoorOrTerrainFraction > 0.22f || edgeFraction > 0.16f || (skyFraction < 0.40f && blueSkyPixels == 0 && brightCloudPixels < (totalSamples * 0.25f))) {
         return SkyAnalysisResult(
             title = "No Sky Detected",
             icon = "🚫",
-            cloudType = "Indoor / Non-Sky Surface",
+            cloudType = "Non-Sky / Surface / Terrain",
             cloudDescription = "Point camera directly at open sky, clouds, or the horizon",
-            visibilityStatus = "Obstructed / Indoor",
-            atmosphericCondition = "Camera Not Facing Sky",
+            visibilityStatus = "Obstructed / Non-Sky",
+            atmosphericCondition = "Camera Not Facing Open Sky",
             confidenceScore = 98,
             estimatedRainRisk = "N/A",
-            explanation = "WeatherGPT detected indoor objects, furniture, or a non-sky surface. The sky vision engine requires an unobstructed view of the open atmosphere or cloud layer.",
-            recommendation = "Step outside or point your camera through an open window towards the clouds.",
+            explanation = "WeatherGPT detected a screen, wallpaper, room, or non-sky surface. The sky vision engine requires an unobstructed view of the open atmosphere or cloud layer.",
+            recommendation = "Step outside or point your camera upwards towards the real clouds.",
             statusColor = WarningAmber
         )
     }
