@@ -220,11 +220,31 @@ fun ChatScreen(
 
     val isListening by voiceAssistant.isListening.collectAsState()
     val isSpeaking by voiceAssistant.isSpeaking.collectAsState()
+    val isProcessingVoice by voiceAssistant.isProcessing.collectAsState()
+    val voiceRms by voiceAssistant.rmsLevel.collectAsState()
     var autoSpeakEnabled by remember { mutableStateOf(true) }
+
+    LaunchedEffect(voiceAssistant) {
+        voiceAssistant.onUserTranscriptFinal = { transcript, langCode ->
+            chatViewModel.setVoiceProcessing(transcript)
+        }
+        voiceAssistant.onAssistantAnswerReceived = { displayText, speechText, lang, langCode ->
+            val userQ = voiceAssistant.currentTranscript.value.ifBlank { "Voice Query" }
+            chatViewModel.updateVoiceInteraction(
+                userQuery = userQ,
+                answerText = displayText,
+                language = lang,
+                languageCode = langCode
+            )
+        }
+        voiceAssistant.onErrorOccurred = { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun sendText(textToSend: String) {
         val value = textToSend.trim()
-        if (value.isBlank() || uiState.isLoading) return
+        if (value.isBlank() || uiState.isLoading || isProcessingVoice) return
 
         val langToSend = if (selectedLanguage.equals("Auto", ignoreCase = true)) "auto" else selectedLanguage
 
@@ -242,35 +262,28 @@ fun ChatScreen(
         sendText(message.value)
     }
 
-    val onVoiceResult: (String) -> Unit = { spokenText ->
-        val trimmed = spokenText.trim()
-        if (trimmed.isNotBlank()) {
-            sendText(trimmed)
-        }
-    }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            voiceAssistant.startListening(
-                languageCode = selectedLanguage,
-                onResult = onVoiceResult,
-                onError = { err ->
-                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                }
+            voiceAssistant.startRealtimeVoice(
+                latitude = activeLocation.latitude,
+                longitude = activeLocation.longitude,
+                locationName = activeLocation.name,
+                language = selectedLanguage
             )
         } else {
-            Toast.makeText(context, "Microphone permission is required for voice input", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Microphone permission is required for voice assistant", Toast.LENGTH_SHORT).show()
         }
     }
 
     fun toggleVoiceListening() {
         if (isSpeaking) {
-            voiceAssistant.stopSpeaking()
+            voiceAssistant.interrupt()
+            return
         }
         if (isListening) {
-            voiceAssistant.stopListening()
+            voiceAssistant.stopAudioRecording()
         } else {
             val hasPermission = ContextCompat.checkSelfPermission(
                 context,
@@ -278,29 +291,15 @@ fun ChatScreen(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasPermission) {
-                voiceAssistant.startListening(
-                    languageCode = selectedLanguage,
-                    onResult = onVoiceResult,
-                    onError = { err ->
-                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                    }
+                voiceAssistant.startRealtimeVoice(
+                    latitude = activeLocation.latitude,
+                    longitude = activeLocation.longitude,
+                    locationName = activeLocation.name,
+                    language = selectedLanguage
                 )
             } else {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
-        }
-    }
-
-    // Auto-speak responses
-    LaunchedEffect(uiState.messages.size) {
-        val lastMessage = uiState.messages.lastOrNull()
-        if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
-            val speechLang = if (!selectedLanguage.equals("Auto", ignoreCase = true)) {
-                selectedLanguage
-            } else {
-                uiState.detectedLanguageCode ?: "en-IN"
-            }
-            voiceAssistant.speak(lastMessage.content, speechLang)
         }
     }
 
@@ -310,10 +309,11 @@ fun ChatScreen(
         } ?: LanguageStore.SUPPORTED_LANGUAGES.first()
     }
 
-    // Determine current Orb state for the 220dp Living Orb
+    // Determine current Orb state for the Living Orb
+    val isBusy = uiState.isLoading || isProcessingVoice
     val orbState = when {
         uiState.error != null -> OrbState.ERROR
-        uiState.isLoading -> OrbState.PROCESSING
+        isBusy -> OrbState.PROCESSING
         isSpeaking -> OrbState.AI_SPEAKING
         isListening -> OrbState.LISTENING
         else -> OrbState.IDLE
@@ -338,7 +338,7 @@ fun ChatScreen(
         ) {
             WeatherAIOrb(
                 orbState = orbState,
-                audioAmplitude = if (isListening || isSpeaking) 0.65f else 0.05f,
+                audioAmplitude = if (isListening || isSpeaking) voiceRms.coerceIn(0.15f, 1.0f) else 0.05f,
                 size = 180.dp,
                 onTap = { toggleVoiceListening() }
             )
@@ -349,7 +349,7 @@ fun ChatScreen(
                 text = when {
                     isListening -> "Listening..."
                     isSpeaking -> "Responding..."
-                    uiState.isLoading -> "Thinking..."
+                    isBusy -> "Thinking..."
                     else -> "Tap to speak"
                 },
                 color = TextPrimary,
@@ -363,8 +363,8 @@ fun ChatScreen(
             Text(
                 text = when {
                     isListening -> "Speak naturally"
-                    isSpeaking -> "Tap orb or mic to interrupt"
-                    uiState.isLoading -> "Analyzing atmospheric telemetry"
+                    isSpeaking -> "Tap orb to interrupt"
+                    isBusy -> "Analyzing atmospheric telemetry"
                     else -> "Ask anything about the weather"
                 },
                 color = TextSecondary,

@@ -180,6 +180,44 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
+    fun updateVoiceInteraction(
+        userQuery: String,
+        answerText: String,
+        language: String?,
+        languageCode: String?
+    ) {
+        val instantMessages = listOf(
+            ChatUiMessage(
+                role = "user",
+                content = userQuery
+            ),
+            ChatUiMessage(
+                role = "assistant",
+                content = answerText
+            )
+        )
+        _uiState.value = ChatUiState(
+            messages = instantMessages,
+            isLoading = false,
+            error = null,
+            detectedLanguage = language,
+            detectedLanguageCode = languageCode
+        )
+    }
+
+    fun setVoiceProcessing(userQuery: String) {
+        _uiState.value = ChatUiState(
+            messages = listOf(
+                ChatUiMessage(
+                    role = "user",
+                    content = userQuery
+                )
+            ),
+            isLoading = true,
+            error = null
+        )
+    }
+
     fun clearChat() {
 
         agentState =

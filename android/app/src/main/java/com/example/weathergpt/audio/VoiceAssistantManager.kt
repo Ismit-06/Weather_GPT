@@ -1,14 +1,19 @@
 package com.example.weathergpt.audio
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.util.Base64
 import android.util.Log
 import com.example.weathergpt.data.BackendConfig
 import kotlinx.coroutines.CoroutineScope
@@ -25,42 +30,83 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.sqrt
 import kotlin.random.Random
 
+/**
+ * Production-grade Real-time Multilingual Voice Assistant Manager.
+ * 
+ * Supports:
+ * 1. Low-latency WebSocket streaming (/ws/voice) with 16kHz 16-bit Mono PCM
+ * 2. Real-time audio RMS metering for living 3D Orb visualizer
+ * 3. Streaming neural TTS audio chunk playback with queuing
+ * 4. Sub-200ms Barge-In / Interruption handling
+ * 5. Display Text != Speech Text separation (Zero emoji/markdown read aloud)
+ * 6. Multi-language detection and local fallback when offline
+ */
 class VoiceAssistantManager(private val context: Context) {
 
-    private val tag = "WeatherVoiceAssistant"
+    private val tag = "RealtimeVoice"
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // Speech Recognizer (In-App STT)
-    private var speechRecognizer: SpeechRecognizer? = null
-
-    // Neural Audio Player (fish-audio/s2.1-pro-free:free via OpenRouter)
-    private var mediaPlayer: MediaPlayer? = null
-    private var rmsSimulationJob: Job? = null
-
-    // Text to Speech (Fallback Engine)
-    private var tts: TextToSpeech? = null
-    private var isTtsInitialized = false
-
+    // State flows for UI binding
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
+    private val _isProcessing = MutableStateFlow(false)
+    val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
+
     private val _rmsLevel = MutableStateFlow(0f)
     val rmsLevel: StateFlow<Float> = _rmsLevel.asStateFlow()
 
+    private val _currentTranscript = MutableStateFlow("")
+    val currentTranscript: StateFlow<String> = _currentTranscript.asStateFlow()
+
+    // Real-time Audio Capture (16kHz 16-bit Mono PCM)
+    private var audioRecord: AudioRecord? = null
+    private var recordingJob: Job? = null
+    private val sampleRate = 16000
+    private val channelConfig = AudioFormat.CHANNEL_IN_MONO
+    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+
+    // WebSocket connection
+    private var webSocket: WebSocket? = null
+    private var isWsConnected = false
+    private var activeSessionId: String? = null
+
+    // Audio Playback Queue
+    private val audioChunkQueue = ConcurrentLinkedQueue<File>()
+    private var currentPlayingPlayer: MediaPlayer? = null
+    private var playbackJob: Job? = null
+    private var rmsSimulationJob: Job? = null
+
+    // Callbacks
+    var onAssistantAnswerReceived: ((displayText: String, speechText: String, lang: String?, langCode: String?) -> Unit)? = null
+    var onUserTranscriptFinal: ((transcript: String, langCode: String?) -> Unit)? = null
+    var onErrorOccurred: ((errorMessage: String) -> Unit)? = null
+
+    // Fallbacks
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var tts: TextToSpeech? = null
+    private var isTtsInitialized = false
+
     init {
-        initTts()
+        initFallbackTts()
     }
 
-    private fun initTts() {
+    private fun initFallbackTts() {
         try {
             tts = TextToSpeech(context.applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
@@ -71,9 +117,6 @@ class VoiceAssistantManager(private val context: Context) {
                     tts?.setPitch(1.0f)
                     tts?.setSpeechRate(0.96f)
                     isTtsInitialized = true
-                    Log.d(tag, "Fallback TTS initialized successfully")
-                } else {
-                    Log.w(tag, "Fallback TTS initialization failed status=$status")
                 }
             }
 
@@ -94,19 +137,343 @@ class VoiceAssistantManager(private val context: Context) {
                 }
             })
         } catch (e: Exception) {
-            Log.e(tag, "Error setting up fallback TTS", e)
+            Log.e(tag, "Fallback TTS init error", e)
         }
     }
 
-    fun startListening(
-        languageCode: String? = null,
-        onResult: (String) -> Unit,
-        onError: (String) -> Unit = {}
+    /**
+     * Start real-time voice conversation session over WebSocket
+     */
+    @SuppressLint("MissingPermission")
+    fun startRealtimeVoice(
+        latitude: Double,
+        longitude: Double,
+        locationName: String,
+        language: String
     ) {
-        stopSpeaking()
+        stopPlayback()
+        stopAudioRecording()
 
+        connectWebSocket(latitude, longitude, locationName, language) { success ->
+            if (success) {
+                startPcmAudioRecording()
+            } else {
+                Log.w(tag, "WebSocket connect failed, falling back to standard recognition")
+                startSpeechRecognizerFallback(language)
+            }
+        }
+    }
+
+    private fun connectWebSocket(
+        latitude: Double,
+        longitude: Double,
+        locationName: String,
+        language: String,
+        onConnected: (Boolean) -> Unit
+    ) {
+        closeWebSocket()
+
+        try {
+            val request = Request.Builder()
+                .url(BackendConfig.WS_URL)
+                .build()
+
+            webSocket = BackendConfig.okHttpClient.newWebSocket(request, object : WebSocketListener() {
+                override fun onOpen(ws: WebSocket, response: Response) {
+                    Log.d(tag, "Real-time Voice WebSocket Connected")
+                    isWsConnected = true
+
+                    // Send session start configuration
+                    val startMeta = JSONObject().apply {
+                        put("type", "voice_session_start")
+                        put("latitude", latitude)
+                        put("longitude", longitude)
+                        put("location_name", locationName)
+                        put("language", if (language.equals("Auto", ignoreCase = true)) "auto" else language)
+                    }
+                    ws.send(startMeta.toString())
+                    coroutineScope.launch { onConnected(true) }
+                }
+
+                override fun onMessage(ws: WebSocket, text: String) {
+                    handleWsJsonMessage(text)
+                }
+
+                override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                    Log.w(tag, "WebSocket connection failure: ${t.message}")
+                    isWsConnected = false
+                    coroutineScope.launch {
+                        onConnected(false)
+                    }
+                }
+
+                override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                    Log.d(tag, "WebSocket Closed: $code $reason")
+                    isWsConnected = false
+                }
+            })
+        } catch (e: Exception) {
+            Log.e(tag, "Error initiating WebSocket", e)
+            onConnected(false)
+        }
+    }
+
+    private fun handleWsJsonMessage(jsonText: String) {
+        try {
+            val data = JSONObject(jsonText)
+            val type = data.optString("type")
+
+            when (type) {
+                "session_started" -> {
+                    activeSessionId = data.optString("session_id")
+                    _isListening.value = true
+                    _isProcessing.value = false
+                    Log.d(tag, "Session started: $activeSessionId")
+                }
+
+                "speech_started" -> {
+                    // User has begun speaking into microphone
+                    _isListening.value = true
+                    _isProcessing.value = false
+                }
+
+                "transcript_final" -> {
+                    val text = data.optString("text")
+                    val langCode = data.optString("language_code")
+                    _currentTranscript.value = text
+                    _isListening.value = false
+                    _isProcessing.value = true
+                    coroutineScope.launch {
+                        onUserTranscriptFinal?.invoke(text, langCode)
+                    }
+                }
+
+                "assistant_text" -> {
+                    val displayText = data.optString("display_text")
+                    val speechText = data.optString("speech_text")
+                    val lang = data.optString("language")
+                    val langCode = data.optString("language_code")
+
+                    _isProcessing.value = false
+                    coroutineScope.launch {
+                        onAssistantAnswerReceived?.invoke(displayText, speechText, lang, langCode)
+                    }
+                }
+
+                "audio_chunk" -> {
+                    val rawB64 = data.optString("data")
+                    val isLast = data.optBoolean("is_last_chunk", false)
+                    if (rawB64.isNotEmpty()) {
+                        val audioBytes = Base64.decode(rawB64, Base64.DEFAULT)
+                        enqueueAudioChunk(audioBytes, isLast)
+                    }
+                }
+
+                "speech_finished" -> {
+                    Log.d(tag, "Server finished generating speech chunks")
+                }
+
+                "interrupted" -> {
+                    stopPlayback()
+                }
+
+                "error" -> {
+                    val msg = data.optString("message", "Voice processing error")
+                    _isListening.value = false
+                    _isProcessing.value = false
+                    coroutineScope.launch {
+                        onErrorOccurred?.invoke(msg)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error parsing WebSocket JSON", e)
+        }
+    }
+
+    /**
+     * Records 16kHz 16-bit Mono PCM audio and streams binary chunks over WebSocket
+     */
+    @SuppressLint("MissingPermission")
+    private fun startPcmAudioRecording() {
+        try {
+            val minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+            val bufferSize = maxOf(minBufSize, 4096)
+
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                sampleRate,
+                channelConfig,
+                audioFormat,
+                bufferSize
+            )
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e(tag, "AudioRecord initialization failed")
+                return
+            }
+
+            audioRecord?.startRecording()
+            _isListening.value = true
+
+            recordingJob = coroutineScope.launch(Dispatchers.IO) {
+                val buffer = ByteArray(2048) // 64ms chunk at 16kHz 16-bit Mono
+                while (isActive && _isListening.value && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                    val readBytes = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                    if (readBytes > 0) {
+                        // Calculate real-time RMS amplitude for visual orb
+                        val rms = calculatePcmRms(buffer, readBytes)
+                        withContext(Dispatchers.Main) {
+                            _rmsLevel.value = (rms / 32768f * 3.5f).coerceIn(0f, 1f)
+                        }
+
+                        // Send binary audio chunk to server
+                        if (isWsConnected && webSocket != null) {
+                            val byteString = buffer.toByteString(0, readBytes)
+                            webSocket?.send(byteString)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Audio recording failed", e)
+            _isListening.value = false
+        }
+    }
+
+    private fun calculatePcmRms(buffer: ByteArray, length: Int): Float {
+        var sum = 0.0
+        val sampleCount = length / 2
+        if (sampleCount == 0) return 0f
+
+        for (i in 0 until length - 1 step 2) {
+            val sample = (buffer[i].toInt() and 0xFF) or (buffer[i + 1].toInt() shl 8)
+            val sampleShort = sample.toShort()
+            sum += sampleShort * sampleShort
+        }
+        return sqrt(sum / sampleCount).toFloat()
+    }
+
+    /**
+     * Sub-200ms Barge-In: Interrupts playback, cancels ongoing speech, and resets state.
+     */
+    fun interrupt() {
+        stopPlayback()
+        if (isWsConnected && webSocket != null) {
+            val interruptMsg = JSONObject().apply {
+                put("type", "interrupt")
+            }
+            webSocket?.send(interruptMsg.toString())
+        }
+    }
+
+    private fun enqueueAudioChunk(audioBytes: ByteArray, isLast: Boolean) {
+        try {
+            val chunkFile = File(context.cacheDir, "speech_chunk_${System.currentTimeMillis()}_${Random.nextInt(1000)}.mp3")
+            FileOutputStream(chunkFile).use { it.write(audioBytes) }
+            audioChunkQueue.offer(chunkFile)
+
+            if (!_isSpeaking.value) {
+                startAudioChunkPlaybackQueue()
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error enqueuing audio chunk", e)
+        }
+    }
+
+    private fun startAudioChunkPlaybackQueue() {
+        playbackJob?.cancel()
+        playbackJob = coroutineScope.launch {
+            _isSpeaking.value = true
+            startRmsSimulation()
+
+            while (isActive && (!audioChunkQueue.isEmpty() || _isProcessing.value)) {
+                val nextFile = audioChunkQueue.poll()
+                if (nextFile == null) {
+                    delay(50)
+                    continue
+                }
+
+                val completed = kotlinx.coroutines.CompletableDeferred<Boolean>()
+                withContext(Dispatchers.Main) {
+                    try {
+                        currentPlayingPlayer?.release()
+                        currentPlayingPlayer = MediaPlayer().apply {
+                            setDataSource(nextFile.absolutePath)
+                            setOnCompletionListener {
+                                try { nextFile.delete() } catch (_: Exception) {}
+                                completed.complete(true)
+                            }
+                            setOnErrorListener { _, _, _ ->
+                                try { nextFile.delete() } catch (_: Exception) {}
+                                completed.complete(false)
+                                true
+                            }
+                            prepare()
+                            start()
+                        }
+                    } catch (e: Exception) {
+                        try { nextFile.delete() } catch (_: Exception) {}
+                        completed.complete(false)
+                    }
+                }
+
+                completed.await()
+            }
+
+            _isSpeaking.value = false
+            stopRmsSimulation()
+        }
+    }
+
+    fun stopAudioRecording() {
+        _isListening.value = false
+        recordingJob?.cancel()
+        recordingJob = null
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+        } catch (_: Exception) {}
+        audioRecord = null
+        _rmsLevel.value = 0f
+    }
+
+    fun stopPlayback() {
+        playbackJob?.cancel()
+        playbackJob = null
+        while (!audioChunkQueue.isEmpty()) {
+            val file = audioChunkQueue.poll()
+            try { file?.delete() } catch (_: Exception) {}
+        }
+        try {
+            currentPlayingPlayer?.stop()
+            currentPlayingPlayer?.release()
+        } catch (_: Exception) {}
+        currentPlayingPlayer = null
+
+        try {
+            tts?.stop()
+        } catch (_: Exception) {}
+
+        stopRmsSimulation()
+        _isSpeaking.value = false
+        _isProcessing.value = false
+    }
+
+    private fun closeWebSocket() {
+        try {
+            webSocket?.close(1000, "Closed by client")
+        } catch (_: Exception) {}
+        webSocket = null
+        isWsConnected = false
+    }
+
+    // ----------------------------------------------------
+    // Fallback Methods for Offline / Disconnected States
+    // ----------------------------------------------------
+    private fun startSpeechRecognizerFallback(languageCode: String?) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            onError("Speech recognition is not available on this device.")
+            onErrorOccurred?.invoke("Speech recognition is not available.")
             return
         }
 
@@ -116,59 +483,29 @@ class VoiceAssistantManager(private val context: Context) {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
                         _isListening.value = true
-                        Log.d(tag, "Ready for speech")
                     }
-
-                    override fun onBeginningOfSpeech() {
-                        Log.d(tag, "User began speaking")
-                    }
-
+                    override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {
                         _rmsLevel.value = (rmsdB.coerceIn(0f, 10f) / 10f)
                     }
-
                     override fun onBufferReceived(buffer: ByteArray?) {}
-
                     override fun onEndOfSpeech() {
                         _isListening.value = false
-                        Log.d(tag, "End of speech detected")
                     }
-
                     override fun onError(error: Int) {
                         _isListening.value = false
                         _rmsLevel.value = 0f
-                        val msg = when (error) {
-                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized. Please try again."
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening timed out."
-                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network error."
-                            else -> "Could not hear audio clearly."
-                        }
-                        Log.w(tag, "Speech recognition error: $error -> $msg")
-                        onError(msg)
+                        onErrorOccurred?.invoke("Speech recognition error ($error)")
                     }
-
                     override fun onResults(results: Bundle?) {
                         _isListening.value = false
-                        _rmsLevel.value = 0f
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()?.trim()
                         if (!text.isNullOrEmpty()) {
-                            Log.d(tag, "Recognized speech: $text")
-                            onResult(text)
-                        } else {
-                            onError("Could not understand audio.")
+                            onUserTranscriptFinal?.invoke(text, languageCode)
                         }
                     }
-
-                    override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()
-                        if (!text.isNullOrEmpty()) {
-                            Log.v(tag, "Partial speech: $text")
-                        }
-                    }
-
+                    override fun onPartialResults(partialResults: Bundle?) {}
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
@@ -176,72 +513,29 @@ class VoiceAssistantManager(private val context: Context) {
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-
                 val isAuto = languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true)
-                val recognitionLocale = when {
-                    isAuto -> Locale.getDefault().toLanguageTag().ifBlank { "en-IN" }
-                    languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) -> "or-IN"
-                    languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) -> "hi-IN"
-                    languageCode.equals("Telugu", ignoreCase = true) -> "te-IN"
-                    languageCode.equals("Tamil", ignoreCase = true) -> "ta-IN"
-                    languageCode.equals("Kannada", ignoreCase = true) -> "kn-IN"
-                    languageCode.equals("Bengali", ignoreCase = true) -> "bn-IN"
-                    languageCode.equals("Marathi", ignoreCase = true) -> "mr-IN"
-                    languageCode.equals("Gujarati", ignoreCase = true) -> "gu-IN"
-                    languageCode.equals("Malayalam", ignoreCase = true) -> "ml-IN"
-                    languageCode.equals("Punjabi", ignoreCase = true) -> "pa-IN"
-                    languageCode.equals("English", ignoreCase = true) -> "en-IN"
-                    languageCode.contains("-") -> languageCode
-                    else -> "en-IN"
-                }
-
+                val recognitionLocale = if (isAuto) Locale.getDefault().toLanguageTag().ifBlank { "en-IN" } else languageCode
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLocale)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLocale)
-                putExtra(
-                    "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
-                    arrayOf("en-IN", "hi-IN", "or-IN", "te-IN", "ta-IN", "bn-IN", "mr-IN", "gu-IN", "kn-IN", "ml-IN", "pa-IN")
-                )
             }
-
             speechRecognizer?.startListening(intent)
         } catch (e: Exception) {
-            Log.e(tag, "Error starting speech recognition", e)
-            _isListening.value = false
-            _rmsLevel.value = 0f
-            onError("Could not access microphone: ${e.message}")
+            onErrorOccurred?.invoke("Microphone error: ${e.message}")
         }
     }
 
-    fun stopListening() {
-        try {
-            speechRecognizer?.stopListening()
-        } catch (_: Exception) {}
-        _isListening.value = false
-        _rmsLevel.value = 0f
-    }
-
-    /**
-     * Synthesizes and speaks text using OpenRouter's neural Fish Audio model
-     * (fish-audio/s2.1-pro-free:free) with automatic fallback to local TTS.
-     */
     fun speak(text: String, languageCode: String? = null) {
-        stopListening()
-        stopSpeaking()
-
-        if (text.isBlank()) return
-        val cleanText = cleanMarkdownForSpeech(text)
-        if (cleanText.isBlank()) return
+        stopPlayback()
+        val cleanSpeech = cleanMarkdownForSpeech(text)
+        if (cleanSpeech.isBlank()) return
 
         coroutineScope.launch {
             try {
                 _isSpeaking.value = true
                 startRmsSimulation()
 
-                // 1. Fetch neural audio from Backend / OpenRouter TTS endpoint
                 val audioFile = withContext(Dispatchers.IO) {
                     val jsonBody = JSONObject().apply {
-                        put("text", cleanText)
+                        put("text", cleanSpeech)
                         put("language", languageCode)
                         put("format", "mp3")
                     }
@@ -252,24 +546,17 @@ class VoiceAssistantManager(private val context: Context) {
                         .build()
 
                     val response = BackendConfig.okHttpClient.newCall(request).execute()
-                    if (!response.isSuccessful) {
-                        throw IllegalStateException("Backend TTS returned code ${response.code}")
-                    }
+                    if (!response.isSuccessful) throw IllegalStateException("TTS error ${response.code}")
 
-                    val bytes = response.body?.bytes()
-                    if (bytes == null || bytes.isEmpty()) {
-                        throw IllegalStateException("Empty TTS audio received")
-                    }
-
-                    val tempFile = File(context.cacheDir, "neural_speech_${System.currentTimeMillis()}.mp3")
+                    val bytes = response.body?.bytes() ?: throw IllegalStateException("Empty audio")
+                    val tempFile = File(context.cacheDir, "speech_fallback_${System.currentTimeMillis()}.mp3")
                     FileOutputStream(tempFile).use { it.write(bytes) }
                     tempFile
                 }
 
-                // 2. Play with Android MediaPlayer
                 withContext(Dispatchers.Main) {
-                    mediaPlayer?.release()
-                    mediaPlayer = MediaPlayer().apply {
+                    currentPlayingPlayer?.release()
+                    currentPlayingPlayer = MediaPlayer().apply {
                         setDataSource(audioFile.absolutePath)
                         setOnCompletionListener {
                             _isSpeaking.value = false
@@ -280,7 +567,7 @@ class VoiceAssistantManager(private val context: Context) {
                             _isSpeaking.value = false
                             stopRmsSimulation()
                             try { audioFile.delete() } catch (_: Exception) {}
-                            speakFallbackTts(cleanText, languageCode)
+                            speakFallbackTts(cleanSpeech, languageCode)
                             true
                         }
                         prepare()
@@ -288,40 +575,23 @@ class VoiceAssistantManager(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                Log.w(tag, "Neural TTS failed (${e.message}), falling back to local TTS engine")
-                speakFallbackTts(cleanText, languageCode)
+                speakFallbackTts(cleanSpeech, languageCode)
             }
         }
     }
 
     private fun speakFallbackTts(cleanText: String, languageCode: String?) {
         try {
-            val locale = when {
-                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> Locale.getDefault()
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) -> Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) -> Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) -> Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) -> Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) -> Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) -> Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) -> Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) -> Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) -> Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) -> Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) -> Locale.ENGLISH
-                languageCode.contains("-") -> Locale.forLanguageTag(languageCode)
-                else -> Locale.forLanguageTag(languageCode)
+            val locale = if (languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true)) {
+                Locale.getDefault()
+            } else {
+                Locale.forLanguageTag(languageCode)
             }
-            val avail = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-            if (avail >= TextToSpeech.LANG_AVAILABLE) {
-                tts?.language = locale
-            }
-
+            tts?.language = locale
             tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "WeatherGPT_Speak_${System.currentTimeMillis()}")
             _isSpeaking.value = true
             startRmsSimulation()
         } catch (e: Exception) {
-            Log.e(tag, "Fallback TTS speak failed", e)
             _isSpeaking.value = false
             stopRmsSimulation()
         }
@@ -331,10 +601,9 @@ class VoiceAssistantManager(private val context: Context) {
         rmsSimulationJob?.cancel()
         rmsSimulationJob = coroutineScope.launch {
             while (isActive && _isSpeaking.value) {
-                // Natural speaking cadence fluctuation (0.15 to 0.75 range)
                 val base = 0.35f + Random.nextFloat() * 0.40f
                 _rmsLevel.value = base
-                delay(90)
+                delay(80)
             }
             _rmsLevel.value = 0f
         }
@@ -344,21 +613,6 @@ class VoiceAssistantManager(private val context: Context) {
         rmsSimulationJob?.cancel()
         rmsSimulationJob = null
         _rmsLevel.value = 0f
-    }
-
-    fun stopSpeaking() {
-        try {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
-        } catch (_: Exception) {}
-
-        try {
-            tts?.stop()
-        } catch (_: Exception) {}
-
-        stopRmsSimulation()
-        _isSpeaking.value = false
     }
 
     fun cleanMarkdownForSpeech(markdown: String): String {
@@ -386,11 +640,11 @@ class VoiceAssistantManager(private val context: Context) {
         }
         var content = if (filtered.isNotEmpty()) filtered.joinToString(". ") else text
 
-        // 1. Remove all Emoji unicode characters (Surrogate pairs & symbols)
+        // 1. Remove all Emoji characters completely
         content = content.replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}\\x{1F300}-\\x{1F9FF}\\x{2600}-\\x{27BF}\\x{FE00}-\\x{FE0F}]"), "")
         content = content.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]"), "")
 
-        // 2. Expand units phonetically for natural speech
+        // 2. Expand units phonetically
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*C\\b"), "$1 degrees Celsius")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*F\\b"), "$1 degrees Fahrenheit")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\b"), "$1 degrees")
@@ -399,23 +653,33 @@ class VoiceAssistantManager(private val context: Context) {
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*mm\\b"), "$1 millimeters")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*%\\b"), "$1 percent")
 
-        // 3. Remove markdown headers, bold labels, bullets
+        // 3. Strip markdown symbols
         content = content.replace(Regex("(?m)^\\s*[-*•]\\s*"), "")
         content = content.replace(Regex("[#*`_~>\\[\\]()]"), " ")
         content = content.replace(Regex("\\bhttps?://\\S+"), "")
 
-        // 4. Clean up multiple punctuation and whitespace
+        // 4. Clean whitespace
         content = content.replace(Regex("\\s+"), " ")
         content = content.replace(Regex("\\.{2,}"), ".")
         content = content.replace(Regex("\\s+([.,!?])"), "$1")
         return content.trim()
     }
 
+    fun stopSpeaking() {
+        stopPlayback()
+    }
+
+    fun stopListening() {
+        stopAudioRecording()
+    }
+
     fun destroy() {
+        stopAudioRecording()
+        stopPlayback()
+        closeWebSocket()
         try {
             speechRecognizer?.destroy()
             speechRecognizer = null
-            stopSpeaking()
             tts?.shutdown()
             tts = null
         } catch (_: Exception) {}

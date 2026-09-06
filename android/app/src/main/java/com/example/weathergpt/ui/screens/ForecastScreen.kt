@@ -6,8 +6,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Cloud
@@ -210,8 +214,11 @@ private fun ForecastContent(
     onRefresh: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val current = forecast.firstOrNull()
-    val nextHours = forecast.take(12)
+    var selectedHourIndex by remember { mutableIntStateOf(0) }
+
+    val next24Hours = remember(forecast) { forecast.take(24) }
+    val activeItem = next24Hours.getOrNull(selectedHourIndex) ?: forecast.firstOrNull()
+    val next12Hours = remember(forecast) { forecast.take(12) }
 
     Column(
         modifier = Modifier
@@ -332,8 +339,13 @@ private fun ForecastContent(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(nextHours) { item ->
-                    HourlyItemCard(item = item)
+                items(next12Hours.size) { index ->
+                    val item = next12Hours[index]
+                    HourlyItemCard(
+                        item = item,
+                        isSelected = index == selectedHourIndex,
+                        onClick = { selectedHourIndex = index }
+                    )
                 }
             }
 
@@ -342,12 +354,24 @@ private fun ForecastContent(
             // =========================================================
             // TEMPERATURE TREND SPLINE CHART
             // =========================================================
-            Text(
-                text = "Temperature trend",
-                color = TextPrimary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Temperature trend",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "Drag or tap graph to inspect",
+                    color = TextMuted,
+                    fontSize = 11.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -357,15 +381,43 @@ private fun ForecastContent(
                 padding = 16.dp
             ) {
                 SplineTemperatureChart(
-                    forecastItems = forecast.take(24)
+                    forecastItems = next24Hours,
+                    selectedIndex = selectedHourIndex,
+                    onSelectIndex = { selectedHourIndex = it }
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // =========================================================
-            // 2X2 METRICS GRID
+            // 2X2 METRICS GRID (Live synced with active point in time)
             // =========================================================
+            val precipProb = activeItem?.precipitation_probability_pct?.roundToInt()
+            val precipAmount = activeItem?.precipitation_mm
+            val precipDisplay = when {
+                precipProb != null && precipAmount != null && precipAmount > 0.0 -> "$precipProb% (${"%.1f".format(precipAmount)}mm)"
+                precipProb != null -> "$precipProb%"
+                precipAmount != null -> "${"%.1f".format(precipAmount)} mm"
+                else -> "0%"
+            }
+
+            // Real UV Index approximation based on cloud cover and daylight hour
+            val cloudPct = activeItem?.cloud_cover_pct ?: 20.0
+            val hourOfDay = try {
+                val zdt = ZonedDateTime.parse(activeItem?.time)
+                zdt.hour
+            } catch (_: Exception) { 12 }
+            val uvText = when {
+                hourOfDay < 6 || hourOfDay >= 18 -> "0 (Night)"
+                cloudPct > 80.0 -> "Low (1-2)"
+                hourOfDay in 11..15 && cloudPct < 30.0 -> "Very High (8-9)"
+                hourOfDay in 10..16 && cloudPct < 60.0 -> "High (6-7)"
+                else -> "Moderate (3-5)"
+            }
+
+            val windSpeedKmH = activeItem?.wind_speed_ms?.let { (it * 3.6).roundToInt() } ?: 6
+            val humidityVal = activeItem?.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%"
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -374,14 +426,14 @@ private fun ForecastContent(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.WaterDrop,
                     title = "Precipitation",
-                    value = current?.precipitation_probability_pct?.roundToInt()?.let { "$it%" } ?: "10%"
+                    value = precipDisplay
                 )
 
                 ForecastGridCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.Cloud,
                     title = "UV Index",
-                    value = "Moderate"
+                    value = uvText
                 )
             }
 
@@ -395,14 +447,14 @@ private fun ForecastContent(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.Air,
                     title = "Wind",
-                    value = current?.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "6 km/h"
+                    value = "$windSpeedKmH km/h"
                 )
 
                 ForecastGridCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Default.Speed,
                     title = "Humidity",
-                    value = current?.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "80%"
+                    value = humidityVal
                 )
             }
         } else {
@@ -500,7 +552,7 @@ private fun ForecastGridCard(
                 Text(
                     text = value,
                     color = TextPrimary,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -509,11 +561,13 @@ private fun ForecastGridCard(
 }
 
 /**
- * Hourly forecast glass card.
+ * Hourly forecast glass card with selectable active highlight.
  */
 @Composable
 private fun HourlyItemCard(
-    item: MetForecastItem
+    item: MetForecastItem,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {}
 ) {
     val timeLabel = remember(item.time) {
         formatHour(item.time)
@@ -523,8 +577,13 @@ private fun HourlyItemCard(
         modifier = Modifier
             .width(68.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xB30A1626))
-            .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+            .background(if (isSelected) Color(0x334DA3FF) else Color(0xB30A1626))
+            .border(
+                1.dp,
+                if (isSelected) Color(0x8052D9FF) else BorderGlass,
+                RoundedCornerShape(18.dp)
+            )
+            .clickable { onClick() }
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -533,8 +592,9 @@ private fun HourlyItemCard(
         ) {
             Text(
                 text = timeLabel,
-                color = TextSecondary,
-                fontSize = 12.sp
+                color = if (isSelected) SecondaryCyan else TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -558,11 +618,14 @@ private fun HourlyItemCard(
 
 /**
  * Spline temperature chart with smooth cubic bezier curve, gradient fill,
- * min/max callouts, peak tooltip, and X-axis labels.
+ * interactive pointer indicator that tracks user touch / drag, and real-time
+ * floating tooltip callout displaying exact temperature and time.
  */
 @Composable
 private fun SplineTemperatureChart(
-    forecastItems: List<MetForecastItem>
+    forecastItems: List<MetForecastItem>,
+    selectedIndex: Int = 0,
+    onSelectIndex: (Int) -> Unit = {}
 ) {
     val temps = forecastItems.mapNotNull { it.temperature_c }
     if (temps.size < 2) {
@@ -574,24 +637,64 @@ private fun SplineTemperatureChart(
     val maxTemp = temps.maxOrNull() ?: 35.0
     val tempRange = (maxTemp - minTemp).coerceAtLeast(4.0)
 
-    val peakIndex = temps.indexOf(maxTemp).coerceAtLeast(0)
+    val safeSelectedIndex = selectedIndex.coerceIn(0, forecastItems.size - 1)
+    val selectedItem = forecastItems.getOrNull(safeSelectedIndex)
+    val selectedTemp = selectedItem?.temperature_c ?: temps[safeSelectedIndex]
+    val selectedTimeLabel = formatHour(selectedItem?.time)
+
+    // X-axis 5 interval time labels computed from actual forecast telemetry
+    val xAxisLabels = remember(forecastItems) {
+        if (forecastItems.size >= 5) {
+            val step = (forecastItems.size - 1) / 4.0
+            (0..4).map { i ->
+                val idx = (i * step).roundToInt().coerceIn(0, forecastItems.size - 1)
+                if (i == 0) "Now" else formatHour(forecastItems[idx].time)
+            }
+        } else {
+            listOf("Now", "6H", "12H", "18H", "24H")
+        }
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(175.dp)
+                .pointerInput(forecastItems.size) {
+                    detectTapGestures { offset ->
+                        val w = size.width.toFloat()
+                        val step = w / (forecastItems.size - 1).coerceAtLeast(1)
+                        val nearest = (offset.x / step).roundToInt().coerceIn(0, forecastItems.size - 1)
+                        onSelectIndex(nearest)
+                    }
+                }
+                .pointerInput(forecastItems.size) {
+                    detectHorizontalDragGestures { change, _ ->
+                        val w = size.width.toFloat()
+                        val step = w / (forecastItems.size - 1).coerceAtLeast(1)
+                        val nearest = (change.position.x / step).roundToInt().coerceIn(0, forecastItems.size - 1)
+                        onSelectIndex(nearest)
+                    }
+                }
         ) {
+            val canvasWidth = constraints.maxWidth.toFloat()
+            val canvasHeight = constraints.maxHeight.toFloat()
+            val padY = 32f
+            val chartH = (canvasHeight - padY * 2).coerceAtLeast(10f)
+
+            val stepX = canvasWidth / (temps.size - 1).coerceAtLeast(1)
+            val activeX = safeSelectedIndex * stepX
+            val normY = (selectedTemp - minTemp) / tempRange
+            val activeY = padY + chartH * (1.0 - normY).toFloat()
+
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val padY = 24f
-                val chartH = h - padY * 2
 
                 val points = temps.mapIndexed { idx, t ->
                     val x = idx * (w / (temps.size - 1).coerceAtLeast(1))
-                    val normY = (t - minTemp) / tempRange
-                    val y = padY + chartH * (1.0 - normY).toFloat()
+                    val nY = (t - minTemp) / tempRange
+                    val y = padY + chartH * (1.0 - nY).toFloat()
                     Offset(x, y)
                 }
 
@@ -626,19 +729,30 @@ private fun SplineTemperatureChart(
                     style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                if (peakIndex in points.indices) {
-                    val peakPoint = points[peakIndex]
-                    drawCircle(
-                        color = Color.White,
-                        radius = 4.dp.toPx(),
-                        center = peakPoint
-                    )
-                    drawCircle(
-                        color = PrimaryBlue,
-                        radius = 2.dp.toPx(),
-                        center = peakPoint
-                    )
-                }
+                // Vertical dashed / soft indicator line at selected pointer position
+                drawLine(
+                    color = Color(0x6652D9FF),
+                    start = Offset(activeX, padY),
+                    end = Offset(activeX, h),
+                    strokeWidth = 1.5.dp.toPx()
+                )
+
+                // Outer halo and glowing active point on the spline curve
+                drawCircle(
+                    color = Color(0x3352D9FF),
+                    radius = 8.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 4.5.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
+                drawCircle(
+                    color = PrimaryBlue,
+                    radius = 2.5.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
             }
 
             // Min temp label at bottom-left
@@ -650,42 +764,58 @@ private fun SplineTemperatureChart(
                 Text(
                     text = "${minTemp.roundToInt()}°",
                     color = TextSecondary,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            // Tooltip callout pill at peak point
+            // Dynamic Tooltip Callout tracking the active pointer X position smoothly
+            val tooltipWidth = 64.dp
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val tooltipWidthPx = with(density) { tooltipWidth.toPx() }
+            val clampedTooltipX = (activeX - tooltipWidthPx / 2f)
+                .coerceIn(0f, (canvasWidth - tooltipWidthPx).coerceAtLeast(0f))
+            val tooltipOffsetDp = with(density) { clampedTooltipX.toDp() }
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 6.dp)
+                    .padding(start = tooltipOffsetDp, top = 2.dp)
             ) {
                 Box(
                     modifier = Modifier
+                        .width(tooltipWidth)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xD90A1626))
-                        .border(1.dp, BorderGlass, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .background(Color(0xE60A1626))
+                        .border(1.dp, Color(0x4D52D9FF), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "${maxTemp.roundToInt()}°\n18:00",
-                        color = TextPrimary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 12.sp
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${selectedTemp.roundToInt()}°",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = selectedTimeLabel,
+                            color = SecondaryCyan,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // X-axis timeline labels
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf("Now", "6H", "12H", "18H", "24H").forEach { label ->
+            xAxisLabels.forEach { label ->
                 Text(
                     text = label,
                     color = TextSecondary,

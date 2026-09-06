@@ -44,6 +44,7 @@ from app.routers.flood_prediction import router as flood_prediction_router
 from app.routers.hazards import router as hazards_router
 from app.routers.safety import router as safety_router
 from app.routers.tts import router as tts_router
+from app.routers.voice_ws import router as voice_ws_router
 
 
 
@@ -113,6 +114,7 @@ app.include_router(flood_prediction_router)
 app.include_router(hazards_router)
 app.include_router(safety_router)
 app.include_router(tts_router)
+app.include_router(voice_ws_router)
 
 # Conversational intelligence.
 # New location search/geocoding API.

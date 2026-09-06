@@ -14,6 +14,7 @@ object BackendConfig {
     // Render Cloud Backend (Permanent host)
     const val BASE_URL = "https://weather-gpt-ymze.onrender.com/"
     const val BASE_URL_NO_SLASH = "https://weather-gpt-ymze.onrender.com"
+    const val WS_URL = "wss://weather-gpt-ymze.onrender.com/ws/voice"
 
     // Retry interceptor for cold-start 502/503/504 errors while Render spins up
     private class ColdStartRetryInterceptor : Interceptor {
