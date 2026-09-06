@@ -202,6 +202,10 @@ def extract_activity(
         ("photo", "photography"),
         ("beach", "beach"),
         ("picnic", "picnic"),
+        ("go outside", "outdoor"),
+        ("go out", "outdoor"),
+        ("outside", "outdoor"),
+        ("outdoor", "outdoor"),
     ]
 
     for phrase, activity in activities:

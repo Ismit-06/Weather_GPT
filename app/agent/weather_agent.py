@@ -606,6 +606,8 @@ class WeatherAgent:
             ]
         )
 
+        tool_result = None
+
         # -----------------------------------------------------
         # Best-time tool
         # -----------------------------------------------------
@@ -615,44 +617,12 @@ class WeatherAgent:
             activity = (
                 resolved.activity
                 or self.context.activity
+                or "outdoor"
             )
-
-            if activity is None:
-
-                return {
-                    "status":
-                        "needs_clarification",
-
-                    "type":
-                        "MISSING_ACTIVITY",
-
-                    "question":
-                        question,
-
-                    "clarification": (
-                        "What activity are you planning? "
-                        "For example, running, cycling, "
-                        "walking, or cricket."
-                    ),
-
-                    "language":
-                        detected_language,
-
-                    "language_code":
-                        language_code,
-
-                    "script_code":
-                        script_code,
-
-                    "context":
-                        asdict(
-                            self.context
-                        ),
-                }
 
             date_text = (
                 resolved.day_text
-                or "tomorrow"
+                or "today"
             )
 
             result = (
@@ -688,68 +658,8 @@ class WeatherAgent:
                         ),
                 )
 
-            return {
-                "status":
-                    result.get(
-                        "status",
-                        "success",
-                    ),
-
-                "type":
-                    "BEST_TIME",
-
-                "question":
-                    question,
-
-                "intent":
-                    "ACTIVITY",
-
-                "activity":
-                    activity,
-
-                "date":
-                    result.get("date"),
-
-                "recommendation":
-                    result.get(
-                        "recommendation"
-                    ),
-
-                "best_window":
-                    result.get(
-                        "best_window"
-                    ),
-
-                "other_windows":
-                    result.get(
-                        "other_windows",
-                        [],
-                    ),
-
-                "source":
-                    result.get(
-                        "source"
-                    ),
-
-                "updated_at":
-                    result.get(
-                        "updated_at"
-                    ),
-
-                "language":
-                    detected_language,
-
-                "language_code":
-                    language_code,
-
-                "script_code":
-                    script_code,
-
-                "context":
-                    asdict(
-                        self.context
-                    ),
-            }
+            tool_result = result
+            # Proceed directly down to LLM generation below rather than early-exiting with raw data
 
         # -----------------------------------------------------
         # Ambiguous time
@@ -1074,30 +984,31 @@ class WeatherAgent:
             except ValueError:
                 target_datetime = None
 
-        tool_result = await run_weather_tool(
-            intent=self.context.intent
-                or "CURRENT_WEATHER",
+        if tool_result is None:
+            tool_result = await run_weather_tool(
+                intent=self.context.intent
+                    or "CURRENT_WEATHER",
 
-            latitude=active_latitude,
-            longitude=active_longitude,
+                latitude=active_latitude,
+                longitude=active_longitude,
 
-            target_local_time=
-                target_datetime,
+                target_local_time=
+                    target_datetime,
 
-            activity=
-                self.context.activity,
+                activity=
+                    self.context.activity,
 
-            best_time_request=
-                best_time_request,
+                best_time_request=
+                    best_time_request,
 
-            date_text=(
-                resolved.day_text
-                or "tomorrow"
-            ),
+                date_text=(
+                    resolved.day_text
+                    or "tomorrow"
+                ),
 
-            timezone_name=
-                active_timezone,
-        )
+                timezone_name=
+                    active_timezone,
+            )
 
         # -----------------------------------------------------
         # Build grounded context for Sarvam.
@@ -1154,7 +1065,35 @@ class WeatherAgent:
                 else:
                     summary_lines.append("Rain Windows: No rain detected in the forecast period.")
             if "recommendation" in tool_result:
-                summary_lines.append(f"Recommendation: {tool_result['recommendation']}")
+                rec = tool_result["recommendation"]
+                if isinstance(rec, dict):
+                    summary_lines.append(
+                        f"BEST WINDOW: ⭐ {rec.get('start')} – {rec.get('end')} (Score: {rec.get('score')}, Level: {rec.get('level')})"
+                    )
+                    w = rec.get("weather", {})
+                    summary_lines.append(
+                        f"Best Window Weather: {w.get('temperature_c')}°C, humidity {w.get('humidity_pct')}%, max rain {w.get('max_rainfall_mm')} mm, wind {w.get('wind_speed_ms')} m/s"
+                    )
+                    if rec.get("reasons"):
+                        summary_lines.append("Conditions: " + "; ".join(rec.get("reasons", [])))
+                else:
+                    summary_lines.append(f"Recommendation: {rec}")
+
+            if "other_windows" in tool_result and isinstance(tool_result["other_windows"], list):
+                others = tool_result["other_windows"]
+                alt_lines = []
+                for idx, ow in enumerate(others[:3]):
+                    try:
+                        s_str = datetime.fromisoformat(ow["start"]).strftime("%I:%M %p").lstrip("0")
+                        e_str = datetime.fromisoformat(ow["end"]).strftime("%I:%M %p").lstrip("0")
+                        alt_lines.append(f"Alternative {idx+1}: {s_str} – {e_str} (Score: {ow.get('average_score')})")
+                    except Exception:
+                        pass
+                if alt_lines:
+                    summary_lines.append("ALTERNATIVE WINDOWS:\n" + "\n".join(alt_lines))
+
+            if "activity_assessment" in tool_result:
+                summary_lines.append(f"Activity Assessment: {tool_result['activity_assessment']}")
             if "assessment" in tool_result:
                 summary_lines.append(f"Assessment: {tool_result['assessment']}")
             if "summary" in tool_result:
