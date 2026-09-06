@@ -178,8 +178,9 @@ class VoiceAssistantManager(private val context: Context) {
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
 
+                val isAuto = languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true)
                 val recognitionLocale = when {
-                    languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> "en-IN"
+                    isAuto -> Locale.getDefault().toLanguageTag().ifBlank { "en-IN" }
                     languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) -> "or-IN"
                     languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) -> "hi-IN"
                     languageCode.equals("Telugu", ignoreCase = true) -> "te-IN"
@@ -197,7 +198,10 @@ class VoiceAssistantManager(private val context: Context) {
 
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLocale)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLocale)
-                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("en-IN", "hi-IN", "or-IN", "te-IN", "ta-IN"))
+                putExtra(
+                    "android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES",
+                    arrayOf("en-IN", "hi-IN", "or-IN", "te-IN", "ta-IN", "bn-IN", "mr-IN", "gu-IN", "kn-IN", "ml-IN", "pa-IN")
+                )
             }
 
             speechRecognizer?.startListening(intent)

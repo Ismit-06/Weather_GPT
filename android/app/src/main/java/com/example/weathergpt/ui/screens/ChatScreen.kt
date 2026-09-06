@@ -477,83 +477,90 @@ fun ChatScreen(
             }
 
             // ----------------------------------------------------
-            // 3. 2x2 QUICK SUGGESTION GLASS CARDS
+            // 3. QUICK SUGGESTIONS (Shown when no current answer)
             // ----------------------------------------------------
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Row 1
-                    Row(
+            if (uiState.messages.isEmpty() && !uiState.isLoading && uiState.error == null) {
+                item {
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        SuggestionGlassCard(
-                            icon = "🌧️",
-                            title = "Will it rain?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Will it rain today in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "🧳",
-                            title = "What to pack?",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                    }
+                        // Row 1
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SuggestionGlassCard(
+                                icon = "🌧️",
+                                title = "Will it rain?",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    message.value = "Will it rain today in ${activeLocation.name}?"
+                                    sendMessage()
+                                }
+                            )
+                            SuggestionGlassCard(
+                                icon = "🧳",
+                                title = "What to pack?",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    message.value = "What should I pack or wear for the weather in ${activeLocation.name}?"
+                                    sendMessage()
+                                }
+                            )
+                        }
 
-                    // Row 2
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        SuggestionGlassCard(
-                            icon = "🛣️",
-                            title = "Road conditions",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "📖",
-                            title = "Show on map",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
-                                sendMessage()
-                            }
-                        )
+                        // Row 2
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SuggestionGlassCard(
+                                icon = "🛣️",
+                                title = "Road conditions",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    message.value = "Are roads and driving conditions safe in ${activeLocation.name}?"
+                                    sendMessage()
+                                }
+                            )
+                            SuggestionGlassCard(
+                                icon = "📖",
+                                title = "Show on map",
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    message.value = "Give me an overview of weather telemetry on map for ${activeLocation.name}."
+                                    sendMessage()
+                                }
+                            )
+                        }
                     }
                 }
             }
 
             // ----------------------------------------------------
-            // 4. CONVERSATION MESSAGES (Translucent Glass Bubbles)
+            // 4. INSTANT ANSWER CARD (Latest Question & Response)
             // ----------------------------------------------------
             if (uiState.messages.isNotEmpty()) {
-                items(
-                    items = uiState.messages,
-                    key = { "${it.role}-${it.content.hashCode()}" }
-                ) { messageItem ->
-                    when (messageItem.role.lowercase()) {
-                        "user" -> GlassUserBubble(text = messageItem.content)
-                        else -> GlassAssistantBubble(
-                            text = messageItem.content,
+                val latestUser = uiState.messages.findLast { it.role.equals("user", ignoreCase = true) }
+                val latestAssistant = uiState.messages.findLast { !it.role.equals("user", ignoreCase = true) }
+
+                if (latestUser != null) {
+                    item(key = "user-latest-${latestUser.content.hashCode()}") {
+                        GlassUserBubble(text = latestUser.content)
+                    }
+                }
+
+                if (latestAssistant != null) {
+                    item(key = "assistant-latest-${latestAssistant.content.hashCode()}") {
+                        GlassAssistantBubble(
+                            text = latestAssistant.content,
                             onSpeak = {
                                 if (isSpeaking) {
                                     voiceAssistant.stopSpeaking()
                                 } else {
                                     voiceAssistant.speak(
-                                        messageItem.content,
+                                        latestAssistant.content,
                                         uiState.detectedLanguageCode
                                     )
                                 }
@@ -561,17 +568,36 @@ fun ChatScreen(
                             isSpeaking = isSpeaking,
                             onCopy = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("WeatherGPT Response", messageItem.content)
+                                val clip = ClipData.newPlainText("WeatherGPT Response", latestAssistant.content)
                                 clipboard.setPrimaryClip(clip)
                                 Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
                 }
+            }
 
-                if (uiState.isLoading) {
-                    item {
-                        GlassThinkingBubble()
+            if (uiState.isLoading) {
+                item(key = "loading-bubble") {
+                    GlassThinkingBubble()
+                }
+            }
+
+            if (uiState.error != null) {
+                item(key = "error-bubble") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0x33FF4D4D))
+                            .border(1.dp, Color(0x66FF4D4D), RoundedCornerShape(16.dp))
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            text = uiState.error ?: "An unexpected error occurred.",
+                            color = Color(0xFFFF9999),
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }
