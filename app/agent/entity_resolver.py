@@ -160,11 +160,10 @@ def extract_location(
 ) -> str | None:
 
     # Capture a named place after common location
-    # prepositions without swallowing time/day phrases.
+    # prepositions without swallowing time/day phrases or temporal adverbs.
     patterns = [
-        r"\b(?:in|at|near)\s+([A-Za-z][A-Za-z .'-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|this|on|at|around)\b|[?.!,]|$)",
-
-        r"\b(?:in|at|near)\s+([A-Za-z][A-Za-z .'-]{1,60})$",
+        r"\b(?:in|at|near)\s+([A-Za-z\u0900-\u0D7F][A-Za-z\u0900-\u0D7F .'-]{1,60}?)(?=\s+(?:today|tomorrow|tonight|this|on|at|around|right now|now|currently|presently|soon|later|aaj|kal)\b|[?.!,]|$)",
+        r"\b(?:in|at|near)\s+([A-Za-z\u0900-\u0D7F][A-Za-z\u0900-\u0D7F .'-]{1,60})$",
     ]
 
     for pattern in patterns:
@@ -185,8 +184,10 @@ def extract_location(
         if not value:
             continue
 
-        # Don't accidentally interpret common non-location
-        # phrases as place names.
+        # Strip trailing temporal words
+        value = re.sub(r"(?i)\s+(?:right now|now|currently|presently|today|tomorrow|tonight|aaj|kal)$", "", value).strip(" .,!?")
+
+        # Don't accidentally interpret common non-location phrases as place names.
         blocked = {
             "the weather",
             "home",
@@ -196,6 +197,9 @@ def extract_location(
             "afternoon",
             "evening",
             "night",
+            "right now",
+            "now",
+            "currently",
         }
 
         if value.lower() in blocked:
