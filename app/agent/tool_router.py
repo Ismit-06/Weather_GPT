@@ -62,16 +62,27 @@ async def run_weather_tool(
         intent or "CURRENT_WEATHER"
     ).upper()
 
-    # ---------------------------------------------------------
-    # CURRENT WEATHER
-    # ---------------------------------------------------------
+    if intent in {"CURRENT_WEATHER", "EXPLAIN"}:
 
-    if intent == "CURRENT_WEATHER":
-
-        return await get_current_weather(
+        res = await get_current_weather(
             latitude=latitude,
             longitude=longitude,
         )
+        if intent == "EXPLAIN" and res.get("status") == "success":
+            curr = res.get("current", {})
+            temp = curr.get("temperature_c", curr.get("temperature"))
+            hum = curr.get("humidity_pct", curr.get("relative_humidity_pct"))
+            if isinstance(temp, (int, float)) and isinstance(hum, (int, float)):
+                from app.tools.activity_conditions import calculate_heat_index
+                hi = calculate_heat_index(float(temp), float(hum))
+                res["explanation_context"] = {
+                    "temperature_c": temp,
+                    "humidity_pct": hum,
+                    "heat_index_c": hi,
+                    "dew_point_c": curr.get("dew_point_c"),
+                    "wind_speed_ms": curr.get("wind_speed_ms"),
+                }
+        return res
 
     # ---------------------------------------------------------
     # RAIN

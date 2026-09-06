@@ -300,11 +300,32 @@ fun HomeScreen(
                             val feelsLikeTemp = currentWeather?.dew_point_c?.roundToInt()
                                 ?: currentWeather?.temperature_c?.roundToInt()?.minus(2)
                                 ?: 27
-                            Text(
-                                text = "Feels like $feelsLikeTemp°",
-                                color = TextSecondary,
-                                fontSize = 13.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Feels like $feelsLikeTemp°",
+                                    color = TextSecondary,
+                                    fontSize = 13.sp
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0x3338BDF8))
+                                        .border(1.dp, Color(0x6638BDF8), RoundedCornerShape(10.dp))
+                                        .clickable { onOpenChat() }
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Why? 💡",
+                                        color = SecondaryCyan,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
 
                         RealisticWeatherIllustration(

@@ -604,11 +604,11 @@ fun ChatScreen(
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "☂️",
-                            title = "Carry umbrella?",
+                            icon = "💡",
+                            title = "Why feels like this?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "Should I carry an umbrella today in ${activeLocation.name}?"
+                                message.value = "Why does it feel hotter or colder than actual temperature in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )

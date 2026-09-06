@@ -447,10 +447,10 @@ def resolve_query(
 
     ambiguous_time = None
 
-    # A bare hour such as "7" or "at 7" is ambiguous
-    # unless AM/PM/daypart was provided.
+    # A bare hour such as "at 7" or "around 8" is ambiguous
+    # unless AM/PM/daypart was provided or it's a temperature/percentage.
     bare_hour = re.search(
-        r"\b(?:at|around|by)?\s*(\d{1,2})\b",
+        r"\b(?:at|around|by)\s+(\d{1,2})\b",
         text,
         flags=re.IGNORECASE,
     )
@@ -479,6 +479,14 @@ def resolve_query(
                 "दोपहर",
                 "शाम",
                 "रात",
+                "degree",
+                "degrees",
+                "°c",
+                "°",
+                "%",
+                "percent",
+                "kmph",
+                "km/h",
             ]
         )
     ):

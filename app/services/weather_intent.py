@@ -15,6 +15,7 @@ INTENTS = {
     "FLOOD",
     "ALERTS",
     "GENERAL_WEATHER",
+    "EXPLAIN",
 }
 
 
@@ -37,6 +38,33 @@ def detect_weather_intent(
 ) -> str:
 
     text = question.lower().strip()
+
+    # ---------------------------------------------------------
+    # 0. EXPLANATION / "WHY" QUESTIONS (e.g. Why does it feel so hot? Why 34°C feels like 40°C?)
+    # ---------------------------------------------------------
+
+    if has_any(
+        text,
+        [
+            r"\bwhy\b",
+            r"\bwhy is it\b",
+            r"\bwhy does it\b",
+            r"\bwhy feels\b",
+            r"\bfeels hotter\b",
+            r"\bfeels colder\b",
+            r"\bfeels like\b",
+            r"\bexplain\b",
+            r"\bhow come\b",
+            r"\bkyun\b",
+            r"\bkyu\b",
+            r"\bkyon\b",
+            r"क्यों",
+            r"ఎందుకు",
+            r"ஏன்",
+            r"କାହିଁକି",
+        ]
+    ):
+        return "EXPLAIN"
 
     # ---------------------------------------------------------
     # 1. HIGH-PRIORITY ACTIVITY / OUTDOOR QUESTIONS

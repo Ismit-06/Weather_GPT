@@ -1110,6 +1110,11 @@ class WeatherAgent:
                 summary_lines.append(f"Assessment: {tool_result['assessment']}")
             if "summary" in tool_result:
                 summary_lines.append(f"Weather Summary: {tool_result['summary']}")
+            if "explanation_context" in tool_result:
+                ec = tool_result["explanation_context"]
+                summary_lines.append(
+                    f"Thermal Breakdown: Actual Temperature {ec.get('temperature_c')}°C, Relative Humidity {ec.get('humidity_pct')}%, Calculated Perceived Heat Index {ec.get('heat_index_c')}°C, Dew Point {ec.get('dew_point_c')}°C"
+                )
             if "current" in tool_result and isinstance(tool_result["current"], dict):
                 c = tool_result["current"]
                 summary_lines.append(
