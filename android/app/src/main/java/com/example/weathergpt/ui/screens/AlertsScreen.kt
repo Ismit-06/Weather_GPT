@@ -363,51 +363,115 @@ fun AlertsScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             // =========================================================
-            // WHAT NEEDS ATTENTION (Semantic Alert Panels)
+            // AI ALERT PRIORITIZATION — WHAT ACTUALLY MATTERS
             // =========================================================
-            Text(
-                text = "What needs attention",
-                color = TextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "🚨 WHAT ACTUALLY MATTERS",
+                    color = DangerRed,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.5.sp
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Alert 1: Moderate (Amber)
-            MockupAlertCard(
-                icon = Icons.Default.WaterDrop,
-                title = "Heavy rain watch",
-                severity = "MODERATE",
-                explanation = "Periods of heavy rainfall may affect travel and low-lying areas.",
-                action = "Keep rain protection ready.",
-                accentColor = WarningAmber
-            )
+            // AI Contextual Advice Callout
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                padding = 14.dp
+            ) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(text = "💡", fontSize = 18.sp)
+                    Column {
+                        Text(
+                            text = "WeatherGPT Safety Intelligence",
+                            color = SecondaryCyan,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = "You don't need to change your plans unless you're travelling between 4–6 PM.",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // HIGH PRIORITY
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "HIGH PRIORITY",
+                    color = DangerRed,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp
+                )
+                MockupAlertCard(
+                    icon = Icons.Default.WaterDrop,
+                    title = "🌧️ Heavy rain",
+                    severity = "HIGH",
+                    explanation = "Expected 4:20 – 6:10 PM with possible water accumulation on roads.",
+                    action = "Avoid low-lying routes; delay outdoor travel until 6:15 PM.",
+                    accentColor = DangerRed
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Alert 2: Monitor (Blue/Cyan) - Clicking opens dams/flood module
-            MockupAlertCard(
-                icon = Icons.Default.Warning,
-                title = "Flood intelligence",
-                severity = "MONITOR",
-                explanation = "Water-related risk should be checked using live flood modules.",
-                action = "Review flood conditions and nearby reservoir infrastructure.",
-                accentColor = SecondaryCyan,
-                onClick = onOpenDams
-            )
+            // MEDIUM PRIORITY
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "MEDIUM",
+                    color = WarningAmber,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp
+                )
+                MockupAlertCard(
+                    icon = Icons.Default.Warning,
+                    title = "🌬️ Strong winds",
+                    severity = "MEDIUM",
+                    explanation = "Gusts up to 35 km/h expected after 7:00 PM.",
+                    action = "Secure outdoor items and drive cautiously on exposed bridges.",
+                    accentColor = WarningAmber
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Alert 3: Normal (Green)
-            MockupAlertCard(
-                icon = Icons.Default.Cloud,
-                title = "Weather conditions",
-                severity = "NORMAL",
-                explanation = "No major severe-weather signal is currently detected in your area.",
-                action = "Continue monitoring live conditions.",
-                accentColor = SuccessGreen
-            )
+            // LOW PRIORITY
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "LOW",
+                    color = SuccessGreen,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp
+                )
+                MockupAlertCard(
+                    icon = Icons.Default.Cloud,
+                    title = "☀️ High UV tomorrow",
+                    severity = "LOW",
+                    explanation = "UV Index reaches 8.0 during midday peak (11:30 AM – 2:30 PM).",
+                    action = "Sunscreen and eyewear recommended if outdoors.",
+                    accentColor = SuccessGreen
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
