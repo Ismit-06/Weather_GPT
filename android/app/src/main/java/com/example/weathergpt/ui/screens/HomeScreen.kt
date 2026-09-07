@@ -276,27 +276,48 @@ fun HomeScreen(
                     )
                 }
 
-                // Refresh Button
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0E1626))
-                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
-                        .clickable {
-                            refreshTrigger++
-                            Toast.makeText(context, "Updating weather for ${activeLocation.name}...", Toast.LENGTH_SHORT).show()
-                        },
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh weather",
-                        tint = if (isLoading) SecondaryCyan else Color(0xFF8896AB),
+                    // AI Preferences Button
+                    Box(
                         modifier = Modifier
-                            .size(17.dp)
-                            .then(if (isLoading) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
-                    )
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(if (userPreferences.isOptInEnabled) Color(0x2638BDF8) else Color(0xFF0E1626))
+                            .border(1.dp, if (userPreferences.isOptInEnabled) Color(0x6638BDF8) else Color(0x2EFFFFFF), CircleShape)
+                            .clickable { showPersonalizationDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🧠",
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    // Refresh Button
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF0E1626))
+                            .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                            .clickable {
+                                refreshTrigger++
+                                Toast.makeText(context, "Updating weather for ${activeLocation.name}...", Toast.LENGTH_SHORT).show()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh weather",
+                            tint = if (isLoading) SecondaryCyan else Color(0xFF8896AB),
+                            modifier = Modifier
+                                .size(17.dp)
+                                .then(if (isLoading) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
+                        )
+                    }
                 }
             }
 
@@ -527,6 +548,74 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            } else {
+                // When personalization is turned off, show an elegant compact banner so user can easily re-enable or customize
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showPersonalizationDialog = true },
+                    shape = RoundedCornerShape(18.dp),
+                    padding = 12.dp
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x2638BDF8)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "🧠", fontSize = 15.sp)
+                            }
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column {
+                                Text(
+                                    text = "AI Activity Insights is Paused",
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Tap to enable custom running, cycling & commute forecasts",
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0x3338BDF8))
+                                .border(1.dp, Color(0x6638BDF8), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    UserPreferencesStore.setOptIn(context, true)
+                                    Toast.makeText(context, "AI Activity Insights enabled", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Turn On",
+                                color = SecondaryCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
