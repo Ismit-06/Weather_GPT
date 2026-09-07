@@ -42,60 +42,55 @@ class ForecastViewModel : ViewModel() {
 
     fun loadForecast(
         latitude: Double,
-        longitude: Double
+        longitude: Double,
+        forceRefresh: Boolean = false
     ) {
-
         lastLatitude = latitude
         lastLongitude = longitude
 
-        viewModelScope.launch {
+        // Check for instant cache hit
+        val cached = MetWeatherClient.getCachedWeather(latitude, longitude)
+        if (cached != null && _state.value !is ForecastState.Success) {
+            _state.value = ForecastState.Success(weather = cached)
+        }
 
+        viewModelScope.launch {
             fetchWeather(
                 latitude = latitude,
                 longitude = longitude,
-                showLoading = _state.value !is ForecastState.Success
+                showLoading = _state.value !is ForecastState.Success,
+                forceRefresh = forceRefresh
             )
         }
 
         startAutoRefresh()
     }
 
-
     private suspend fun fetchWeather(
         latitude: Double,
         longitude: Double,
-        showLoading: Boolean
+        showLoading: Boolean,
+        forceRefresh: Boolean = false
     ) {
-
         if (showLoading) {
-            _state.value =
-                ForecastState.Loading
+            _state.value = ForecastState.Loading
         }
 
         try {
+            val response = MetWeatherClient.getFastWeather(
+                lat = latitude,
+                lon = longitude,
+                forceRefresh = forceRefresh
+            )
 
-            val response =
-                MetWeatherClient.api.getWeather(
-                    latitude = latitude,
-                    longitude = longitude
-                )
-
-            _state.value =
-                ForecastState.Success(
-                    weather = response
-                )
-
+            _state.value = ForecastState.Success(
+                weather = response
+            )
         } catch (e: Exception) {
-
-            // Don't destroy existing live data just because
-            // one refresh request temporarily failed.
             if (_state.value !is ForecastState.Success) {
-
-                _state.value =
-                    ForecastState.Error(
-                        e.message
-                            ?: "Unable to load weather"
-                    )
+                _state.value = ForecastState.Error(
+                    e.message ?: "Unable to load weather"
+                )
             }
         }
     }

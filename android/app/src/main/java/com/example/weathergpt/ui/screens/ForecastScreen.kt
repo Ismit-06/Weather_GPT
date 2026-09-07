@@ -60,6 +60,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
@@ -96,17 +98,19 @@ fun ForecastScreen(
         viewModel.loadForecast(initialLoc.latitude, initialLoc.longitude)
 
         if (!LocationStore.isManual(context)) {
-            try {
-                val provider = DeviceLocationProvider(context)
-                val gpsLoc = provider.getCurrentLocation()
-                if (gpsLoc != null) {
-                    selectedLocation = selectedLocation.copy(
-                        latitude = gpsLoc.latitude,
-                        longitude = gpsLoc.longitude
-                    )
-                    viewModel.loadForecast(gpsLoc.latitude, gpsLoc.longitude)
-                }
-            } catch (_: Exception) {}
+            launch(Dispatchers.IO) {
+                try {
+                    val provider = DeviceLocationProvider(context)
+                    val gpsLoc = provider.getCurrentLocation()
+                    if (gpsLoc != null && (gpsLoc.latitude != initialLoc.latitude || gpsLoc.longitude != initialLoc.longitude)) {
+                        selectedLocation = selectedLocation.copy(
+                            latitude = gpsLoc.latitude,
+                            longitude = gpsLoc.longitude
+                        )
+                        viewModel.loadForecast(gpsLoc.latitude, gpsLoc.longitude)
+                    }
+                } catch (_: Exception) {}
+            }
         }
     }
 

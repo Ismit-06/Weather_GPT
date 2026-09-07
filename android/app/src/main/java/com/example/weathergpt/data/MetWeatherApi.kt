@@ -49,4 +49,31 @@ object MetWeatherClient {
     val api: MetWeatherApi by lazy {
         BackendConfig.createRetrofit().create(MetWeatherApi::class.java)
     }
+
+    private val memoryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, MetWeatherResponse>>()
+    private const val CACHE_VALIDITY_MS = 10 * 60 * 1000L // 10 minutes
+
+    private fun cacheKey(lat: Double, lon: Double): String {
+        return "${"%.3f".format(java.util.Locale.US, lat)}_${"%.3f".format(java.util.Locale.US, lon)}"
+    }
+
+    fun getCachedWeather(lat: Double, lon: Double): MetWeatherResponse? {
+        val entry = memoryCache[cacheKey(lat, lon)] ?: return null
+        // Return cached entry if within validity or as instant placeholder
+        return entry.second
+    }
+
+    suspend fun getFastWeather(lat: Double, lon: Double, forceRefresh: Boolean = false): MetWeatherResponse {
+        val key = cacheKey(lat, lon)
+        val now = System.currentTimeMillis()
+        if (!forceRefresh) {
+            val cached = memoryCache[key]
+            if (cached != null && (now - cached.first) < CACHE_VALIDITY_MS) {
+                return cached.second
+            }
+        }
+        val fresh = api.getWeather(lat, lon)
+        memoryCache[key] = Pair(now, fresh)
+        return fresh
+    }
 }

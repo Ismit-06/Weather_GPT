@@ -16,10 +16,22 @@ USER_AGENT = (
 )
 
 
+import time
+
+_forecast_cache: dict[str, tuple[float, dict]] = {}
+CACHE_TTL_SECONDS = 600  # 10 minutes cache per coordinate pair
+
 async def get_met_forecast(
     latitude: float,
     longitude: float,
 ) -> dict:
+
+    key = f"{round(latitude, 3)}_{round(longitude, 3)}"
+    now = time.time()
+    if key in _forecast_cache:
+        cached_time, cached_data = _forecast_cache[key]
+        if now - cached_time < CACHE_TTL_SECONDS:
+            return cached_data
 
     params = {
         "lat": round(latitude, 4),
@@ -27,7 +39,7 @@ async def get_met_forecast(
     }
 
     async with httpx.AsyncClient(
-        timeout=30.0,
+        timeout=15.0,
         headers={
             "User-Agent": USER_AGENT,
             "Accept": "application/json",
@@ -40,8 +52,9 @@ async def get_met_forecast(
         )
 
         response.raise_for_status()
-
-        return response.json()
+        data = response.json()
+        _forecast_cache[key] = (now, data)
+        return data
 
 
 def parse_time(value: str | None) -> datetime | None:
