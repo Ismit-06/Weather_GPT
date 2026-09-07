@@ -92,7 +92,6 @@ fun AppNavigation() {
     val screens = listOf(
         Screen.Home,
         Screen.Chat,
-        Screen.Forecast,
         Screen.Camera,
         Screen.Map,
         Screen.Alerts
