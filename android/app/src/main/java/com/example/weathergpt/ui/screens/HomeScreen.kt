@@ -500,9 +500,9 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Headline + Proactive advice
+                        // Proactive advice
                         Text(
-                            text = "${insight.icon} ${insight.headline}: ${insight.details}",
+                            text = "${insight.icon} ${insight.summary}",
                             color = TextPrimary,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
