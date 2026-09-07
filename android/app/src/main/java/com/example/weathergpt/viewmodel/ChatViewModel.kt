@@ -64,6 +64,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        // Track and learn activity preferences (Opt-in)
+        try {
+            com.example.weathergpt.data.UserPreferencesStore.recordActivityQuery(context, text)
+        } catch (_: Exception) {}
+
         val currentState =
             _uiState.value
 

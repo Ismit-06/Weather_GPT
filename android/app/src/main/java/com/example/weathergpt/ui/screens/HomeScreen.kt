@@ -43,9 +43,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,9 +64,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.data.MetWeatherClient
+import com.example.weathergpt.data.UserPreferencesStore
 import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.location.SelectedLocation
@@ -92,6 +97,13 @@ fun HomeScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    val userPreferences by UserPreferencesStore.preferences.collectAsState()
+    var showPersonalizationDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        UserPreferencesStore.loadPreferences(context)
+    }
 
     var activeLocation by remember {
         mutableStateOf(LocationStore.getLocation(context))
@@ -404,6 +416,123 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            // ====================================================
+            // PERSONAL ACTIVITY INSIGHT CARD (LEARNED PREFERENCE)
+            // ====================================================
+            if (userPreferences.isOptInEnabled) {
+                val insight = remember(userPreferences.primaryActivity, forecastList, currentWeather) {
+                    com.example.weathergpt.data.UserPreferencesStore.evaluateActivityInsight(
+                        userPreferences.primaryActivity,
+                        forecastList
+                    )
+                }
+
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    padding = 14.dp
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "🧠", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "PERSONAL ACTIVITY INSIGHT",
+                                    color = SecondaryCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+
+                            // Activity Switcher / Settings Button
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0x2638BDF8))
+                                    .border(1.dp, Color(0x4D38BDF8), RoundedCornerShape(12.dp))
+                                    .clickable { showPersonalizationDialog = true }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${insight.icon} ${insight.activity}",
+                                        color = SecondaryCyan,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "⚙️",
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Headline + Proactive advice
+                        Text(
+                            text = "${insight.icon} ${insight.headline}: ${insight.details}",
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Best window: ${insight.bestTimeWindow}",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+
+                            // Suitability Badge
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        when (insight.suitability) {
+                                            "EXCELLENT" -> Color(0x3310B981)
+                                            "GOOD" -> Color(0x3338BDF8)
+                                            "MODERATE" -> Color(0x33F59E0B)
+                                            else -> Color(0x33EF4444)
+                                        }
+                                    )
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = insight.suitability,
+                                    color = when (insight.suitability) {
+                                        "EXCELLENT" -> Color(0xFF34D399)
+                                        "GOOD" -> Color(0xFF38BDF8)
+                                        "MODERATE" -> Color(0xFFFBBF24)
+                                        else -> Color(0xFFF87171)
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // ====================================================
             // 2X2 SECONDARY METRICS GRID
@@ -770,6 +899,25 @@ fun HomeScreen(
                         Toast.makeText(context, "Location set to ${sel.name}", Toast.LENGTH_SHORT).show()
                     }
                     showLocationDialog = false
+                }
+            )
+        }
+
+        // AI Activity Personalization Preferences Dialog
+        if (showPersonalizationDialog) {
+            PersonalizationPreferencesDialog(
+                userPreferences = userPreferences,
+                onDismiss = { showPersonalizationDialog = false },
+                onToggleOptIn = { enabled ->
+                    UserPreferencesStore.setOptIn(context, enabled)
+                },
+                onSelectPrimaryActivity = { activity ->
+                    UserPreferencesStore.setPrimaryActivity(context, activity)
+                    showPersonalizationDialog = false
+                    Toast.makeText(context, "Focus activity set to $activity", Toast.LENGTH_SHORT).show()
+                },
+                onToggleActivity = { activity, enabled ->
+                    UserPreferencesStore.toggleActivity(context, activity, enabled)
                 }
             )
         }
@@ -1187,5 +1335,179 @@ private fun formatDay(raw: String?): String {
         parsed.format(DateTimeFormatter.ofPattern("EEEE"))
     } catch (_: Exception) {
         "Day"
+    }
+}
+
+@Composable
+private fun PersonalizationPreferencesDialog(
+    userPreferences: com.example.weathergpt.data.UserPreferences,
+    onDismiss: () -> Unit,
+    onToggleOptIn: (Boolean) -> Unit,
+    onSelectPrimaryActivity: (String) -> Unit,
+    onToggleActivity: (String, Boolean) -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            shape = RoundedCornerShape(24.dp),
+            padding = 18.dp
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🧠", fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Activity Preferences",
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x26FFFFFF))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "✕", color = TextSecondary, fontSize = 13.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Opt-in switch row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x660A1626))
+                        .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "AI Personalization",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Learns your favorite activities from questions (e.g. running, cycling, commute) to provide daily proactive insights.",
+                            color = TextMuted,
+                            fontSize = 10.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Switch(
+                        checked = userPreferences.isOptInEnabled,
+                        onCheckedChange = onToggleOptIn,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = PrimaryBlue,
+                            uncheckedThumbColor = Color(0xFF64748B),
+                            uncheckedTrackColor = Color(0xFF1E293B)
+                        )
+                    )
+                }
+
+                if (userPreferences.isOptInEnabled) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "PRIMARY FOCUS ACTIVITY",
+                        color = SecondaryCyan,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.weathergpt.data.UserPreferencesStore.AVAILABLE_ACTIVITIES.forEach { (name, icon) ->
+                            val isSelected = userPreferences.primaryActivity == name
+                            val isLearned = userPreferences.learnedActivities.contains(name)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(if (isSelected) Color(0x3338BDF8) else Color(0x400A1626))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) SecondaryCyan else BorderGlass,
+                                        RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { onSelectPrimaryActivity(name) }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = icon, fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = name,
+                                            color = if (isSelected) Color.White else TextSecondary,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                        if (isLearned) {
+                                            Text(
+                                                text = "Learned preference",
+                                                color = Color(0xFF34D399),
+                                                fontSize = 9.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0x3310B981))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "ACTIVE",
+                                            color = Color(0xFF34D399),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

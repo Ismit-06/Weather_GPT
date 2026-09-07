@@ -303,7 +303,7 @@ private fun FloatingGlassHeader() {
 
 /*
  * ================================================================
- * FLOATING GLASS BOTTOM NAVIGATION DOCK (28dp radius)
+ * FLOATING GLASS BOTTOM NAVIGATION DOCK — Glassmorphism Pill
  * ================================================================
  */
 
@@ -313,35 +313,41 @@ private fun FloatingGlassBottomDock(
     currentRoute: String?,
     onNavigate: (String) -> Unit
 ) {
+    // Outer wrapper: transparent background so the pill visually floats
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundDark)
+            .background(Color.Transparent)
             .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 8.dp)
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
+        // The floating pill container
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(36.dp))
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xE60A1626), // 90% opacity dark glass
-                            Color(0xCC0A1626)
+                            Color(0xCC0D1B2E), // ~80% dark navy glass
+                            Color(0xBF081220)  // ~75% deeper navy
                         )
                     )
                 )
                 .border(
                     width = 1.dp,
-                    color = BorderGlass,
-                    shape = RoundedCornerShape(26.dp)
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color(0x40FFFFFF), // subtle top highlight
+                            Color(0x14FFFFFF)  // fading bottom edge
+                        )
+                    ),
+                    shape = RoundedCornerShape(36.dp)
                 )
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 screens.forEach { screen ->
@@ -351,39 +357,40 @@ private fun FloatingGlassBottomDock(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null
                             ) {
                                 onNavigate(screen.route)
                             }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
+                        // Active = filled blue circle; inactive = bare icon
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .size(40.dp)
+                                .clip(CircleShape)
                                 .background(
-                                    if (isSelected) Color(0x2E4DA3FF) else Color.Transparent
+                                    if (isSelected) PrimaryBlue else Color.Transparent
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = if (isSelected) navIconFilled(screen) else navIconOutlined(screen),
                                 contentDescription = screen.title,
-                                tint = if (isSelected) SecondaryCyan else TextMuted,
-                                modifier = Modifier.size(20.dp)
+                                tint = if (isSelected) Color.White else Color(0xFF7A8FA6),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
 
                         Text(
                             text = screen.title,
-                            color = if (isSelected) SecondaryCyan else TextMuted,
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            color = if (isSelected) Color.White else Color(0xFF4E6070),
+                            fontSize = 9.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            letterSpacing = 0.2.sp
                         )
                     }
                 }
