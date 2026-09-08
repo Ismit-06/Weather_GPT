@@ -26,20 +26,26 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -103,7 +109,30 @@ fun AppNavigation() {
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            FloatingGlassHeader()
+            FloatingGlassHeader(
+                onAlertsClick = {
+                    if (currentRoute != Screen.Alerts.route) {
+                        navController.navigate(Screen.Alerts.route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onNavigate = { route ->
+                    if (currentRoute != route) {
+                        navController.navigate(route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
         },
         bottomBar = {
             FloatingGlassBottomDock(
@@ -198,103 +227,182 @@ fun AppNavigation() {
  */
 
 @Composable
-private fun FloatingGlassHeader() {
-    Box(
+private fun FloatingGlassHeader(
+    onAlertsClick: () -> Unit = {},
+    onNavigate: (String) -> Unit = {}
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(BackgroundDark)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 18.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xD90A1626), // 85% opacity dark navy glass
-                            Color(0xBF0A1626)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.dp,
-                    color = BorderGlass,
-                    shape = RoundedCornerShape(20.dp)
-                )
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+        // Left: Logo + Title
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(0xFF4DA3FF),
+                                Color(0xFF1E60E2)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                // Logo + Title
+                Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = "WeatherGPT",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = "WeatherGPT",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    letterSpacing = 0.2.sp
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+                Text(
+                    text = "AI Weather Intelligence",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Normal
+                )
+            }
+        }
+
+        // Right: [● LIVE] [🔔•] [☰]
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // LIVE Status Pill
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0x1F10B981))
+                    .border(1.dp, Color(0x3810B981), RoundedCornerShape(50))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(11.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(PrimaryBlue, Color(0xFF2563EB))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cloud,
-                            contentDescription = "WeatherGPT",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = "WeatherGPT",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = "AI Weather Intelligence",
-                            color = TextSecondary,
-                            fontSize = 10.sp
-                        )
-                    }
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(SuccessGreen)
+                    )
+                    Text(
+                        text = "LIVE",
+                        color = SuccessGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
                 }
+            }
 
-                // LIVE Status Pill
+            // Notification Bell with unread dot
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xB30A1626))
+                    .border(1.dp, BorderGlass, CircleShape)
+                    .clickable { onAlertsClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    contentAlignment = Alignment.TopEnd
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = "Alerts & Notifications",
+                        tint = Color(0xFFE2E8F0),
+                        modifier = Modifier
+                            .size(19.dp)
+                            .padding(end = 1.dp, top = 1.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF5252))
+                    )
+                }
+            }
+
+            // Menu Button with dropdown
+            Box {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x2636E6A0))
-                        .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xB30A1626))
+                        .border(1.dp, BorderGlass, CircleShape)
+                        .clickable { showMenu = true },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(SuccessGreen)
-                        )
-                        Text(
-                            text = "LIVE",
-                            color = SuccessGreen,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu",
+                        tint = Color(0xFFE2E8F0),
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier
+                        .background(Color(0xF00A1626))
+                        .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("🗺️ Radar Map", color = TextPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            showMenu = false
+                            onNavigate(Screen.Map.route)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📷 Sky AI Camera", color = TextPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            showMenu = false
+                            onNavigate(Screen.Camera.route)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("💧 Dam Telemetry", color = TextPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            showMenu = false
+                            onNavigate(Screen.Dams.route)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("⚠️ Weather Alerts", color = TextPrimary, fontSize = 13.sp) },
+                        onClick = {
+                            showMenu = false
+                            onAlertsClick()
+                        }
+                    )
                 }
             }
         }

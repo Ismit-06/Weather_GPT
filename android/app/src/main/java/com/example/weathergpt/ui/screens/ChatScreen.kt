@@ -349,19 +349,46 @@ fun ChatScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // ----------------------------------------------------
-        // 1. CENTRAL INTERACTIVE 3D LIVING AI ORB (Compact & Focused)
-        // ----------------------------------------------------
+        // ──────────────────────────────────────────────────────────────────
+        // 1. HEADER + AI ORB
+        // ──────────────────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Show large header only when idle (no messages)
+            if (uiState.messages.isEmpty() && !uiState.isLoading && uiState.error == null) {
+                Text(
+                    text = "AI ASSISTANT",
+                    color = SecondaryCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Ask WeatherGPT.",
+                    color = TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Real-time weather answers. Smarter decisions.",
+                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             WeatherAIOrb(
                 orbState = orbState,
                 audioAmplitude = if (isListening || isSpeaking) voiceRms.coerceIn(0.15f, 1.0f) else 0.05f,
-                size = 180.dp,
+                size = if (uiState.messages.isEmpty() && !uiState.isLoading) 180.dp else 160.dp,
                 onTap = { toggleVoiceListening() }
             )
 
@@ -370,9 +397,9 @@ fun ChatScreen(
             Text(
                 text = when {
                     isListening -> "Listening..."
-                    isSpeaking -> "Responding..."
-                    isBusy -> "Thinking..."
-                    else -> "Tap to speak"
+                    isSpeaking  -> "Responding..."
+                    isBusy      -> "Thinking..."
+                    else        -> "Tap to speak"
                 },
                 color = TextPrimary,
                 fontSize = 18.sp,
@@ -385,9 +412,9 @@ fun ChatScreen(
             Text(
                 text = when {
                     isListening -> "Speak naturally"
-                    isSpeaking -> "Tap orb to interrupt"
-                    isBusy -> "Analyzing atmospheric telemetry"
-                    else -> "Ask anything about the weather"
+                    isSpeaking  -> "Tap orb to interrupt"
+                    isBusy      -> "Analyzing atmospheric telemetry"
+                    else        -> "Ask anything about the weather"
                 },
                 color = TextSecondary,
                 fontSize = 12.sp
@@ -396,14 +423,14 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ----------------------------------------------------
-        // 2. LOCATION & LANGUAGE GLASS CAPSULE CARDS (Row of 2)
-        // ----------------------------------------------------
+        // ──────────────────────────────────────────────────────────────────
+        // 2. LOCATION & LANGUAGE PILL CARDS  (with subtitle text)
+        // ──────────────────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Location Card [ 📍 Amravati > ]
+            // Location pill
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -419,32 +446,45 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = "Location",
                             tint = PrimaryBlue,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Text(
-                            text = activeLocation.name.take(12).let { if (activeLocation.name.length > 12) "$it…" else it },
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Column {
+                            Text(
+                                text = activeLocation.name.take(14)
+                                    .let { if (activeLocation.name.length > 14) "$it…" else it },
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val sub = listOfNotNull(activeLocation.admin1, activeLocation.country)
+                                .filter { it.isNotBlank() }.joinToString(", ")
+                            if (sub.isNotBlank()) {
+                                Text(
+                                    text = sub.take(22).let { if (sub.length > 22) "$it…" else it },
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Select",
+                        contentDescription = null,
                         tint = TextMuted,
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
 
-            // Language Card [ 🌐 EN > ]
+            // Language pill
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -460,25 +500,33 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
+                        modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Language,
                             contentDescription = "Language",
                             tint = SecondaryCyan,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Text(
-                            text = currentAppLang.englishName.take(10),
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Column {
+                            Text(
+                                text = currentAppLang.englishName.take(12),
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Chat & Voice",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Select",
+                        contentDescription = null,
                         tint = TextMuted,
                         modifier = Modifier.size(16.dp)
                     )
@@ -488,9 +536,9 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ----------------------------------------------------
-        // 3. DYNAMIC CONTENT AREA (Answer Tab OR Quick Suggestions)
-        // ----------------------------------------------------
+        // ──────────────────────────────────────────────────────────────────
+        // 3. DYNAMIC CONTENT AREA
+        // ──────────────────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -539,7 +587,7 @@ fun ChatScreen(
                     )
                 }
             } else {
-                // Quick suggestions when idle
+                // Quick suggestions — 2-col grid matching reference design
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -549,43 +597,39 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
-                            icon = "⭐",
-                            title = "Best time today?",
+                            icon = "⭐", title = "Best time to travel?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "When should I go outside today in ${activeLocation.name}?"
+                                message.value = "When is the best time to travel from ${activeLocation.name} this week?"
                                 sendMessage()
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "🏃",
-                            title = "Can I go for a run?",
+                            icon = "☂️", title = "Will it rain today?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Will it rain today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🏃", title = "Can I go for a run?",
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 message.value = "Can I go for a run right now in ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
                         SuggestionGlassCard(
-                            icon = "👕",
-                            title = "What to wear?",
+                            icon = "🧳", title = "What to pack?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "What should I wear today in ${activeLocation.name}?"
-                                sendMessage()
-                            }
-                        )
-                        SuggestionGlassCard(
-                            icon = "🎒",
-                            title = "Going to college",
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                message.value = "I'm going to college today in ${activeLocation.name}. What should I wear and carry?"
+                                message.value = "What should I pack for a trip today from ${activeLocation.name}?"
                                 sendMessage()
                             }
                         )
@@ -595,17 +639,15 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SuggestionGlassCard(
-                            icon = "🌡️",
-                            title = "Comfort score?",
+                            icon = "📷", title = "Photography tips?",
                             modifier = Modifier.weight(1f),
                             onClick = {
-                                message.value = "What is my personal comfort score today in ${activeLocation.name}?"
+                                message.value = "Give me outdoor photography tips for today's weather in ${activeLocation.name}."
                                 sendMessage()
                             }
                         )
                         SuggestionGlassCard(
-                            icon = "💡",
-                            title = "Why feels like this?",
+                            icon = "💡", title = "Why feels like this?",
                             modifier = Modifier.weight(1f),
                             onClick = {
                                 message.value = "Why does it feel hotter or colder than actual temperature in ${activeLocation.name}?"
@@ -619,108 +661,103 @@ fun ChatScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ========================================================
-        // 5. FLOATING GLASS COMPOSER DOCK
-        // ========================================================
-        Box(
+        // ──────────────────────────────────────────────────────────────────
+        // 4. GLASS INPUT BAR  — mic · text · mic-button · send circle
+        // ──────────────────────────────────────────────────────────────────
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(Color(0xD90A1626))
+                .border(1.dp, BorderGlass, RoundedCornerShape(28.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            // Attachment / paperclip placeholder icon
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Attach",
+                tint = TextMuted,
+                modifier = Modifier.size(20.dp)
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            BasicTextField(
+                value = message.value,
+                onValueChange = { message.value = it },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Color(0xD90A1626))
-                    .border(1.dp, BorderGlass, RoundedCornerShape(26.dp))
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicTextField(
-                    value = message.value,
-                    onValueChange = { message.value = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 8.dp),
-                    enabled = !uiState.isLoading,
-                    textStyle = TextStyle(
-                        color = TextPrimary,
-                        fontSize = 14.sp
-                    ),
-                    cursorBrush = SolidColor(PrimaryBlue),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { sendMessage() }),
-                    decorationBox = { innerTextField ->
-                        if (message.value.isEmpty()) {
-                            Text(
-                                text = when {
-                                    isListening -> "Listening... Speak now"
-                                    isSpeaking -> "WeatherGPT is speaking..."
-                                    else -> "Type or speak..."
-                                },
-                                color = when {
-                                    isListening -> SecondaryCyan
-                                    isSpeaking -> Color(0xFF36E6A0)
-                                    else -> TextMuted
-                                },
-                                fontSize = 14.sp
-                            )
-                        }
-                        innerTextField()
-                    }
-                )
-
-                // Voice Mic Button
-                val micPulse = rememberInfiniteTransition(label = "pulse")
-                val micScale by micPulse.animateFloat(
-                    initialValue = 1.0f,
-                    targetValue = 1.2f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(500, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "scale"
-                )
-
-                IconButton(
-                    onClick = { toggleVoiceListening() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                        contentDescription = "Microphone",
-                        tint = if (isListening) Color(0xFFFF6B6B) else TextMuted,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .scale(if (isListening) micScale else 1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                // Circular Bright Blue Send Button
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (message.value.isNotBlank() && !uiState.isLoading) PrimaryBlue
-                            else Color(0xFF16253B)
+                    .weight(1f)
+                    .padding(vertical = 6.dp),
+                enabled = !uiState.isLoading,
+                textStyle = TextStyle(color = TextPrimary, fontSize = 14.sp),
+                cursorBrush = SolidColor(PrimaryBlue),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                decorationBox = { innerTextField ->
+                    if (message.value.isEmpty()) {
+                        Text(
+                            text = when {
+                                isListening -> "Listening… speak now"
+                                isSpeaking  -> "WeatherGPT is speaking…"
+                                else        -> "Ask anything..."
+                            },
+                            color = when {
+                                isListening -> SecondaryCyan
+                                isSpeaking  -> Color(0xFF36E6A0)
+                                else        -> TextMuted
+                            },
+                            fontSize = 14.sp
                         )
-                        .clickable(
-                            enabled = message.value.isNotBlank() && !uiState.isLoading
-                        ) {
-                            sendMessage()
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF7E8B9F),
-                        modifier = Modifier.size(18.dp)
-                    )
+                    }
+                    innerTextField()
                 }
+            )
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Mic icon
+            val micPulse = rememberInfiniteTransition(label = "pulse")
+            val micScale by micPulse.animateFloat(
+                initialValue = 1.0f,
+                targetValue = 1.2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(500, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            Icon(
+                imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                contentDescription = "Mic",
+                tint = if (isListening) Color(0xFFFF6B6B) else TextSecondary,
+                modifier = Modifier
+                    .size(22.dp)
+                    .scale(if (isListening) micScale else 1f)
+                    .clickable { toggleVoiceListening() }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Send — blue radial gradient circle
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(listOf(PrimaryBlue, Color(0xFF1A5BB5)))
+                    )
+                    .clickable(enabled = message.value.isNotBlank() && !uiState.isLoading) {
+                        sendMessage()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF7E8B9F),
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -793,16 +830,18 @@ private fun SuggestionGlassCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Box(
+    Row(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
             .background(Color(0xB30A1626))
             .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
-        contentAlignment = Alignment.CenterStart
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -816,6 +855,12 @@ private fun SuggestionGlassCard(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextMuted,
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 

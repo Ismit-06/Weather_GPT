@@ -32,6 +32,13 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
         }
 
+        // Initialize OSMDroid configuration
+        org.osmdroid.config.Configuration.getInstance().load(
+            applicationContext,
+            applicationContext.getSharedPreferences("osmdroid_prefs", android.content.Context.MODE_PRIVATE)
+        )
+        org.osmdroid.config.Configuration.getInstance().userAgentValue = packageName
+
         val preferences =
             getSharedPreferences(
                 "weather_gpt_settings",
