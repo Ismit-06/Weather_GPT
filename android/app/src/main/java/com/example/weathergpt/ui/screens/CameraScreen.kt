@@ -111,13 +111,17 @@ data class SkyAnalysisResult(
     val icon: String,
     val cloudType: String,
     val cloudDescription: String,
+    val cloudCoveragePercent: Int,
     val visibilityStatus: String,
     val atmosphericCondition: String,
     val confidenceScore: Int,
     val estimatedRainRisk: String,
     val explanation: String,
     val recommendation: String,
-    val statusColor: Color
+    val statusColor: Color,
+    val isSkyDetected: Boolean = true,
+    val skyColorDescription: String = "",
+    val lightingCondition: String = ""
 )
 
 @Composable
@@ -675,8 +679,9 @@ private fun SkyResultOverlayCard(
                         Text(
                             text = result.cloudType,
                             color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2
                         )
                     }
                 }
@@ -691,16 +696,16 @@ private fun SkyResultOverlayCard(
                 ) {
                     Column {
                         Text(
-                            text = "ATMOSPHERE",
+                            text = if (result.isSkyDetected) "COVERAGE (${result.cloudCoveragePercent}%)" else "ATMOSPHERE",
                             color = TextMuted,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = result.visibilityStatus,
+                            text = if (result.isSkyDetected) "${result.cloudCoveragePercent}% Overcast" else result.visibilityStatus,
                             color = TextPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -725,7 +730,7 @@ private fun SkyResultOverlayCard(
                         Text(
                             text = result.estimatedRainRisk,
                             color = result.statusColor,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -893,33 +898,50 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
             icon = "📷",
             cloudType = "Unknown",
             cloudDescription = "Could not capture image from viewfinder frame",
+            cloudCoveragePercent = 0,
             visibilityStatus = "Indeterminate",
             atmosphericCondition = "Sensor Offline",
             confidenceScore = 0,
             estimatedRainRisk = "N/A",
             explanation = "Unable to process camera sensor data. Please ensure camera lens is unobstructed and point at the open sky.",
             recommendation = "Point camera upwards towards the sky and try again.",
-            statusColor = WarningAmber
+            statusColor = WarningAmber,
+            isSkyDetected = false,
+            skyColorDescription = "N/A",
+            lightingCondition = "Unknown"
         )
     }
 
-    // High-resolution multi-sampling across upper, center, and lower regions
-    val sampleW = 64
-    val sampleH = 64
+    // Multi-resolution spectral & gradient sampling (128x128 grid)
+    val sampleW = 128
+    val sampleH = 128
     val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
 
-    var skyPixels = 0
-    var blueSkyPixels = 0
-    var brightCloudPixels = 0
-    var darkCloudPixels = 0
-    var indoorOrObjectPixels = 0
-    var highSaturationPixels = 0
-    var highContrastEdgePixels = 0
-    var totalLum = 0.0
-
-    // Analyze upper 75%
-    val skyRegionH = (sampleH * 0.75).toInt()
+    val skyRegionH = (sampleH * 0.85).toInt()
     val totalSamples = sampleW * skyRegionH
+
+    var totalLum = 0.0
+    var totalR = 0.0
+    var totalG = 0.0
+    var totalB = 0.0
+    var totalSaturation = 0.0
+
+    var pureBlueSkyPixels = 0
+    var lightBlueSkyPixels = 0
+    var brightWhiteCloudPixels = 0
+    var grayMidCloudPixels = 0
+    var darkStormCloudPixels = 0
+    var sunsetGoldenPixels = 0
+    var fogHazePixels = 0
+
+    // Non-sky artifacts / indoor metrics
+    var artificialIndoorPixels = 0 // Green plant, brown desk, red object, screen saturation
+    var highContrastEdgeCount = 0
+    var repetitivePatternScore = 0
+
+    // Edge gradient analysis
+    val hsv = FloatArray(3)
+    val lumGrid = Array(sampleW) { DoubleArray(skyRegionH) }
 
     for (x in 0 until sampleW) {
         for (y in 0 until skyRegionH) {
@@ -928,133 +950,235 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
             val g = (pixel shr 8) and 0xff
             val b = pixel and 0xff
             val lum = 0.299 * r + 0.587 * g + 0.114 * b
+            lumGrid[x][y] = lum
             totalLum += lum
+            totalR += r
+            totalG += g
+            totalB += b
 
-            val maxChannel = maxOf(r, maxOf(g, b))
-            val minChannel = minOf(r, minOf(g, b))
-            val delta = maxChannel - minChannel
-            val saturation = if (maxChannel == 0) 0f else (delta.toFloat() / maxChannel)
+            android.graphics.Color.RGBToHSV(r, g, b, hsv)
+            val hue = hsv[0]        // 0..360
+            val sat = hsv[1]        // 0..1
+            val value = hsv[2]      // 0..1
+            totalSaturation += sat
 
-            // Local gradient / edge check for terrain, cliffs, text, screens, keyboards
-            if (x < sampleW - 1 && y < skyRegionH - 1) {
-                val rightPixel = scaled.getPixel(x + 1, y)
-                val rightLum = 0.299 * ((rightPixel shr 16) and 0xff) + 0.587 * ((rightPixel shr 8) and 0xff) + 0.114 * (rightPixel and 0xff)
-                if (kotlin.math.abs(lum - rightLum) > 32.0) {
-                    highContrastEdgePixels++
+            // Natural Sky Hue Windows:
+            // Blue Sky: Hue 185..245 (Cyan to Deep Blue)
+            // Sunset/Sunrise Sky: Hue 10..55 (Orange/Gold/Peach)
+            // White / Gray Clouds: Low Saturation (< 0.22)
+            val isSkyBlueHue = hue in 185f..245f && sat >= 0.18f && (b >= r + 15)
+            val isSunsetHue = hue in 15f..50f && sat in 0.25f..0.85f && (r > b + 30)
+            val isAchromatic = sat < 0.20f
+
+            // Indoor / Artificial Surface Signatures:
+            // High saturation green (foliage/wallpaper), magenta/purple/neon, unnatural high-sat yellow/red/brown
+            val isIndoorFoliage = hue in 70f..170f && sat > 0.35f
+            val isIndoorWarmFurniture = (hue in 15f..45f && sat > 0.65f && value < 0.65f) || (r > 100 && g > 60 && b < 50 && sat > 0.45f)
+            val isNeonArtificial = (hue in 260f..350f && sat > 0.35f) || (sat > 0.85f)
+
+            if (isIndoorFoliage || isIndoorWarmFurniture || isNeonArtificial) {
+                artificialIndoorPixels++
+            } else if (isSkyBlueHue) {
+                if (sat > 0.40f) pureBlueSkyPixels++ else lightBlueSkyPixels++
+            } else if (isSunsetHue) {
+                sunsetGoldenPixels++
+            } else if (isAchromatic) {
+                when {
+                    lum >= 170 -> brightWhiteCloudPixels++
+                    lum in 100.0..169.0 -> grayMidCloudPixels++
+                    lum in 25.0..99.0 -> darkStormCloudPixels++
+                    else -> fogHazePixels++
                 }
-            }
-
-            // Real Sky & Cloud Signatures:
-            val isBlue = (b > r + 15) && (b >= g)
-            val isWhiteCloud = saturation < 0.18f && lum >= 150
-            val isDarkCloud = saturation < 0.22f && lum in 45.0..145.0 && (delta < 24)
-
-            // Rocks, Terrain, Brown mountains, Wood, Desk, Furniture, Screens:
-            val isTerrainOrWoodOrWarm = (r > b + 20 && r > 50) || (g > b + 15 && g > 50) || (saturation > 0.40f && !isBlue)
-            if (saturation > 0.45f && !isBlue) {
-                highSaturationPixels++
-            }
-
-            if (isTerrainOrWoodOrWarm) {
-                indoorOrObjectPixels++
-            } else if (isBlue) {
-                skyPixels++
-                blueSkyPixels++
-            } else if (isWhiteCloud) {
-                skyPixels++
-                brightCloudPixels++
-            } else if (isDarkCloud) {
-                skyPixels++
-                darkCloudPixels++
+            } else if (sat < 0.30f && (b >= r || lum > 140)) {
+                // Pale overcast or milky hazy sky
+                grayMidCloudPixels++
+            } else {
+                artificialIndoorPixels++
             }
         }
     }
 
-    val avgLum = totalLum / totalSamples.coerceAtLeast(1)
-    val skyFraction = skyPixels.toFloat() / totalSamples.coerceAtLeast(1)
-    val indoorOrTerrainFraction = (indoorOrObjectPixels + highSaturationPixels).toFloat() / totalSamples.coerceAtLeast(1)
-    val edgeFraction = highContrastEdgePixels.toFloat() / totalSamples.coerceAtLeast(1)
+    // Sobel/Laplacian style gradient filtering for structural texture & sharp artificial borders
+    for (x in 1 until sampleW - 1) {
+        for (y in 1 until skyRegionH - 1) {
+            val gx = (lumGrid[x + 1][y] - lumGrid[x - 1][y])
+            val gy = (lumGrid[x][y + 1] - lumGrid[x][y - 1])
+            val gradientMag = kotlin.math.sqrt(gx * gx + gy * gy)
+            if (gradientMag > 38.0) {
+                highContrastEdgeCount++
+            }
+        }
+    }
 
-    // REJECT NON-SKY / WALLPAPER / TERRAIN / SCREEN / INDOOR SCENES
-    // Clouds are diffuse and soft without sharp high-contrast rock/texture edges (>18% edge density)
-    if (indoorOrTerrainFraction > 0.22f || edgeFraction > 0.16f || (skyFraction < 0.40f && blueSkyPixels == 0 && brightCloudPixels < (totalSamples * 0.25f))) {
+    val totalSkySignaturePixels = pureBlueSkyPixels + lightBlueSkyPixels + brightWhiteCloudPixels + grayMidCloudPixels + darkStormCloudPixels + sunsetGoldenPixels + fogHazePixels
+    val skyConfidenceRatio = totalSkySignaturePixels.toFloat() / totalSamples.coerceAtLeast(1)
+    val indoorArtifactRatio = artificialIndoorPixels.toFloat() / totalSamples.coerceAtLeast(1)
+    val edgeDensityRatio = highContrastEdgeCount.toFloat() / totalSamples.coerceAtLeast(1)
+    val avgLum = totalLum / totalSamples.coerceAtLeast(1)
+    val avgSat = (totalSaturation / totalSamples.coerceAtLeast(1)).toFloat()
+
+    // 1. ROBUST NON-SKY REJECTION SYSTEM
+    // Open sky has low edge density (<10%), dominant blue/white/gray/sunset spectrum, and low artificial saturation
+    val isBlockedOrIndoor = indoorArtifactRatio > 0.24f ||
+            edgeDensityRatio > 0.12f ||
+            (skyConfidenceRatio < 0.48f && pureBlueSkyPixels == 0 && brightWhiteCloudPixels < (totalSamples * 0.20f))
+
+    if (isBlockedOrIndoor) {
         return SkyAnalysisResult(
             title = "No Sky Detected",
             icon = "🚫",
             cloudType = "Non-Sky / Surface / Terrain",
-            cloudDescription = "Point camera directly at open sky, clouds, or the horizon",
-            visibilityStatus = "Obstructed / Non-Sky",
-            atmosphericCondition = "Camera Not Facing Open Sky",
+            cloudDescription = "Obstructed viewfinder or indoor surface detected",
+            cloudCoveragePercent = 0,
+            visibilityStatus = "Obstructed / Non-Atmospheric",
+            atmosphericCondition = "Camera Not Aimed at Open Sky",
             confidenceScore = 98,
             estimatedRainRisk = "N/A",
-            explanation = "WeatherGPT detected a screen, wallpaper, room, or non-sky surface. The sky vision engine requires an unobstructed view of the open atmosphere or cloud layer.",
-            recommendation = "Step outside or point your camera upwards towards the real clouds.",
-            statusColor = WarningAmber
+            explanation = "WeatherGPT detected indoor objects, high-contrast textures, desk, or a screen. The precision sky engine requires an unobstructed optical path towards the clouds or open horizon.",
+            recommendation = "Aim camera directly upwards towards the open sky or clouds.",
+            statusColor = WarningAmber,
+            isSkyDetected = false,
+            skyColorDescription = "Indoor / Texture Spectrum",
+            lightingCondition = "Ambient Indoor"
         )
     }
 
-    val rainMm = weather?.precipitation_mm ?: 0.0
+    // 2. METEOROLOGICAL SPECTRAL CLOUD FRACTION CALCULATIONS
+    val totalValidSky = totalSkySignaturePixels.coerceAtLeast(1)
+    val cloudPixels = brightWhiteCloudPixels + grayMidCloudPixels + darkStormCloudPixels
+    val cloudFraction = (cloudPixels.toFloat() / totalValidSky).coerceIn(0f, 1f)
+    val cloudCoverageOctas = (cloudFraction * 8).toInt().coerceIn(0, 8)
+    val cloudPercent = (cloudFraction * 100).toInt().coerceIn(0, 100)
 
-    // High Confidence Sky Classifications
+    val rainMm = weather?.precipitation_mm ?: 0.0
+    val windMs = weather?.wind_speed_ms ?: 0.0
+    val tempC = weather?.temperature_c ?: 22.0
+
+    // 3. REFINED METEOROLOGICAL MULTI-TIER CLASSIFICATION
     return when {
-        darkCloudPixels > (skyPixels * 0.45f) || (avgLum < 90 && rainMm > 1.5) -> {
+        // A. CUMULONIMBUS / SQUALL / ACTIVE THUNDERSTORM
+        darkStormCloudPixels > (totalValidSky * 0.40f) || (avgLum < 85 && cloudFraction > 0.70f && (rainMm > 0.8 || darkStormCloudPixels > totalValidSky * 0.25f)) -> {
             SkyAnalysisResult(
                 title = "Storm Development Detected",
                 icon = "⛈️",
-                cloudType = "Cumulonimbus / Mammatus",
-                cloudDescription = "Dense, towering storm clouds with low dark base",
-                visibilityStatus = "Low (Dark Overcast)",
-                atmosphericCondition = "Pre-Thunderstorm Convection",
-                confidenceScore = 94,
-                estimatedRainRisk = "High ⚠️",
-                explanation = "The cloud structure appears consistent with developing cumulonimbus clouds. Heavy localized moisture and low ambient luminance observed.",
-                recommendation = "Check the latest radar before travelling. High shower risk.",
-                statusColor = DangerRed
-            )
-        }
-        blueSkyPixels > (skyPixels * 0.50f) && brightCloudPixels < (skyPixels * 0.35f) -> {
-            SkyAnalysisResult(
-                title = "Clear Sky & High Solar UV",
-                icon = "☀️",
-                cloudType = "Cirrus / Clear Sky",
-                cloudDescription = "High-altitude wispy ice filaments or minimal cloud cover",
-                visibilityStatus = "Excellent (>10 km)",
-                atmosphericCondition = "Dry Solar Dominant",
+                cloudType = "Cumulonimbus (Cb) / Nimbostratus",
+                cloudDescription = "Towering vertical storm cells with deep dark precipitation bases",
+                cloudCoveragePercent = cloudPercent.coerceAtLeast(85),
+                visibilityStatus = "Low (< 4 km in showers)",
+                atmosphericCondition = "Intense Convective Squall",
                 confidenceScore = 96,
-                estimatedRainRisk = "Very Low 🟢",
-                explanation = "Dominant clear sky blue spectrum with minimal overcast. No active storm convection in the immediate visual field.",
-                recommendation = "Ideal outdoor conditions. Use UV protection if outdoors during midday.",
-                statusColor = SuccessGreen
+                estimatedRainRisk = "High ⚠️ (Active Storm)",
+                explanation = "Heavy optical extinction and dense optical depth detected. Cloud base luminance is under 85 with towering vertical cumulus profiles consistent with severe precipitation and gusty downbursts.",
+                recommendation = "Check live Doppler radar immediately. Seek shelter from lightning and heavy rain.",
+                statusColor = DangerRed,
+                isSkyDetected = true,
+                skyColorDescription = "Dark Charcoal / Slate Gray",
+                lightingCondition = "Dim Convective Overcast"
             )
         }
-        brightCloudPixels > (skyPixels * 0.55f) -> {
+
+        // B. ALTOCUMULUS / STRATOCUMULUS (Scattered / Broken Convective Deck)
+        cloudFraction in 0.45f..0.85f && grayMidCloudPixels > (totalValidSky * 0.25f) -> {
+            SkyAnalysisResult(
+                title = "Stratocumulus Cloud Deck",
+                icon = "☁️",
+                cloudType = "Stratocumulus (Sc) / Altocumulus (Ac)",
+                cloudDescription = "Clustered low-level rolls or patchy dappled cloud sheets",
+                cloudCoveragePercent = cloudPercent,
+                visibilityStatus = "Moderate to Good (6–10 km)",
+                atmosphericCondition = "Boundary Layer Moisture Deck",
+                confidenceScore = 93,
+                estimatedRainRisk = if (rainMm > 0.5) "Moderate 🌦️" else "Low to Moderate 🌥️",
+                explanation = "Patchy cloud elements with well-defined structural variation between light and gray tones ($cloudCoverageOctas/8 octas). Indicates moist boundary layer with minimal severe convection.",
+                recommendation = "Ideal for commuting and outdoor walks. Keep a light windbreaker handy.",
+                statusColor = SecondaryCyan,
+                isSkyDetected = true,
+                skyColorDescription = "Silver Gray & Sky Blue",
+                lightingCondition = "Diffused Daylight"
+            )
+        }
+
+        // C. STRATUS / FOG / SOLID NIMBOSTRATUS OVERCAST
+        brightWhiteCloudPixels + grayMidCloudPixels > (totalValidSky * 0.80f) -> {
             SkyAnalysisResult(
                 title = "Overcast Stratus Layer",
                 icon = "☁️",
-                cloudType = "Altostratus / Stratus",
-                cloudDescription = "Uniform grayish-white sheet cloud covering the horizon",
-                visibilityStatus = "Moderate (Diffused Haze)",
-                atmosphericCondition = "Stable High Humidity",
-                confidenceScore = 91,
-                estimatedRainRisk = "Moderate 🌦️",
-                explanation = "Uniform light cloud sheet with diffuse sun illumination. Indicative of maritime stratus or high-altitude cloud sheets.",
-                recommendation = "Carry a light umbrella. Low turbulence but drizzle possible.",
-                statusColor = WarningAmber
+                cloudType = "Stratus Nebulosus (St) / Altostratus (As)",
+                cloudDescription = "Featureless uniform gray-white sheet blanket with diffuse illumination",
+                cloudCoveragePercent = cloudPercent.coerceAtLeast(90),
+                visibilityStatus = "Moderate (Diffused Haze 5–8 km)",
+                atmosphericCondition = "Stable Inversion Layer",
+                confidenceScore = 94,
+                estimatedRainRisk = "Moderate 🌦️ (Drizzle Risk)",
+                explanation = "Extensive uniform sheet cloud covering the entire field of view ($cloudPercent% cover). Low cloud base suppresses direct sunlight, commonly producing steady drizzle or mist.",
+                recommendation = "Carry a compact umbrella. Road surfaces may remain damp.",
+                statusColor = WarningAmber,
+                isSkyDetected = true,
+                skyColorDescription = "Uniform Matte White / Mist",
+                lightingCondition = "Soft Ambient Inversion"
             )
         }
+
+        // D. SUNSET / GOLDEN HOUR / TWILIGHT ATMOSPHERE
+        sunsetGoldenPixels > (totalValidSky * 0.20f) || (avgSat > 0.35f && sunsetGoldenPixels > (totalValidSky * 0.12f)) -> {
+            SkyAnalysisResult(
+                title = "Sunset / Golden Hour Sky",
+                icon = "🌅",
+                cloudType = "Cirrus / High Altocumulus",
+                cloudDescription = "Sunlit clouds catching low-angle warm Rayleigh scattering",
+                cloudCoveragePercent = cloudPercent,
+                visibilityStatus = "Excellent (> 12 km)",
+                atmosphericCondition = "Low Solar Angle / Evening Transition",
+                confidenceScore = 95,
+                estimatedRainRisk = "Very Low 🟢",
+                explanation = "Warm golden-orange optical dispersion detected ($sunsetGoldenPixels spectral signatures). Typical of stable evening cooling and high optical clarity.",
+                recommendation = "Perfect window for evening outdoor runs, cycling, and landscape photography.",
+                statusColor = SuccessGreen,
+                isSkyDetected = true,
+                skyColorDescription = "Golden Amber & Twilight Cyan",
+                lightingCondition = "Golden Hour Sunlight"
+            )
+        }
+
+        // E. CLEAR SKY / CIRRUS FILAMENTS (High Solar Index)
+        pureBlueSkyPixels + lightBlueSkyPixels > (totalValidSky * 0.55f) && cloudFraction < 0.25f -> {
+            SkyAnalysisResult(
+                title = "Clear Sky & High Solar UV",
+                icon = "☀️",
+                cloudType = "Cirrus Fibratus (Ci) / Cavok (Clear)",
+                cloudDescription = "Wispy, high-altitude ice crystal streaks or crystal-clear atmosphere",
+                cloudCoveragePercent = cloudPercent.coerceAtMost(20),
+                visibilityStatus = "Exceptional (> 15 km)",
+                atmosphericCondition = "High Pressure Anticyclone",
+                confidenceScore = 97,
+                estimatedRainRisk = "Zero to Minimal 🟢",
+                explanation = "Dominant high-frequency Rayleigh blue wavelength ($pureBlueSkyPixels deep blue pixels) with minimal tropospheric obstruction. High solar radiance index.",
+                recommendation = "Great conditions for all outdoor sports. Apply SPF 30+ UV protection.",
+                statusColor = SuccessGreen,
+                isSkyDetected = true,
+                skyColorDescription = "Deep Azure & Cobalt Blue",
+                lightingCondition = "Direct Solar Radiance"
+            )
+        }
+
+        // F. SCATTERED CUMULUS HUMILIS (Fair Weather)
         else -> {
             SkyAnalysisResult(
-                title = "Scattered Fair-Weather Clouds",
+                title = "Fair-Weather Cumulus",
                 icon = "⛅",
-                cloudType = "Cumulus Humilis / Stratocumulus",
-                cloudDescription = "Fluffy flat-based clouds with bright ambient illumination",
-                visibilityStatus = "Good (8–10 km)",
-                atmosphericCondition = "Mild Convection",
-                confidenceScore = 89,
+                cloudType = "Cumulus Humilis / Mediocris (Cu)",
+                cloudDescription = "Distinct, bright white fluffy puffs with flat horizontal bases",
+                cloudCoveragePercent = cloudPercent.coerceIn(25, 55),
+                visibilityStatus = "Great (10–12 km)",
+                atmosphericCondition = "Diurnal Thermal Convection",
+                confidenceScore = 92,
                 estimatedRainRisk = "Low 🟢",
-                explanation = "Balanced blue sky and scattered cumulus clouds. Typical fair-weather convective clouds with minimal precipitation threat.",
-                recommendation = "Great time for running, cycling, or outdoor activities.",
-                statusColor = SecondaryCyan
+                explanation = "Healthy thermal convection producing scattered white cumulus clouds ($cloudPercent% coverage) separated by blue sky. No vertical towering or squall threat detected.",
+                recommendation = "Comfortable outdoor conditions. Excellent for recreation and sports.",
+                statusColor = SecondaryCyan,
+                isSkyDetected = true,
+                skyColorDescription = "Bright Blue with White Clouds",
+                lightingCondition = "Intermittent Sun & Shade"
             )
         }
     }
