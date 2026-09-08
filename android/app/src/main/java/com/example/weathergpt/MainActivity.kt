@@ -10,6 +10,9 @@ import androidx.compose.runtime.setValue
 import com.example.weathergpt.navigation.AppNavigation
 import com.example.weathergpt.ui.theme.WeatherGPTTheme
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.example.weathergpt.data.BackendConfig
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +42,21 @@ class MainActivity : ComponentActivity() {
             WeatherGPTTheme(
                 darkTheme = true
             ) {
-                AppNavigation()
+                var showSplash by remember { mutableStateOf(true) }
+
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    AppNavigation()
+
+                    if (showSplash) {
+                        com.example.weathergpt.ui.components.AnimatedSplashScreen(
+                            onAnimationFinished = {
+                                showSplash = false
+                            }
+                        )
+                    }
+                }
             }
         }
     }
