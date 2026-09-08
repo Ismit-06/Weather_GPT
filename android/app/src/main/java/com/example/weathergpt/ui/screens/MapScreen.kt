@@ -189,7 +189,9 @@ fun MapScreen() {
 
     // User agent for OSM and RainViewer requests
     LaunchedEffect(Unit) {
-        Configuration.getInstance().userAgentValue = context.packageName
+        try {
+            Configuration.getInstance().userAgentValue = context.packageName
+        } catch (_: Throwable) {}
     }
 
     // Reactive layer loader

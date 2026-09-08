@@ -32,12 +32,19 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
         }
 
-        // Initialize OSMDroid configuration
-        org.osmdroid.config.Configuration.getInstance().load(
-            applicationContext,
-            applicationContext.getSharedPreferences("osmdroid_prefs", android.content.Context.MODE_PRIVATE)
-        )
-        org.osmdroid.config.Configuration.getInstance().userAgentValue = packageName
+        // Initialize OSMDroid configuration safely with internal cache paths
+        try {
+            val osmConfig = org.osmdroid.config.Configuration.getInstance()
+            osmConfig.userAgentValue = packageName
+            val osmBaseDir = java.io.File(cacheDir, "osmdroid")
+            if (!osmBaseDir.exists()) osmBaseDir.mkdirs()
+            val osmTileDir = java.io.File(osmBaseDir, "tiles")
+            if (!osmTileDir.exists()) osmTileDir.mkdirs()
+            osmConfig.osmdroidBasePath = osmBaseDir
+            osmConfig.osmdroidTileCache = osmTileDir
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "OSMDroid safe init", e)
+        }
 
         val preferences =
             getSharedPreferences(
