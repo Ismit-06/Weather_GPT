@@ -105,16 +105,19 @@ fun HomeScreen(
         UserPreferencesStore.loadPreferences(context)
     }
 
+    val initialLocation = remember { LocationStore.getLocation(context) }
+    val initialCache = remember { MetWeatherClient.getCachedWeather(initialLocation.latitude, initialLocation.longitude, context) }
+
     var activeLocation by remember {
-        mutableStateOf(LocationStore.getLocation(context))
+        mutableStateOf(initialLocation)
     }
 
     var currentWeather by remember {
-        mutableStateOf<MetForecastItem?>(null)
+        mutableStateOf<MetForecastItem?>(initialCache?.forecast?.firstOrNull())
     }
 
     var forecastList by remember {
-        mutableStateOf<List<MetForecastItem>>(emptyList())
+        mutableStateOf<List<MetForecastItem>>(initialCache?.forecast ?: emptyList())
     }
 
     var selectedForecastTab by remember {
@@ -126,7 +129,7 @@ fun HomeScreen(
     }
 
     var isLoading by remember {
-        mutableStateOf(true)
+        mutableStateOf(initialCache == null)
     }
 
     var hasError by remember {
@@ -145,11 +148,22 @@ fun HomeScreen(
     LaunchedEffect(refreshTrigger) {
         while (true) {
             try {
-                isLoading = true
                 activeLocation = LocationStore.getLocation(context)
                 var latitude = activeLocation.latitude
                 var longitude = activeLocation.longitude
 
+                // 1. Instant Cache Hydration (<10ms UI paint)
+                val instantCache = MetWeatherClient.getCachedWeather(latitude, longitude, context)
+                if (instantCache != null && instantCache.forecast.isNotEmpty()) {
+                    currentWeather = instantCache.forecast.firstOrNull()
+                    forecastList = instantCache.forecast
+                    isLoading = false
+                    hasError = false
+                } else {
+                    isLoading = (currentWeather == null)
+                }
+
+                // 2. Parallel Location Check (Fast & non-blocking if cached)
                 if (!LocationStore.isManual(context)) {
                     try {
                         val provider = DeviceLocationProvider(context)
@@ -157,53 +171,48 @@ fun HomeScreen(
                         if (deviceLocation != null) {
                             latitude = deviceLocation.latitude
                             longitude = deviceLocation.longitude
-                            var cityName = activeLocation.name
-                            var stateName = activeLocation.admin1
-                            var countryName = activeLocation.country
-                            try {
-                                val rev = LocationReverseClient.api.reverse(deviceLocation.latitude, deviceLocation.longitude)
-                                if (!rev.name.isNullOrBlank()) cityName = rev.name
-                                if (!rev.state.isNullOrBlank()) stateName = rev.state
-                                if (!rev.country.isNullOrBlank()) countryName = rev.country
-                            } catch (_: Exception) {
+
+                            // Async reverse geocoding in background
+                            coroutineScope.launch(Dispatchers.IO) {
                                 try {
-                                    @Suppress("DEPRECATION")
-                                    val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
-                                    val addrs = geocoder.getFromLocation(deviceLocation.latitude, deviceLocation.longitude, 1)
-                                    val a = addrs?.firstOrNull()
-                                    if (a != null) {
-                                        val n = a.locality ?: a.subAdminArea ?: a.adminArea
-                                        if (!n.isNullOrBlank()) cityName = n
-                                        if (!a.adminArea.isNullOrBlank()) stateName = a.adminArea
-                                        if (!a.countryName.isNullOrBlank()) countryName = a.countryName
-                                    }
+                                    var cityName = activeLocation.name
+                                    var stateName = activeLocation.admin1
+                                    var countryName = activeLocation.country
+                                    val rev = LocationReverseClient.api.reverse(deviceLocation.latitude, deviceLocation.longitude)
+                                    if (!rev.name.isNullOrBlank()) cityName = rev.name
+                                    if (!rev.state.isNullOrBlank()) stateName = rev.state
+                                    if (!rev.country.isNullOrBlank()) countryName = rev.country
+
+                                    val updated = SelectedLocation(
+                                        name = cityName,
+                                        latitude = deviceLocation.latitude,
+                                        longitude = deviceLocation.longitude,
+                                        country = countryName,
+                                        admin1 = stateName,
+                                        timezone = "Asia/Kolkata"
+                                    )
+                                    LocationStore.useGps(context, updated)
+                                    activeLocation = updated
                                 } catch (_: Exception) {}
                             }
-                            val updated = SelectedLocation(
-                                name = cityName,
-                                latitude = deviceLocation.latitude,
-                                longitude = deviceLocation.longitude,
-                                country = countryName,
-                                admin1 = stateName,
-                                timezone = "Asia/Kolkata"
-                            )
-                            LocationStore.useGps(context, updated)
-                            activeLocation = updated
                         }
-                    } catch (_: Exception) {
-                        // Fallback to saved location
-                    }
+                    } catch (_: Exception) {}
                 }
 
-                val response = MetWeatherClient.api.getWeather(
-                    latitude = latitude,
-                    longitude = longitude
+                // 3. Fast Network Sync (<1s target)
+                val response = MetWeatherClient.getFastWeather(
+                    lat = latitude,
+                    lon = longitude,
+                    context = context,
+                    forceRefresh = (refreshTrigger > 0)
                 )
                 currentWeather = response.forecast.firstOrNull()
                 forecastList = response.forecast
                 hasError = false
             } catch (_: Exception) {
-                hasError = true
+                if (currentWeather == null) {
+                    hasError = true
+                }
             } finally {
                 isLoading = false
             }

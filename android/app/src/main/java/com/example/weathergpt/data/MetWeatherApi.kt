@@ -52,18 +52,35 @@ object MetWeatherClient {
 
     private val memoryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, MetWeatherResponse>>()
     private const val CACHE_VALIDITY_MS = 10 * 60 * 1000L // 10 minutes
+    private const val DISK_PREF_NAME = "weathergpt_met_cache"
+    private val gson = com.google.gson.Gson()
 
     private fun cacheKey(lat: Double, lon: Double): String {
         return "${"%.3f".format(java.util.Locale.US, lat)}_${"%.3f".format(java.util.Locale.US, lon)}"
     }
 
-    fun getCachedWeather(lat: Double, lon: Double): MetWeatherResponse? {
-        val entry = memoryCache[cacheKey(lat, lon)] ?: return null
-        // Return cached entry if within validity or as instant placeholder
-        return entry.second
+    fun getCachedWeather(lat: Double, lon: Double, context: android.content.Context? = null): MetWeatherResponse? {
+        val key = cacheKey(lat, lon)
+        val entry = memoryCache[key]
+        if (entry != null) return entry.second
+
+        if (context != null) {
+            try {
+                val prefs = context.getSharedPreferences(DISK_PREF_NAME, android.content.Context.MODE_PRIVATE)
+                val json = prefs.getString(key, null)
+                if (!json.isNullOrBlank()) {
+                    val resp = gson.fromJson(json, MetWeatherResponse::class.java)
+                    if (resp != null) {
+                        memoryCache[key] = Pair(System.currentTimeMillis(), resp)
+                        return resp
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return null
     }
 
-    suspend fun getFastWeather(lat: Double, lon: Double, forceRefresh: Boolean = false): MetWeatherResponse {
+    suspend fun getFastWeather(lat: Double, lon: Double, context: android.content.Context? = null, forceRefresh: Boolean = false): MetWeatherResponse {
         val key = cacheKey(lat, lon)
         val now = System.currentTimeMillis()
         if (!forceRefresh) {
@@ -74,6 +91,13 @@ object MetWeatherClient {
         }
         val fresh = api.getWeather(lat, lon)
         memoryCache[key] = Pair(now, fresh)
+
+        if (context != null) {
+            try {
+                val prefs = context.getSharedPreferences(DISK_PREF_NAME, android.content.Context.MODE_PRIVATE)
+                prefs.edit().putString(key, gson.toJson(fresh)).apply()
+            } catch (_: Exception) {}
+        }
         return fresh
     }
 }

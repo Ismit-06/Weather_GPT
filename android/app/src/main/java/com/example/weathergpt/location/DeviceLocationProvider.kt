@@ -27,6 +27,37 @@ class DeviceLocationProvider(
     private val tag = "DeviceLocationProvider"
 
     @SuppressLint("MissingPermission")
+    fun getLastKnownLocationQuick(): DeviceLocation? {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) return null
+
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        var bestLastKnown: Location? = null
+        for (providerName in listOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.PASSIVE_PROVIDER
+        )) {
+            try {
+                val loc = manager.getLastKnownLocation(providerName)
+                if (loc != null) {
+                    if (bestLastKnown == null || isBetterLocation(loc, bestLastKnown)) {
+                        bestLastKnown = loc
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        return bestLastKnown?.let {
+            DeviceLocation(latitude = it.latitude, longitude = it.longitude)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(): DeviceLocation? = withContext(Dispatchers.IO) {
         val fineGranted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
@@ -44,9 +75,11 @@ class DeviceLocationProvider(
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             ?: return@withContext null
 
-        // 1. Identify enabled providers
-        val candidateProviders = mutableListOf<String>()
+        // 1. Check last known immediately
+        val quick = getLastKnownLocationQuick()
 
+        // 2. Identify enabled providers
+        val candidateProviders = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
                 if (manager.isProviderEnabled(LocationManager.FUSED_PROVIDER)) {
@@ -54,51 +87,18 @@ class DeviceLocationProvider(
                 }
             } catch (_: Exception) {}
         }
-
         try {
             if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
                 candidateProviders.add(LocationManager.NETWORK_PROVIDER)
             }
         } catch (_: Exception) {}
-
         try {
             if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 candidateProviders.add(LocationManager.GPS_PROVIDER)
             }
         } catch (_: Exception) {}
 
-        try {
-            if (manager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
-                candidateProviders.add(LocationManager.PASSIVE_PROVIDER)
-            }
-        } catch (_: Exception) {}
-
-        Log.d(tag, "Enabled location providers: $candidateProviders")
-
-        // 2. Gather last known location across all providers and find best candidate
-        var bestLastKnown: Location? = null
-        for (providerName in listOf(
-            LocationManager.NETWORK_PROVIDER,
-            LocationManager.GPS_PROVIDER,
-            LocationManager.PASSIVE_PROVIDER
-        )) {
-            try {
-                val loc = manager.getLastKnownLocation(providerName)
-                if (loc != null) {
-                    if (bestLastKnown == null || isBetterLocation(loc, bestLastKnown)) {
-                        bestLastKnown = loc
-                    }
-                }
-            } catch (e: Exception) {
-                Log.d(tag, "getLastKnownLocation error for $providerName: ${e.message}")
-            }
-        }
-
-        if (bestLastKnown != null) {
-            Log.d(tag, "Found last known location: (${bestLastKnown.latitude}, ${bestLastKnown.longitude}) accuracy=${bestLastKnown.accuracy}m")
-        }
-
-        // 3. Try to fetch a fresh current location with a 3.5-second timeout
+        // 3. If quick location is available, only wait at most 1000ms for a more precise fix
         val liveProvider = when {
             candidateProviders.contains(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && candidateProviders.contains(LocationManager.FUSED_PROVIDER) -> LocationManager.FUSED_PROVIDER
@@ -110,25 +110,18 @@ class DeviceLocationProvider(
         var liveLocation: Location? = null
         if (liveProvider != null) {
             liveLocation = try {
-                withTimeoutOrNull(3500L) {
+                withTimeoutOrNull(if (quick != null) 1000L else 2000L) {
                     fetchLiveLocation(manager, liveProvider)
                 }
             } catch (e: Exception) {
-                Log.w(tag, "fetchLiveLocation timed out or failed: ${e.message}")
                 null
             }
         }
 
-        val finalLocation = liveLocation ?: bestLastKnown
-        if (finalLocation != null) {
-            Log.d(tag, "Returning location: (${finalLocation.latitude}, ${finalLocation.longitude})")
-            DeviceLocation(
-                latitude = finalLocation.latitude,
-                longitude = finalLocation.longitude
-            )
+        if (liveLocation != null) {
+            DeviceLocation(latitude = liveLocation.latitude, longitude = liveLocation.longitude)
         } else {
-            Log.w(tag, "Could not obtain any location fix")
-            null
+            quick
         }
     }
 
