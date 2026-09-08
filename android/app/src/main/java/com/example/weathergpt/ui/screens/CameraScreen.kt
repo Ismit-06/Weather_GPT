@@ -106,6 +106,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.InputStream
 
+data class DetectedVisionObject(
+    val label: String,
+    val icon: String,
+    val category: String, // "Atmosphere", "Architecture", "Terrain", "Vegetation", "Indoor"
+    val confidence: Int,
+    val weatherImplication: String,
+    val boundingBoxNormalized: List<Float>? = null // [top, left, bottom, right]
+)
+
 data class SkyAnalysisResult(
     val title: String,
     val icon: String,
@@ -121,7 +130,10 @@ data class SkyAnalysisResult(
     val statusColor: Color,
     val isSkyDetected: Boolean = true,
     val skyColorDescription: String = "",
-    val lightingCondition: String = ""
+    val lightingCondition: String = "",
+    val detectedObjects: List<DetectedVisionObject> = emptyList(),
+    val environmentSceneType: String = "Outdoor Open Sky",
+    val microclimateImpact: String = ""
 )
 
 @Composable
@@ -311,6 +323,7 @@ fun CameraScreen(
             val left = (width - reticleSize) / 2f
             val top = height * 0.18f
 
+            // Main Viewfinder Reticle
             drawRoundRect(
                 color = Color(0x6652D9FF),
                 topLeft = Offset(left, top),
@@ -333,6 +346,32 @@ fun CameraScreen(
             drawLine(cyanColor, Offset(left, top + reticleSize), Offset(left, top + reticleSize - cornerLen), strokeW)
             drawLine(cyanColor, Offset(left + reticleSize, top + reticleSize), Offset(left + reticleSize - cornerLen, top + reticleSize), strokeW)
             drawLine(cyanColor, Offset(left + reticleSize, top + reticleSize), Offset(left + reticleSize, top + cornerLen), strokeW)
+
+            // Dynamic Vision Bounding Boxes for detected objects (Buildings, Trees, Horizon, Clouds)
+            analysisResult?.detectedObjects?.forEach { obj ->
+                obj.boundingBoxNormalized?.let { box ->
+                    if (box.size == 4) {
+                        val bTop = box[0] * height
+                        val bLeft = box[1] * width
+                        val bBottom = box[2] * height
+                        val bRight = box[3] * width
+                        val boxColor = when (obj.category) {
+                            "Architecture" -> Color(0xFFF59E0B) // Amber
+                            "Vegetation" -> Color(0xFF10B981)   // Green
+                            "Atmosphere" -> Color(0xFF38BDF8)   // Sky Cyan
+                            else -> Color(0xFFA855F7)           // Purple
+                        }
+
+                        drawRoundRect(
+                            color = boxColor.copy(alpha = 0.85f),
+                            topLeft = Offset(bLeft, bTop),
+                            size = Size(bRight - bLeft, bBottom - bTop),
+                            style = Stroke(width = 1.5.dp.toPx()),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+                        )
+                    }
+                }
+            }
 
             if (isAnalyzing) {
                 val scanY = top + (reticleSize * scanProgress)
@@ -773,6 +812,121 @@ private fun SkyResultOverlayCard(
                 }
             }
 
+            // Microclimate & Environmental Context Card
+            if (result.isSkyDetected && result.microclimateImpact.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0x2A0D9488))
+                        .border(1.dp, Color(0x4D14B8A6), RoundedCornerShape(14.dp))
+                        .padding(12.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "🌐",
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "ENVIRONMENT & MICROCLIMATE: ${result.environmentSceneType.uppercase()}",
+                                color = Color(0xFF5EEAD4),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = result.microclimateImpact,
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+
+            // Detected Objects & Horizon Features
+            if (result.detectedObjects.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "COMPUTER VISION DETECTIONS (${result.detectedObjects.size})",
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    result.detectedObjects.forEach { obj ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0x26FFFFFF))
+                                .border(1.dp, BorderGlass, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = obj.icon, fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(
+                                            text = "${obj.label} (${obj.confidence}%)",
+                                            color = TextPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = obj.weatherImplication,
+                                            color = TextSecondary,
+                                            fontSize = 10.sp,
+                                            lineHeight = 13.sp
+                                        )
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            when (obj.category) {
+                                                "Architecture" -> Color(0x33F59E0B)
+                                                "Vegetation" -> Color(0x3310B981)
+                                                "Atmosphere" -> Color(0x3338BDF8)
+                                                else -> Color(0x33A855F7)
+                                            }
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = obj.category.uppercase(),
+                                        color = when (obj.category) {
+                                            "Architecture" -> Color(0xFFFBBF24)
+                                            "Vegetation" -> Color(0xFF34D399)
+                                            "Atmosphere" -> Color(0xFF7DD3FC)
+                                            else -> Color(0xFFC084FC)
+                                        },
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             Row(
@@ -903,48 +1057,64 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
             atmosphericCondition = "Sensor Offline",
             confidenceScore = 0,
             estimatedRainRisk = "N/A",
-            explanation = "Unable to process camera sensor data. Please ensure camera lens is unobstructed and point at the open sky.",
-            recommendation = "Point camera upwards towards the sky and try again.",
+            explanation = "Unable to process camera sensor data. Please ensure camera lens is unobstructed and point at the open sky or outdoor scenery.",
+            recommendation = "Point camera towards the sky, buildings, or landscape and try again.",
             statusColor = WarningAmber,
             isSkyDetected = false,
             skyColorDescription = "N/A",
-            lightingCondition = "Unknown"
+            lightingCondition = "Unknown",
+            detectedObjects = emptyList(),
+            environmentSceneType = "Indeterminate",
+            microclimateImpact = ""
         )
     }
 
-    // Multi-resolution spectral & gradient sampling (128x128 grid)
     val sampleW = 128
     val sampleH = 128
     val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
 
-    val skyRegionH = (sampleH * 0.85).toInt()
-    val totalSamples = sampleW * skyRegionH
+    // Analyze three distinct vertical zones:
+    // Zone 1: Upper Sky & Clouds (0% to 50%)
+    // Zone 2: Horizon & Mid Skyline / Architecture (40% to 75%)
+    // Zone 3: Ground / Vegetation / Streets / Surfaces (70% to 100%)
+    val skyZoneLimitY = (sampleH * 0.55).toInt()
+    val horizonZoneStartY = (sampleH * 0.35).toInt()
+    val horizonZoneEndY = (sampleH * 0.80).toInt()
+    val groundZoneStartY = (sampleH * 0.65).toInt()
+
+    val totalPixels = sampleW * sampleH
+    val lumGrid = Array(sampleW) { DoubleArray(sampleH) }
+    val hsv = FloatArray(3)
 
     var totalLum = 0.0
-    var totalR = 0.0
-    var totalG = 0.0
-    var totalB = 0.0
-    var totalSaturation = 0.0
+    var totalSat = 0.0
 
-    var pureBlueSkyPixels = 0
-    var lightBlueSkyPixels = 0
+    // Sky Region Counts (Upper)
+    var skyZonePixelCount = 0
+    var skyBluePixels = 0
     var brightWhiteCloudPixels = 0
-    var grayMidCloudPixels = 0
+    var grayCloudPixels = 0
     var darkStormCloudPixels = 0
     var sunsetGoldenPixels = 0
-    var fogHazePixels = 0
 
-    // Non-sky artifacts / indoor metrics
-    var artificialIndoorPixels = 0 // Green plant, brown desk, red object, screen saturation
-    var highContrastEdgeCount = 0
-    var repetitivePatternScore = 0
+    // Environmental Object / Horizon Counts
+    var vegetationTreePixels = 0
+    var buildingStructurePixels = 0
+    var terrainSoilPixels = 0
+    var indoorObstructionPixels = 0
 
-    // Edge gradient analysis
-    val hsv = FloatArray(3)
-    val lumGrid = Array(sampleW) { DoubleArray(skyRegionH) }
+    // Gradient Edge Maps for architectural and texture identification
+    var verticalBuildingEdges = 0
+    var horizontalHorizonEdges = 0
+    var randomTextureEdges = 0
+
+    // Bounding Box estimation accumulators [minX, minY, maxX, maxY]
+    var cloudMinX = sampleW; var cloudMinY = sampleH; var cloudMaxX = 0; var cloudMaxY = 0; var cloudPointCount = 0
+    var bldgMinX = sampleW; var bldgMinY = sampleH; var bldgMaxX = 0; var bldgMaxY = 0; var bldgPointCount = 0
+    var vegMinX = sampleW; var vegMinY = sampleH; var vegMaxX = 0; var vegMaxY = 0; var vegPointCount = 0
 
     for (x in 0 until sampleW) {
-        for (y in 0 until skyRegionH) {
+        for (y in 0 until sampleH) {
             val pixel = scaled.getPixel(x, y)
             val r = (pixel shr 16) and 0xff
             val g = (pixel shr 8) and 0xff
@@ -952,233 +1122,371 @@ private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyA
             val lum = 0.299 * r + 0.587 * g + 0.114 * b
             lumGrid[x][y] = lum
             totalLum += lum
-            totalR += r
-            totalG += g
-            totalB += b
 
             android.graphics.Color.RGBToHSV(r, g, b, hsv)
-            val hue = hsv[0]        // 0..360
-            val sat = hsv[1]        // 0..1
-            val value = hsv[2]      // 0..1
-            totalSaturation += sat
+            val hue = hsv[0]
+            val sat = hsv[1]
+            val value = hsv[2]
+            totalSat += sat
 
-            // Natural Sky Hue Windows:
-            // Blue Sky: Hue 185..245 (Cyan to Deep Blue)
-            // Sunset/Sunrise Sky: Hue 10..55 (Orange/Gold/Peach)
-            // White / Gray Clouds: Low Saturation (< 0.22)
-            val isSkyBlueHue = hue in 185f..245f && sat >= 0.18f && (b >= r + 15)
-            val isSunsetHue = hue in 15f..50f && sat in 0.25f..0.85f && (r > b + 30)
-            val isAchromatic = sat < 0.20f
+            val isSkyRegion = y <= skyZoneLimitY
 
-            // Indoor / Artificial Surface Signatures:
-            // High saturation green (foliage/wallpaper), magenta/purple/neon, unnatural high-sat yellow/red/brown
-            val isIndoorFoliage = hue in 70f..170f && sat > 0.35f
-            val isIndoorWarmFurniture = (hue in 15f..45f && sat > 0.65f && value < 0.65f) || (r > 100 && g > 60 && b < 50 && sat > 0.45f)
-            val isNeonArtificial = (hue in 260f..350f && sat > 0.35f) || (sat > 0.85f)
+            // 1. Sky & Atmospheric Signatures
+            val isSkyBlue = hue in 185f..245f && sat >= 0.18f && (b >= r + 10)
+            val isSunsetGold = hue in 12f..55f && sat in 0.25f..0.85f && (r > b + 25)
+            val isAchromaticAtmosphere = sat < 0.20f && isSkyRegion
 
-            if (isIndoorFoliage || isIndoorWarmFurniture || isNeonArtificial) {
-                artificialIndoorPixels++
-            } else if (isSkyBlueHue) {
-                if (sat > 0.40f) pureBlueSkyPixels++ else lightBlueSkyPixels++
-            } else if (isSunsetHue) {
-                sunsetGoldenPixels++
-            } else if (isAchromatic) {
-                when {
-                    lum >= 170 -> brightWhiteCloudPixels++
-                    lum in 100.0..169.0 -> grayMidCloudPixels++
-                    lum in 25.0..99.0 -> darkStormCloudPixels++
-                    else -> fogHazePixels++
+            if (isSkyRegion) {
+                skyZonePixelCount++
+                if (isSkyBlue) {
+                    skyBluePixels++
+                } else if (isSunsetGold) {
+                    sunsetGoldenPixels++
+                } else if (isAchromaticAtmosphere) {
+                    when {
+                        lum >= 170 -> {
+                            brightWhiteCloudPixels++
+                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
+                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
+                            cloudPointCount++
+                        }
+                        lum in 100.0..169.0 -> {
+                            grayCloudPixels++
+                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
+                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
+                            cloudPointCount++
+                        }
+                        lum in 25.0..99.0 -> {
+                            darkStormCloudPixels++
+                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
+                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
+                            cloudPointCount++
+                        }
+                    }
                 }
-            } else if (sat < 0.30f && (b >= r || lum > 140)) {
-                // Pale overcast or milky hazy sky
-                grayMidCloudPixels++
-            } else {
-                artificialIndoorPixels++
+            }
+
+            // 2. Vegetation & Trees (Green hues, distinct organic chlorophyll reflection)
+            val isVegetation = hue in 68f..165f && sat in 0.22f..0.88f && value in 0.15f..0.85f
+            if (isVegetation) {
+                vegetationTreePixels++
+                vegMinX = minOf(vegMinX, x); vegMinY = minOf(vegMinY, y)
+                vegMaxX = maxOf(vegMaxX, x); vegMaxY = maxOf(vegMaxY, y)
+                vegPointCount++
+            }
+
+            // 3. Architecture & Built Urban Structures (Concrete, Glass, Steel, Brick)
+            // Found in mid/horizon and lower zones: neutral grays with sharp geometric profiles or brick tones
+            val isBrickOrConcrete = (sat < 0.25f && lum in 40.0..210.0 && y >= horizonZoneStartY) ||
+                    (hue in 5f..35f && sat in 0.20f..0.55f && y in horizonZoneStartY..horizonZoneEndY)
+            if (isBrickOrConcrete && !isVegetation) {
+                buildingStructurePixels++
+                bldgMinX = minOf(bldgMinX, x); bldgMinY = minOf(bldgMinY, y)
+                bldgMaxX = maxOf(bldgMaxX, x); bldgMaxY = maxOf(bldgMaxY, y)
+                bldgPointCount++
+            }
+
+            // 4. Ground Soil / Pavement / Roads
+            val isRoadOrGround = y >= groundZoneStartY && sat < 0.20f && lum < 120.0
+            if (isRoadOrGround) {
+                terrainSoilPixels++
+            }
+
+            // 5. Indoor / Desk artifacts (Unnatural neon, intense warmth close-up)
+            if (sat > 0.85f || (hue in 260f..350f && sat > 0.40f) || (lum < 20.0 && sat > 0.5f)) {
+                indoorObstructionPixels++
             }
         }
     }
 
-    // Sobel/Laplacian style gradient filtering for structural texture & sharp artificial borders
+    // Gradient Edge Convolution for Geometric Edge Orientation (detects building pillars vs horizontal cloud strata)
     for (x in 1 until sampleW - 1) {
-        for (y in 1 until skyRegionH - 1) {
+        for (y in 1 until sampleH - 1) {
             val gx = (lumGrid[x + 1][y] - lumGrid[x - 1][y])
             val gy = (lumGrid[x][y + 1] - lumGrid[x][y - 1])
-            val gradientMag = kotlin.math.sqrt(gx * gx + gy * gy)
-            if (gradientMag > 38.0) {
-                highContrastEdgeCount++
+            val mag = kotlin.math.sqrt(gx * gx + gy * gy)
+            if (mag > 35.0) {
+                if (kotlin.math.abs(gx) > kotlin.math.abs(gy) * 1.6) {
+                    verticalBuildingEdges++
+                } else if (kotlin.math.abs(gy) > kotlin.math.abs(gx) * 1.6) {
+                    horizontalHorizonEdges++
+                } else {
+                    randomTextureEdges++
+                }
             }
         }
     }
 
-    val totalSkySignaturePixels = pureBlueSkyPixels + lightBlueSkyPixels + brightWhiteCloudPixels + grayMidCloudPixels + darkStormCloudPixels + sunsetGoldenPixels + fogHazePixels
-    val skyConfidenceRatio = totalSkySignaturePixels.toFloat() / totalSamples.coerceAtLeast(1)
-    val indoorArtifactRatio = artificialIndoorPixels.toFloat() / totalSamples.coerceAtLeast(1)
-    val edgeDensityRatio = highContrastEdgeCount.toFloat() / totalSamples.coerceAtLeast(1)
-    val avgLum = totalLum / totalSamples.coerceAtLeast(1)
-    val avgSat = (totalSaturation / totalSamples.coerceAtLeast(1)).toFloat()
+    val avgLum = totalLum / totalPixels.coerceAtLeast(1)
+    val avgSat = (totalSat / totalPixels.coerceAtLeast(1)).toFloat()
 
-    // 1. ROBUST NON-SKY REJECTION SYSTEM
-    // Open sky has low edge density (<10%), dominant blue/white/gray/sunset spectrum, and low artificial saturation
-    val isBlockedOrIndoor = indoorArtifactRatio > 0.24f ||
-            edgeDensityRatio > 0.12f ||
-            (skyConfidenceRatio < 0.48f && pureBlueSkyPixels == 0 && brightWhiteCloudPixels < (totalSamples * 0.20f))
+    val skySampleCount = skyZonePixelCount.coerceAtLeast(1)
+    val totalValidSkyPixels = (skyBluePixels + brightWhiteCloudPixels + grayCloudPixels + darkStormCloudPixels + sunsetGoldenPixels).coerceAtLeast(1)
+    val cloudPixels = brightWhiteCloudPixels + grayCloudPixels + darkStormCloudPixels
+    val cloudCoverageFraction = (cloudPixels.toFloat() / totalValidSkyPixels).coerceIn(0f, 1f)
+    val cloudPercent = (cloudCoverageFraction * 100).toInt().coerceIn(0, 100)
 
-    if (isBlockedOrIndoor) {
-        return SkyAnalysisResult(
-            title = "No Sky Detected",
-            icon = "🚫",
-            cloudType = "Non-Sky / Surface / Terrain",
-            cloudDescription = "Obstructed viewfinder or indoor surface detected",
-            cloudCoveragePercent = 0,
-            visibilityStatus = "Obstructed / Non-Atmospheric",
-            atmosphericCondition = "Camera Not Aimed at Open Sky",
-            confidenceScore = 98,
-            estimatedRainRisk = "N/A",
-            explanation = "WeatherGPT detected indoor objects, high-contrast textures, desk, or a screen. The precision sky engine requires an unobstructed optical path towards the clouds or open horizon.",
-            recommendation = "Aim camera directly upwards towards the open sky or clouds.",
-            statusColor = WarningAmber,
-            isSkyDetected = false,
-            skyColorDescription = "Indoor / Texture Spectrum",
-            lightingCondition = "Ambient Indoor"
+    val vegetationRatio = vegetationTreePixels.toFloat() / totalPixels.coerceAtLeast(1)
+    val buildingRatio = buildingStructurePixels.toFloat() / totalPixels.coerceAtLeast(1)
+    val indoorRatio = indoorObstructionPixels.toFloat() / totalPixels.coerceAtLeast(1)
+    val edgeRatio = (verticalBuildingEdges + horizontalHorizonEdges + randomTextureEdges).toFloat() / totalPixels.coerceAtLeast(1)
+
+    // Build Detected Objects List
+    val detectedObjects = mutableListOf<DetectedVisionObject>()
+
+    // 1. Cloud Layer Object
+    if (cloudPointCount > (sampleW * 10)) {
+        val cloudName = when {
+            darkStormCloudPixels > (totalValidSkyPixels * 0.35f) -> "Cumulonimbus Storm Cell"
+            brightWhiteCloudPixels > (totalValidSkyPixels * 0.50f) -> "Altostratus / Stratus Layer"
+            cloudPercent in 20..65 -> "Cumulus Cloud Formations"
+            else -> "Atmospheric Cloud Layer"
+        }
+        val topN = (cloudMinY.toFloat() / sampleH).coerceIn(0f, 0.45f)
+        val leftN = (cloudMinX.toFloat() / sampleW).coerceIn(0f, 0.9f)
+        val botN = (cloudMaxY.toFloat() / sampleH).coerceIn(topN + 0.15f, 0.65f)
+        val rightN = (cloudMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
+
+        detectedObjects.add(
+            DetectedVisionObject(
+                label = cloudName,
+                icon = if (darkStormCloudPixels > totalValidSkyPixels * 0.35f) "⛈️" else "☁️",
+                category = "Atmosphere",
+                confidence = 94,
+                weatherImplication = if (darkStormCloudPixels > totalValidSkyPixels * 0.35f) "Active precipitation & squall risk" else "Stable optical atmospheric layer",
+                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
+            )
         )
     }
 
-    // 2. METEOROLOGICAL SPECTRAL CLOUD FRACTION CALCULATIONS
-    val totalValidSky = totalSkySignaturePixels.coerceAtLeast(1)
-    val cloudPixels = brightWhiteCloudPixels + grayMidCloudPixels + darkStormCloudPixels
-    val cloudFraction = (cloudPixels.toFloat() / totalValidSky).coerceIn(0f, 1f)
-    val cloudCoverageOctas = (cloudFraction * 8).toInt().coerceIn(0, 8)
-    val cloudPercent = (cloudFraction * 100).toInt().coerceIn(0, 100)
+    // 2. Architecture / Buildings Object
+    if (buildingRatio > 0.12f || verticalBuildingEdges > (sampleW * 6)) {
+        val topN = (bldgMinY.toFloat() / sampleH).coerceIn(0.25f, 0.60f)
+        val leftN = (bldgMinX.toFloat() / sampleW).coerceIn(0f, 0.85f)
+        val botN = (bldgMaxY.toFloat() / sampleH).coerceIn(topN + 0.2f, 0.95f)
+        val rightN = (bldgMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
+
+        detectedObjects.add(
+            DetectedVisionObject(
+                label = "Urban Buildings & Skyline",
+                icon = "🏢",
+                category = "Architecture",
+                confidence = 91,
+                weatherImplication = "Urban heat island effect; wind channeling through street canyons",
+                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
+            )
+        )
+    }
+
+    // 3. Trees & Vegetation Object
+    if (vegetationRatio > 0.08f) {
+        val topN = (vegMinY.toFloat() / sampleH).coerceIn(0.35f, 0.70f)
+        val leftN = (vegMinX.toFloat() / sampleW).coerceIn(0f, 0.85f)
+        val botN = (vegMaxY.toFloat() / sampleH).coerceIn(topN + 0.2f, 0.98f)
+        val rightN = (vegMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
+
+        detectedObjects.add(
+            DetectedVisionObject(
+                label = "Canopy / Vegetation",
+                icon = "🌳",
+                category = "Vegetation",
+                confidence = 88,
+                weatherImplication = "Natural shade cooling (-2°C ambient buffer) & ground moisture retention",
+                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
+            )
+        )
+    }
+
+    // Scene Type Classification
+    val sceneType = when {
+        buildingRatio > 0.22f -> "Urban Skyline & Built Environment"
+        vegetationRatio > 0.20f -> "Parkland & Natural Landscape"
+        skyZonePixelCount > (totalPixels * 0.6f) -> "Open Horizon Sky"
+        else -> "Mixed Outdoor Environment"
+    }
+
+    val microclimateNote = when {
+        buildingRatio > 0.20f && darkStormCloudPixels > (totalValidSkyPixels * 0.3f) ->
+            "Urban microclimate: High surface runoff and wind funneling between building facades."
+        buildingRatio > 0.20f && skyBluePixels > (totalValidSkyPixels * 0.4f) ->
+            "Urban microclimate: Concrete & asphalt surfaces radiate stored solar heat (+1.5°C feels-like)."
+        vegetationRatio > 0.18f ->
+            "Vegetation microclimate: Transpiration provides natural humidity buffer and localized wind moderation."
+        else ->
+            "Standard open air microclimate: Unobstructed radiative cooling and ambient atmospheric exchange."
+    }
+
+    // Strict Non-Outdoor / Indoor Rejection (Desk, Close-up walls, Blank screen)
+    val isTotallyIndoor = indoorRatio > 0.30f || (skyBluePixels == 0 && brightWhiteCloudPixels == 0 && darkStormCloudPixels == 0 && vegetationRatio < 0.04f && buildingRatio < 0.06f)
+
+    if (isTotallyIndoor) {
+        return SkyAnalysisResult(
+            title = "Indoor Surface Detected",
+            icon = "🚫",
+            cloudType = "Non-Atmospheric Object",
+            cloudDescription = "Desk, wall, room, or digital display detected",
+            cloudCoveragePercent = 0,
+            visibilityStatus = "Obstructed / Non-Sky",
+            atmosphericCondition = "Camera Aimed Indoors",
+            confidenceScore = 98,
+            estimatedRainRisk = "N/A",
+            explanation = "Computer vision detected indoor textures, desk surface, or close-range objects. To observe live cloud dynamics, building microclimates, and weather patterns, point the camera outdoors.",
+            recommendation = "Aim camera out of a window or step outside to scan buildings, trees, and sky.",
+            statusColor = WarningAmber,
+            isSkyDetected = false,
+            skyColorDescription = "Indoor Texture Spectrum",
+            lightingCondition = "Artificial Interior Lighting",
+            detectedObjects = emptyList(),
+            environmentSceneType = "Indoor / Non-Weather Scene",
+            microclimateImpact = "Indoor temperature control isolated from atmospheric flow."
+        )
+    }
 
     val rainMm = weather?.precipitation_mm ?: 0.0
-    val windMs = weather?.wind_speed_ms ?: 0.0
-    val tempC = weather?.temperature_c ?: 22.0
 
-    // 3. REFINED METEOROLOGICAL MULTI-TIER CLASSIFICATION
+    // Full Meteorological & Computer Vision Synthesis
     return when {
-        // A. CUMULONIMBUS / SQUALL / ACTIVE THUNDERSTORM
-        darkStormCloudPixels > (totalValidSky * 0.40f) || (avgLum < 85 && cloudFraction > 0.70f && (rainMm > 0.8 || darkStormCloudPixels > totalValidSky * 0.25f)) -> {
+        // Storm & Severe Squall
+        darkStormCloudPixels > (totalValidSkyPixels * 0.38f) || (avgLum < 85 && cloudCoverageFraction > 0.70f && (rainMm > 0.6 || darkStormCloudPixels > totalValidSkyPixels * 0.20f)) -> {
             SkyAnalysisResult(
                 title = "Storm Development Detected",
                 icon = "⛈️",
                 cloudType = "Cumulonimbus (Cb) / Nimbostratus",
-                cloudDescription = "Towering vertical storm cells with deep dark precipitation bases",
+                cloudDescription = "Dense storm anvil with dark vertical convective precipitation base",
                 cloudCoveragePercent = cloudPercent.coerceAtLeast(85),
                 visibilityStatus = "Low (< 4 km in showers)",
                 atmosphericCondition = "Intense Convective Squall",
                 confidenceScore = 96,
                 estimatedRainRisk = "High ⚠️ (Active Storm)",
-                explanation = "Heavy optical extinction and dense optical depth detected. Cloud base luminance is under 85 with towering vertical cumulus profiles consistent with severe precipitation and gusty downbursts.",
-                recommendation = "Check live Doppler radar immediately. Seek shelter from lightning and heavy rain.",
+                explanation = "Heavy optical extinction detected in the upper quadrant (${detectedObjects.size} scene elements mapped). Cloud base luminance is under 85 with towering vertical cumulus profiles consistent with severe showers and gusty downdrafts.",
+                recommendation = "Check live Doppler radar. Take shelter inside stable structures away from trees.",
                 statusColor = DangerRed,
                 isSkyDetected = true,
                 skyColorDescription = "Dark Charcoal / Slate Gray",
-                lightingCondition = "Dim Convective Overcast"
+                lightingCondition = "Dim Convective Overcast",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
 
-        // B. ALTOCUMULUS / STRATOCUMULUS (Scattered / Broken Convective Deck)
-        cloudFraction in 0.45f..0.85f && grayMidCloudPixels > (totalValidSky * 0.25f) -> {
+        // Broken Stratocumulus / Altocumulus Deck
+        cloudCoverageFraction in 0.40f..0.85f && grayCloudPixels > (totalValidSkyPixels * 0.22f) -> {
             SkyAnalysisResult(
                 title = "Stratocumulus Cloud Deck",
                 icon = "☁️",
                 cloudType = "Stratocumulus (Sc) / Altocumulus (Ac)",
-                cloudDescription = "Clustered low-level rolls or patchy dappled cloud sheets",
+                cloudDescription = "Patchy dappled rolls and broken cloud sheets above the horizon",
                 cloudCoveragePercent = cloudPercent,
                 visibilityStatus = "Moderate to Good (6–10 km)",
                 atmosphericCondition = "Boundary Layer Moisture Deck",
                 confidenceScore = 93,
                 estimatedRainRisk = if (rainMm > 0.5) "Moderate 🌦️" else "Low to Moderate 🌥️",
-                explanation = "Patchy cloud elements with well-defined structural variation between light and gray tones ($cloudCoverageOctas/8 octas). Indicates moist boundary layer with minimal severe convection.",
-                recommendation = "Ideal for commuting and outdoor walks. Keep a light windbreaker handy.",
+                explanation = "Layered cloud elements detected with structural contrast against the surrounding landscape ($cloudPercent% coverage). Typical of maritime moisture flow and mild diurnal mixing.",
+                recommendation = "Ideal for outdoor activities, walking, and commuting. Keep a light layer handy.",
                 statusColor = SecondaryCyan,
                 isSkyDetected = true,
                 skyColorDescription = "Silver Gray & Sky Blue",
-                lightingCondition = "Diffused Daylight"
+                lightingCondition = "Diffused Daylight",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
 
-        // C. STRATUS / FOG / SOLID NIMBOSTRATUS OVERCAST
-        brightWhiteCloudPixels + grayMidCloudPixels > (totalValidSky * 0.80f) -> {
+        // Solid Stratus / Overcast Inversion
+        brightWhiteCloudPixels + grayCloudPixels > (totalValidSkyPixels * 0.78f) -> {
             SkyAnalysisResult(
                 title = "Overcast Stratus Layer",
                 icon = "☁️",
-                cloudType = "Stratus Nebulosus (St) / Altostratus (As)",
-                cloudDescription = "Featureless uniform gray-white sheet blanket with diffuse illumination",
+                cloudType = "Stratus Nebulosus (St) / Altostratus",
+                cloudDescription = "Uniform featureless gray-white blanket covering the skyline",
                 cloudCoveragePercent = cloudPercent.coerceAtLeast(90),
                 visibilityStatus = "Moderate (Diffused Haze 5–8 km)",
                 atmosphericCondition = "Stable Inversion Layer",
                 confidenceScore = 94,
                 estimatedRainRisk = "Moderate 🌦️ (Drizzle Risk)",
-                explanation = "Extensive uniform sheet cloud covering the entire field of view ($cloudPercent% cover). Low cloud base suppresses direct sunlight, commonly producing steady drizzle or mist.",
-                recommendation = "Carry a compact umbrella. Road surfaces may remain damp.",
+                explanation = "Extensive diffuse cloud deck obscuring direct solar illumination across the skyline. High humidity trapping particulates and creating soft ambient lighting.",
+                recommendation = "Carry a compact umbrella. Roads and urban pavements may remain slick.",
                 statusColor = WarningAmber,
                 isSkyDetected = true,
                 skyColorDescription = "Uniform Matte White / Mist",
-                lightingCondition = "Soft Ambient Inversion"
+                lightingCondition = "Soft Ambient Inversion",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
 
-        // D. SUNSET / GOLDEN HOUR / TWILIGHT ATMOSPHERE
-        sunsetGoldenPixels > (totalValidSky * 0.20f) || (avgSat > 0.35f && sunsetGoldenPixels > (totalValidSky * 0.12f)) -> {
+        // Sunset / Golden Hour Rayleigh Glow
+        sunsetGoldenPixels > (totalValidSkyPixels * 0.18f) || (avgSat > 0.35f && sunsetGoldenPixels > (totalValidSkyPixels * 0.10f)) -> {
             SkyAnalysisResult(
                 title = "Sunset / Golden Hour Sky",
                 icon = "🌅",
-                cloudType = "Cirrus / High Altocumulus",
-                cloudDescription = "Sunlit clouds catching low-angle warm Rayleigh scattering",
+                cloudType = "Cirrus / Altocumulus Twilight",
+                cloudDescription = "Warm golden-amber Rayleigh scattering illuminating clouds and architecture",
                 cloudCoveragePercent = cloudPercent,
                 visibilityStatus = "Excellent (> 12 km)",
                 atmosphericCondition = "Low Solar Angle / Evening Transition",
                 confidenceScore = 95,
                 estimatedRainRisk = "Very Low 🟢",
-                explanation = "Warm golden-orange optical dispersion detected ($sunsetGoldenPixels spectral signatures). Typical of stable evening cooling and high optical clarity.",
-                recommendation = "Perfect window for evening outdoor runs, cycling, and landscape photography.",
+                explanation = "Warm golden optical dispersion detected ($sunsetGoldenPixels spectral signatures). Horizon architecture and trees exhibit soft golden highlights with cooling boundary temperatures.",
+                recommendation = "Optimal window for photography, outdoor dining, running, and cycling.",
                 statusColor = SuccessGreen,
                 isSkyDetected = true,
                 skyColorDescription = "Golden Amber & Twilight Cyan",
-                lightingCondition = "Golden Hour Sunlight"
+                lightingCondition = "Golden Hour Sunlight",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
 
-        // E. CLEAR SKY / CIRRUS FILAMENTS (High Solar Index)
-        pureBlueSkyPixels + lightBlueSkyPixels > (totalValidSky * 0.55f) && cloudFraction < 0.25f -> {
+        // Clear Sky & High Solar UV
+        skyBluePixels > (totalValidSkyPixels * 0.50f) && cloudCoverageFraction < 0.25f -> {
             SkyAnalysisResult(
                 title = "Clear Sky & High Solar UV",
                 icon = "☀️",
                 cloudType = "Cirrus Fibratus (Ci) / Cavok (Clear)",
-                cloudDescription = "Wispy, high-altitude ice crystal streaks or crystal-clear atmosphere",
+                cloudDescription = "Crystal-clear high visibility with minimal tropospheric obstruction",
                 cloudCoveragePercent = cloudPercent.coerceAtMost(20),
                 visibilityStatus = "Exceptional (> 15 km)",
                 atmosphericCondition = "High Pressure Anticyclone",
                 confidenceScore = 97,
                 estimatedRainRisk = "Zero to Minimal 🟢",
-                explanation = "Dominant high-frequency Rayleigh blue wavelength ($pureBlueSkyPixels deep blue pixels) with minimal tropospheric obstruction. High solar radiance index.",
-                recommendation = "Great conditions for all outdoor sports. Apply SPF 30+ UV protection.",
+                explanation = "Dominant high-frequency Rayleigh blue wavelength across the upper visual field with sharp architectural contrast. Maximum solar radiance reaching the surface.",
+                recommendation = "Great conditions for sports. Use SPF 30+ UV protection when outdoors in direct sun.",
                 statusColor = SuccessGreen,
                 isSkyDetected = true,
                 skyColorDescription = "Deep Azure & Cobalt Blue",
-                lightingCondition = "Direct Solar Radiance"
+                lightingCondition = "Direct Solar Radiance",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
 
-        // F. SCATTERED CUMULUS HUMILIS (Fair Weather)
+        // Fair-Weather Cumulus (Default Balanced Outdoor)
         else -> {
             SkyAnalysisResult(
                 title = "Fair-Weather Cumulus",
                 icon = "⛅",
-                cloudType = "Cumulus Humilis / Mediocris (Cu)",
-                cloudDescription = "Distinct, bright white fluffy puffs with flat horizontal bases",
-                cloudCoveragePercent = cloudPercent.coerceIn(25, 55),
+                cloudType = "Cumulus Humilis (Cu)",
+                cloudDescription = "Bright white convective puffs floating above the surrounding skyline",
+                cloudCoveragePercent = cloudPercent.coerceIn(20, 50),
                 visibilityStatus = "Great (10–12 km)",
                 atmosphericCondition = "Diurnal Thermal Convection",
                 confidenceScore = 92,
                 estimatedRainRisk = "Low 🟢",
-                explanation = "Healthy thermal convection producing scattered white cumulus clouds ($cloudPercent% coverage) separated by blue sky. No vertical towering or squall threat detected.",
-                recommendation = "Comfortable outdoor conditions. Excellent for recreation and sports.",
+                explanation = "Convective white cumulus clouds ($cloudPercent% coverage) hovering above the urban and natural horizon. Excellent atmospheric stability with pleasant ambient comfort.",
+                recommendation = "Great weather for outdoor workouts, travel, and sightseeing.",
                 statusColor = SecondaryCyan,
                 isSkyDetected = true,
                 skyColorDescription = "Bright Blue with White Clouds",
-                lightingCondition = "Intermittent Sun & Shade"
+                lightingCondition = "Intermittent Sun & Shade",
+                detectedObjects = detectedObjects,
+                environmentSceneType = sceneType,
+                microclimateImpact = microclimateNote
             )
         }
     }
