@@ -44,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,7 +84,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.TilesOverlay
-import org.osmdroid.views.overlay.compass.CompassOverlay
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.abs
@@ -153,14 +157,10 @@ private data class AreaAnalysis(
     val recommendation: String?
 )
 
-private data class AreaWeatherData(
-    val temperature: Double?,
-    val rainfallProbability: Double?
-)
-
 @Composable
 fun MapScreen() {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val savedLocation = remember { LocationStore.getLocation(context) }
     val initialLocation = remember(savedLocation) {
@@ -187,11 +187,27 @@ fun MapScreen() {
     var radarAiIntel by remember { mutableStateOf<RadarAiIntel?>(null) }
     var loadingRadarAi by remember { mutableStateOf(false) }
 
-    // User agent for OSM and RainViewer requests
-    LaunchedEffect(Unit) {
-        try {
-            Configuration.getInstance().userAgentValue = context.packageName
-        } catch (_: Throwable) {}
+    // MapView lifecycle management
+    DisposableEffect(lifecycleOwner, mapView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    try { mapView?.onResume() } catch (_: Throwable) {}
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    try { mapView?.onPause() } catch (_: Throwable) {}
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            try {
+                mapView?.onPause()
+                mapView?.onDetach()
+            } catch (_: Throwable) {}
+        }
     }
 
     // Reactive layer loader
@@ -201,7 +217,7 @@ fun MapScreen() {
 
         val existingRain = rainTilesOverlay
         if (selectedLayer != "Rain" && existingRain != null) {
-            view.overlays.remove(existingRain)
+            try { view.overlays.remove(existingRain) } catch (_: Throwable) {}
             rainTilesOverlay = null
         }
 
@@ -245,8 +261,10 @@ fun MapScreen() {
                     if (rainTilesOverlay == null) {
                         val frame = fetchRainViewerFrame()
                         val overlay = buildRainOverlay(context, frame?.first, frame?.second)
-                        rainTilesOverlay = overlay
-                        view.overlays.add(overlay)
+                        if (overlay != null) {
+                            rainTilesOverlay = overlay
+                            view.overlays.add(overlay)
+                        }
                     }
                 } catch (_: Exception) {
                     rainTilesOverlay = null
@@ -290,7 +308,7 @@ fun MapScreen() {
         }
 
         loadingLayer = false
-        view.invalidate()
+        try { view.invalidate() } catch (_: Throwable) {}
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -298,20 +316,29 @@ fun MapScreen() {
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 MapView(ctx).apply {
+                    try {
+                        val osmConfig = Configuration.getInstance()
+                        osmConfig.userAgentValue = ctx.packageName
+                        val osmBaseDir = File(ctx.cacheDir, "osmdroid")
+                        if (!osmBaseDir.exists()) osmBaseDir.mkdirs()
+                        val osmTileDir = File(osmBaseDir, "tiles")
+                        if (!osmTileDir.exists()) osmTileDir.mkdirs()
+                        osmConfig.osmdroidBasePath = osmBaseDir
+                        osmConfig.osmdroidTileCache = osmTileDir
+                    } catch (_: Throwable) {}
+
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
                     controller.setZoom(12.0)
                     controller.setCenter(initialLocation)
 
-                    val compass = CompassOverlay(ctx, this)
-                    compass.enableCompass()
-                    overlays.add(compass)
-
-                    val centerMarker = Marker(this)
-                    centerMarker.position = initialLocation
-                    centerMarker.title = "📍 ${savedLocation.name}"
-                    centerMarker.snippet = "Current Location"
-                    overlays.add(centerMarker)
+                    try {
+                        val centerMarker = Marker(this)
+                        centerMarker.position = initialLocation
+                        centerMarker.title = "📍 ${savedLocation.name}"
+                        centerMarker.snippet = "Current Location"
+                        overlays.add(centerMarker)
+                    } catch (_: Throwable) {}
 
                     mapView = this
                     mapReady = true
@@ -332,21 +359,25 @@ fun MapScreen() {
                                     val dx = event.x - downX
                                     val dy = event.y - downY
                                     if (abs(dx) < 25f && abs(dy) < 25f) {
-                                        val geo = projection.fromPixels(event.x.toInt(), event.y.toInt())
-                                        val point = GeoPoint(geo.latitude, geo.longitude)
-                                        selectedMapPoint = point
+                                        try {
+                                            val geo = projection.fromPixels(event.x.toInt(), event.y.toInt())
+                                            val point = GeoPoint(geo.latitude, geo.longitude)
+                                            selectedMapPoint = point
 
-                                        selectedMapMarker?.let { overlays.remove(it) }
+                                            selectedMapMarker?.let {
+                                                try { overlays.remove(it) } catch (_: Throwable) {}
+                                            }
 
-                                        val marker = Marker(this@apply)
-                                        marker.position = point
-                                        marker.title = "📍 Selected location"
-                                        marker.snippet = "%.4f, %.4f".format(point.latitude, point.longitude)
-                                        overlays.add(marker)
-                                        selectedMapMarker = marker
+                                            val marker = Marker(this@apply)
+                                            marker.position = point
+                                            marker.title = "📍 Selected location"
+                                            marker.snippet = "%.4f, %.4f".format(point.latitude, point.longitude)
+                                            overlays.add(marker)
+                                            selectedMapMarker = marker
 
-                                        controller.animateTo(point)
-                                        invalidate()
+                                            controller.animateTo(point)
+                                            invalidate()
+                                        } catch (_: Throwable) {}
                                     }
                                     return false
                                 }
@@ -354,7 +385,7 @@ fun MapScreen() {
                             return false
                         }
                     })
-                    invalidate()
+                    try { invalidate() } catch (_: Throwable) {}
                 }
             },
             update = { view ->
@@ -580,7 +611,7 @@ fun MapScreen() {
                 IconButton(
                     onClick = {
                         isMapRefreshing = true
-                        mapView?.invalidate()
+                        try { mapView?.invalidate() } catch (_: Throwable) {}
                         val current = selectedLayer
                         selectedLayer = ""
                         selectedLayer = current
@@ -617,8 +648,10 @@ fun MapScreen() {
                     onClick = {
                         val cur = LocationStore.getLocation(context)
                         val target = GeoPoint(cur.latitude, cur.longitude)
-                        mapView?.controller?.animateTo(target)
-                        mapView?.controller?.setZoom(13.0)
+                        try {
+                            mapView?.controller?.animateTo(target)
+                            mapView?.controller?.setZoom(13.0)
+                        } catch (_: Throwable) {}
                     },
                     modifier = Modifier.size(36.dp)
                 ) {
@@ -638,7 +671,7 @@ fun MapScreen() {
                 )
 
                 IconButton(
-                    onClick = { mapView?.controller?.zoomIn() },
+                    onClick = { try { mapView?.controller?.zoomIn() } catch (_: Throwable) {} },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -650,7 +683,7 @@ fun MapScreen() {
                 }
 
                 IconButton(
-                    onClick = { mapView?.controller?.zoomOut() },
+                    onClick = { try { mapView?.controller?.zoomOut() } catch (_: Throwable) {} },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -925,30 +958,34 @@ private fun LayerIcon(layer: String) {
 // RAINVIEWER RADAR & OVERLAYS
 // =================================================================
 
-private fun buildRainOverlay(context: Context, host: String?, path: String?): TilesOverlay {
-    val tileHost = if (!host.isNullOrBlank()) host else "https://tilecache.rainviewer.com"
-    val tilePath = if (!path.isNullOrBlank()) path else "/v2/radar/nowcast_0"
+private fun buildRainOverlay(context: Context, host: String?, path: String?): TilesOverlay? {
+    return try {
+        val tileHost = if (!host.isNullOrBlank()) host else "https://tilecache.rainviewer.com"
+        val tilePath = if (!path.isNullOrBlank()) path else "/v2/radar/nowcast_0"
 
-    val tileSource = object : OnlineTileSourceBase(
-        "RainViewerRadar",
-        0,
-        18,
-        256,
-        ".png",
-        arrayOf(tileHost)
-    ) {
-        override fun getTileURLString(pMapTileIndex: Long): String {
-            val z = MapTileIndex.getZoom(pMapTileIndex)
-            val x = MapTileIndex.getX(pMapTileIndex)
-            val y = MapTileIndex.getY(pMapTileIndex)
-            return "$baseUrl$tilePath/256/$z/$x/$y/2/1_1.png"
+        val tileSource = object : OnlineTileSourceBase(
+            "RainViewerRadar",
+            0,
+            18,
+            256,
+            ".png",
+            arrayOf(tileHost)
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String {
+                val z = MapTileIndex.getZoom(pMapTileIndex)
+                val x = MapTileIndex.getX(pMapTileIndex)
+                val y = MapTileIndex.getY(pMapTileIndex)
+                return "$baseUrl$tilePath/256/$z/$x/$y/2/1_1.png"
+            }
         }
-    }
 
-    val provider = MapTileProviderBasic(context.applicationContext, tileSource)
-    val overlay = TilesOverlay(provider, context.applicationContext)
-    overlay.loadingBackgroundColor = AndroidColor.TRANSPARENT
-    return overlay
+        val provider = MapTileProviderBasic(context.applicationContext, tileSource)
+        val overlay = TilesOverlay(provider, context.applicationContext)
+        overlay.loadingBackgroundColor = AndroidColor.TRANSPARENT
+        overlay
+    } catch (_: Throwable) {
+        null
+    }
 }
 
 private suspend fun fetchRainViewerFrame(): Pair<String, String>? = withContext(Dispatchers.IO) {
@@ -1353,92 +1390,98 @@ private fun addWeatherMarkers(
 ) {
     clearDataMarkers(map)
 
-    val marker = Marker(map)
-    marker.position = center
-    marker.title = "☁️ ${weather?.placeName ?: "Local Area"}"
-    marker.snippet = weather?.temperature?.let { "%.1f°C • Humidity: %.0f%%".format(it, weather.humidity ?: 0.0) }
-        ?: "Live weather observation"
-    map.overlays.add(marker)
-    map.invalidate()
+    try {
+        val marker = Marker(map)
+        marker.position = center
+        marker.title = "☁️ ${weather?.placeName ?: "Local Area"}"
+        marker.snippet = weather?.temperature?.let { "%.1f°C • Humidity: %.0f%%".format(it, weather.humidity ?: 0.0) }
+            ?: "Live weather observation"
+        map.overlays.add(marker)
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun addDamMarkers(map: MapView, dams: List<DamMarkerData>) {
     clearDataMarkers(map)
-    for (dam in dams) {
-        val marker = Marker(map)
-        marker.position = GeoPoint(dam.latitude, dam.longitude)
-        marker.title = "💧 ${dam.name}"
-        marker.snippet = dam.storagePercent?.let { "Storage: %.1f%%".format(it) } ?: "Dam reservoir"
-        map.overlays.add(marker)
-    }
-    map.invalidate()
+    try {
+        for (dam in dams) {
+            val marker = Marker(map)
+            marker.position = GeoPoint(dam.latitude, dam.longitude)
+            marker.title = "💧 ${dam.name}"
+            marker.snippet = dam.storagePercent?.let { "Storage: %.1f%%".format(it) } ?: "Dam reservoir"
+            map.overlays.add(marker)
+        }
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun addEarthquakeMarkers(map: MapView, quakes: List<EarthquakeMarkerData>) {
     clearDataMarkers(map)
-    for (quake in quakes) {
-        val marker = Marker(map)
-        marker.position = GeoPoint(quake.latitude, quake.longitude)
-        marker.title = "⚡ M${quake.magnitude ?: 0.0} - ${quake.place}"
-        marker.snippet = quake.depthKm?.let { "Depth: %.1f km".format(it) } ?: "Recent seismic activity"
-        map.overlays.add(marker)
-    }
-    map.invalidate()
+    try {
+        for (quake in quakes) {
+            val marker = Marker(map)
+            marker.position = GeoPoint(quake.latitude, quake.longitude)
+            marker.title = "⚡ M${quake.magnitude ?: 0.0} - ${quake.place}"
+            marker.snippet = quake.depthKm?.let { "Depth: %.1f km".format(it) } ?: "Recent seismic activity"
+            map.overlays.add(marker)
+        }
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun addAlertMarkers(map: MapView, alerts: List<AlertMarkerData>) {
     clearDataMarkers(map)
-    for (alert in alerts) {
-        val marker = Marker(map)
-        marker.position = GeoPoint(alert.latitude, alert.longitude)
-        marker.title = "⚠️ ${alert.title}"
-        marker.snippet = "Severity: ${alert.severity}${if (!alert.description.isNullOrBlank()) " • ${alert.description}" else ""}"
-        map.overlays.add(marker)
-    }
-    map.invalidate()
+    try {
+        for (alert in alerts) {
+            val marker = Marker(map)
+            marker.position = GeoPoint(alert.latitude, alert.longitude)
+            marker.title = "⚠️ ${alert.title}"
+            marker.snippet = "Severity: ${alert.severity}${if (!alert.description.isNullOrBlank()) " • ${alert.description}" else ""}"
+            map.overlays.add(marker)
+        }
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun addFloodOverlay(map: MapView, flood: FloodMapData) {
     removeFloodOverlays(map)
-    val center = GeoPoint(flood.latitude, flood.longitude)
-    val polygon = Polygon(map)
-    polygon.points = Polygon.pointsAsRect(center, 10000.0, 8000.0).map {
-        GeoPoint(it.latitude, it.longitude)
-    }
+    try {
+        val center = GeoPoint(flood.latitude, flood.longitude)
+        val polygon = Polygon(map)
+        polygon.points = Polygon.pointsAsRect(center, 10000.0, 8000.0).map {
+            GeoPoint(it.latitude, it.longitude)
+        }
 
-    val fillColor = when (flood.risk.uppercase()) {
-        "HIGH", "CRITICAL" -> AndroidColor.argb(90, 239, 68, 68)
-        "MODERATE" -> AndroidColor.argb(85, 245, 158, 11)
-        else -> AndroidColor.argb(75, 56, 189, 248)
-    }
+        val fillColor = when (flood.risk.uppercase()) {
+            "HIGH", "CRITICAL" -> AndroidColor.argb(90, 239, 68, 68)
+            "MODERATE" -> AndroidColor.argb(85, 245, 158, 11)
+            else -> AndroidColor.argb(75, 56, 189, 248)
+        }
 
-    polygon.fillColor = fillColor
-    polygon.strokeColor = AndroidColor.argb(200, 30, 64, 175)
-    polygon.strokeWidth = 4f
-    polygon.title = "Flood Zone: ${flood.risk}"
-    polygon.snippet = flood.currentWaterLevel?.let { "Current level: %.2fm".format(it) } ?: "Monitored river basin"
+        polygon.fillColor = fillColor
+        polygon.strokeColor = AndroidColor.argb(200, 30, 64, 175)
+        polygon.strokeWidth = 4f
+        polygon.title = "Flood Zone: ${flood.risk}"
+        polygon.snippet = flood.currentWaterLevel?.let { "Current level: %.2fm".format(it) } ?: "Monitored river basin"
 
-    map.overlays.add(polygon)
-    map.invalidate()
+        map.overlays.add(polygon)
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun removeFloodOverlays(map: MapView) {
-    val iterator = map.overlays.iterator()
-    while (iterator.hasNext()) {
-        val overlay = iterator.next()
-        if (overlay is Polygon) {
-            iterator.remove()
-        }
-    }
-    map.invalidate()
+    try {
+        val toRemove = map.overlays.filterIsInstance<Polygon>()
+        map.overlays.removeAll(toRemove)
+        map.invalidate()
+    } catch (_: Throwable) {}
 }
 
 private fun clearDataMarkers(map: MapView) {
-    val iterator = map.overlays.iterator()
-    while (iterator.hasNext()) {
-        val overlay = iterator.next()
-        if (overlay is Marker && !overlay.title.orEmpty().contains("Current Location")) {
-            iterator.remove()
+    try {
+        val toRemove = map.overlays.filter { overlay ->
+            overlay is Marker && !overlay.title.orEmpty().contains("Current Location")
         }
-    }
+        map.overlays.removeAll(toRemove)
+    } catch (_: Throwable) {}
 }
