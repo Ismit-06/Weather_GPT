@@ -33,11 +33,31 @@ data class AnyLocationWeather(
     val longitude: Double,
     val placeName: String,
     val temperature: Double?,
+    val apparentTemperature: Double? = null,
     val humidity: Double?,
     val windSpeed: Double?,
     val pressure: Double?,
-    val rainProbability: Double?
+    val rainProbability: Double?,
+    val weatherCode: Int? = null,
+    val conditionText: String? = null
 )
+
+fun getWeatherConditionText(code: Int?): String {
+    return when (code) {
+        0 -> "Clear Sky"
+        1 -> "Mainly Clear"
+        2 -> "Partly Cloudy"
+        3 -> "Overcast"
+        45, 48 -> "Fog"
+        51, 53, 55 -> "Drizzle"
+        61, 63, 65 -> "Rain"
+        66, 67 -> "Freezing Rain"
+        71, 73, 75 -> "Snow"
+        80, 81, 82 -> "Rain Showers"
+        95, 96, 99 -> "Thunderstorm"
+        else -> "Clear"
+    }
+}
 
 data class DamMarkerData(
     val name: String,
@@ -325,7 +345,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val url = URL(
                     "https://api.open-meteo.com/v1/forecast" +
                         "?latitude=$lat&longitude=$lon" +
-                        "&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m" +
+                        "&current=temperature_2m,apparent_temperature,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code" +
                         "&hourly=precipitation_probability&forecast_days=1"
                 )
                 val conn = url.openConnection() as HttpURLConnection
@@ -338,16 +358,20 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 val root = JSONObject(body)
                 val curr = root.optJSONObject("current")
                 val hourly = root.optJSONObject("hourly")
+                val wCode = curr?.optInt("weather_code", -1)?.takeIf { it >= 0 }
 
                 val weather = AnyLocationWeather(
                     latitude = lat,
                     longitude = lon,
                     placeName = placeName,
                     temperature = curr?.optDouble("temperature_2m", Double.NaN)?.takeUnless { it.isNaN() },
+                    apparentTemperature = curr?.optDouble("apparent_temperature", Double.NaN)?.takeUnless { it.isNaN() },
                     humidity = curr?.optDouble("relative_humidity_2m", Double.NaN)?.takeUnless { it.isNaN() },
                     windSpeed = curr?.optDouble("wind_speed_10m", Double.NaN)?.takeUnless { it.isNaN() },
                     pressure = curr?.optDouble("surface_pressure", Double.NaN)?.takeUnless { it.isNaN() },
-                    rainProbability = hourly?.optJSONArray("precipitation_probability")?.optDouble(0, Double.NaN)?.takeUnless { it.isNaN() }
+                    rainProbability = hourly?.optJSONArray("precipitation_probability")?.optDouble(0, Double.NaN)?.takeUnless { it.isNaN() },
+                    weatherCode = wCode,
+                    conditionText = getWeatherConditionText(wCode)
                 )
                 _uiState.update { it.copy(weatherData = weather) }
             } catch (e: Exception) {
@@ -490,30 +514,28 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // =================================================================
-    // ANALYZE THIS AREA
+    // ANALYZE THIS AREA (LOCAL TELEMETRY SUMMARY - NO CHATBOT ESSAYS)
     // =================================================================
 
     fun analyzeCurrentArea() {
         val state = _uiState.value
         val lat = state.selectedLatitude
         val lon = state.selectedLongitude
-        val locName = state.selectedLocationName.ifBlank { "this area" }
+        val locName = state.selectedLocationName.ifBlank { "Selected Location" }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isAnalyzingArea = true, errorMessage = null) }
 
-            // Local telemetry card data
-            val weather = state.weatherData
+            if (state.weatherData == null) {
+                fetchWeatherForLocation(lat, lon, locName)
+            }
+
+            val weather = _uiState.value.weatherData
             val rainRisk = weather?.rainProbability ?: 0.0
             val overallRisk = when {
                 rainRisk >= 75.0 -> "HIGH"
                 rainRisk >= 40.0 -> "MODERATE"
                 else -> "SAFE"
-            }
-            val recommendation = when {
-                rainRisk >= 75.0 -> "Heavy rain probability ($rainRisk%). Carrying an umbrella is strongly advised."
-                rainRisk >= 40.0 -> "Scattered showers possible ($rainRisk%). Temperatures around ${weather?.temperature ?: 28}°C."
-                else -> "Favorable outdoor conditions around ${weather?.temperature ?: 28}°C with low rain chance."
             }
 
             val localAnalysis = AreaAnalysis(
@@ -524,47 +546,16 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 rainfallProbability = weather?.rainProbability,
                 floodRisk = state.floodData?.risk ?: "LOW",
                 overallRisk = overallRisk,
-                recommendation = recommendation
+                recommendation = "Weather telemetry for $locName"
             )
 
-            // Grounded WeatherGPT AI analysis
-            try {
-                val question = "What are the live weather, rain radar, and travel conditions right now around $locName?"
-                val response = ChatClient.api.askWeather(
-                    ChatWeatherRequest(
-                        question = question,
-                        latitude = lat,
-                        longitude = lon,
-                        language = "English",
-                        agent_state = AgentState(
-                            location_name = locName,
-                            location_latitude = lat,
-                            location_longitude = lon
-                        )
-                    )
+            _uiState.update {
+                it.copy(
+                    isAnalyzingArea = false,
+                    areaAnalysis = localAnalysis,
+                    aiAnalysisAnswer = null,
+                    aiAnalysisSpeech = null
                 )
-
-                val answer = response.display_text ?: response.clarification ?: response.answer ?: recommendation
-                val speech = response.speech_text ?: answer
-
-                _uiState.update {
-                    it.copy(
-                        isAnalyzingArea = false,
-                        areaAnalysis = localAnalysis,
-                        aiAnalysisAnswer = answer,
-                        aiAnalysisSpeech = speech
-                    )
-                }
-            } catch (e: Exception) {
-                Log.w("MapViewModel", "AI Analysis error: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        isAnalyzingArea = false,
-                        areaAnalysis = localAnalysis,
-                        aiAnalysisAnswer = recommendation,
-                        aiAnalysisSpeech = recommendation
-                    )
-                }
             }
         }
     }

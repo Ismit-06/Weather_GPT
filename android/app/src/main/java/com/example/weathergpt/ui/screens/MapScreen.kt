@@ -32,7 +32,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
@@ -79,7 +78,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.weathergpt.audio.VoiceAssistantManager
 import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.ui.components.GlassCard
 import com.example.weathergpt.ui.theme.BackgroundDark
@@ -150,14 +148,7 @@ fun MapScreen(
     var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
     var selectedLocationMarker by remember { mutableStateOf<Marker?>(null) }
     var currentRadarOverlay by remember { mutableStateOf<TilesOverlay?>(null) }
-    var showAiAnalysisDialog by remember { mutableStateOf(false) }
-
-    val voiceAssistant = remember { VoiceAssistantManager(context) }
-    DisposableEffect(Unit) {
-        onDispose {
-            voiceAssistant.destroy()
-        }
-    }
+    var showWeatherDetailsDialog by remember { mutableStateOf(false) }
 
     // Initialize MapViewModel with location
     LaunchedEffect(savedLocation) {
@@ -481,7 +472,7 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 80.dp, start = 12.dp, end = 12.dp)
+                    .padding(top = 100.dp, start = 12.dp, end = 12.dp)
                     .fillMaxWidth()
             ) {
                 // Radar Player Bar
@@ -575,7 +566,7 @@ fun MapScreen(
                                         .border(1.dp, Color(0x664DA3FF), RoundedCornerShape(10.dp))
                                         .clickable { mapViewModel.selectLatestRadarFrame() }
                                         .padding(horizontal = 8.dp, vertical = 6.dp)
-                                ) {
+                                    ) {
                                     Text(
                                         text = "LATEST",
                                         color = SecondaryCyan,
@@ -735,7 +726,7 @@ fun MapScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
             shape = RoundedCornerShape(18.dp),
             padding = 10.dp
         ) {
@@ -834,10 +825,10 @@ fun MapScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Analyze This Area Button
+                // View Weather Details Button
                 Button(
                     onClick = {
-                        showAiAnalysisDialog = true
+                        showWeatherDetailsDialog = true
                         mapViewModel.analyzeCurrentArea()
                     },
                     modifier = Modifier
@@ -860,7 +851,7 @@ fun MapScreen(
                             )
                         }
                         Text(
-                            text = if (uiState.isAnalyzingArea) "Analyzing Area..." else "Analyze This Area",
+                            text = if (uiState.isAnalyzingArea) "Loading Details..." else "View Weather Details",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
@@ -871,14 +862,14 @@ fun MapScreen(
         }
 
         // =================================================================
-        // AI ANALYSIS DIALOG (GROUNDED WEATHERGPT INTELLIGENCE)
+        // WEATHER DETAILS MODAL (STRUCTURED TELEMETRY ONLY - NO ESSAY, NO TTS)
         // =================================================================
-        if (showAiAnalysisDialog) {
+        if (showWeatherDetailsDialog) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0x80000000))
-                    .clickable { showAiAnalysisDialog = false },
+                    .clickable { showWeatherDetailsDialog = false },
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
@@ -886,7 +877,7 @@ fun MapScreen(
                         .fillMaxWidth(0.92f)
                         .clickable(enabled = false) {},
                     shape = RoundedCornerShape(24.dp),
-                    color = Color(0xF20A1626),
+                    color = Color(0xF50A1626),
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
@@ -895,22 +886,30 @@ fun MapScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "🤖", fontSize = 18.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
+                            Column {
                                 Text(
-                                    text = "WeatherGPT Intelligence",
+                                    text = "WEATHER DETAILS",
+                                    color = SecondaryCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = uiState.selectedLocationName.ifBlank { "Selected Location" },
                                     color = TextPrimary,
-                                    fontSize = 16.sp,
+                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "%.4f° N, %.4f° E".format(uiState.selectedLatitude, uiState.selectedLongitude),
+                                    color = TextMuted,
+                                    fontSize = 11.sp
                                 )
                             }
 
                             IconButton(
-                                onClick = {
-                                    voiceAssistant.stopSpeaking()
-                                    showAiAnalysisDialog = false
-                                },
+                                onClick = { showWeatherDetailsDialog = false },
                                 modifier = Modifier.size(28.dp)
                             ) {
                                 Icon(
@@ -921,22 +920,129 @@ fun MapScreen(
                             }
                         }
 
-                        Text(
-                            text = uiState.selectedLocationName,
-                            color = SecondaryCyan,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        val w = uiState.weatherData
+                        if (w != null) {
+                            // Primary Temperature and Condition Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = w.temperature?.let { "%.1f°C".format(it) } ?: "--",
+                                        color = TextPrimary,
+                                        fontSize = 36.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    w.apparentTemperature?.let {
+                                        Text(
+                                            text = "Feels like %.1f°C".format(it),
+                                            color = TextSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
 
-                        if (uiState.isAnalyzingArea) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0x334DA3FF),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x664DA3FF))
+                                ) {
+                                    Text(
+                                        text = w.conditionText ?: "Live Weather",
+                                        color = SecondaryCyan,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            // Structured Metrics 2x2 Grid
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                DetailMetricTile(
+                                    label = "Rain Risk",
+                                    value = w.rainProbability?.let { "%.0f%%".format(it) } ?: "--",
+                                    icon = "🌧️",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DetailMetricTile(
+                                    label = "Humidity",
+                                    value = w.humidity?.let { "%.0f%%".format(it) } ?: "--",
+                                    icon = "💧",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                DetailMetricTile(
+                                    label = "Wind Speed",
+                                    value = w.windSpeed?.let { "%.1f m/s".format(it) } ?: "--",
+                                    icon = "💨",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DetailMetricTile(
+                                    label = "Pressure",
+                                    value = w.pressure?.let { "%.0f hPa".format(it) } ?: "--",
+                                    icon = "🌡️",
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Radar & Layer Status line
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0x22FFFFFF),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Radar Observation",
+                                        color = TextMuted,
+                                        fontSize = 11.sp
+                                    )
+                                    Text(
+                                        text = if (w.rainProbability != null && w.rainProbability > 50.0) {
+                                            "Active precipitation detected"
+                                        } else {
+                                            "Clear radar returns"
+                                        },
+                                        color = if (w.rainProbability != null && w.rainProbability > 50.0) {
+                                            WarningAmber
+                                        } else {
+                                            SuccessGreen
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        } else {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 16.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(vertical = 20.dp),
+                                horizontalArrangement = Arrangement.Center
                             ) {
                                 CircularProgressIndicator(
                                     color = PrimaryBlue,
@@ -945,42 +1051,10 @@ fun MapScreen(
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Synthesizing radar & weather telemetry...",
+                                    text = "Loading weather details...",
                                     color = TextSecondary,
                                     fontSize = 13.sp
                                 )
-                            }
-                        } else {
-                            val answer = uiState.aiAnalysisAnswer
-                                ?: uiState.areaAnalysis?.recommendation
-                                ?: "Conditions are normal around this location."
-
-                            Text(
-                                text = answer,
-                                color = TextPrimary,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        val speechText = uiState.aiAnalysisSpeech ?: answer
-                                        voiceAssistant.speak(speechText, "en-IN")
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                                        contentDescription = "Speak analysis",
-                                        tint = SecondaryCyan
-                                    )
-                                }
                             }
                         }
                     }
@@ -1039,6 +1113,32 @@ private fun AreaMetricBox(
             Text(text = label, color = TextMuted, fontSize = 10.sp)
             Spacer(modifier = Modifier.height(2.dp))
             Text(text = value, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun DetailMetricTile(
+    label: String,
+    value: String,
+    icon: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0x330A1626))
+            .border(1.dp, Color(0x3378BEFF), RoundedCornerShape(14.dp))
+            .padding(vertical = 10.dp, horizontal = 12.dp)
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = icon, fontSize = 13.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = label, color = TextMuted, fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = value, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
