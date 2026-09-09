@@ -17,24 +17,22 @@ class ResolvedQuery:
 
 
 def extract_time(text: str) -> str | None:
-
     patterns = [
-        r"\b\d{1,2}:\d{2}\s*(?:am|pm)\b",
-        r"\b\d{1,2}\s*(?:am|pm)\b",
-        r"\b\d{1,2}\s*(?:a\.m\.|p\.m\.)\b",
-        r"\b\d{1,2}\s*baje\b",
-        r"\b\d{1,2}\s*बजे\b",
+        r"\b\d{1,2}:\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)\b",
+        r"\b\d{1,2}\s*(?:am|pm|a\.m\.|p\.m\.)\b",
+        r"\b\d{1,2}\s*(?:baje|बजे)\b",
+        r"\b(?:at|around|by|for|what about|and)\s+(\d{1,2}(?::\d{2})?)\b",
+        r"^\s*(\d{1,2}(?::\d{2})?)\s*(?:\?|\.)?\s*$",
     ]
 
     for pattern in patterns:
-
         match = re.search(
             pattern,
             text,
             flags=re.IGNORECASE,
         )
-
         if match:
+            # If the pattern has a capture group (like bare number in 'what about 7'), return the full matched phrase or group
             return match.group(0)
 
     return None

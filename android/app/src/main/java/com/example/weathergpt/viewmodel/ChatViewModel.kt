@@ -25,7 +25,8 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val detectedLanguage: String? = null,
-    val detectedLanguageCode: String? = null
+    val detectedLanguageCode: String? = null,
+    val latestSpeechText: String? = null
 )
 
 
@@ -128,13 +129,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                val answer =
-                    response.answer
+                val displayText =
+                    response.display_text
+                        ?.trim()
+                        .takeUnless {
+                            it.isNullOrEmpty()
+                        }
+                        ?: response.answer
                         ?.trim()
                         .takeUnless {
                             it.isNullOrEmpty()
                         }
                         ?: "I couldn't generate a response."
+
+                val speechText =
+                    response.speech_text
+                        ?.trim()
+                        .takeUnless {
+                            it.isNullOrEmpty()
+                        }
+                        ?: displayText
 
                 val instantMessages = listOf(
                     ChatUiMessage(
@@ -143,7 +157,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     ),
                     ChatUiMessage(
                         role = "assistant",
-                        content = answer
+                        content = displayText
                     )
                 )
 
@@ -155,7 +169,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         detectedLanguage =
                             response.language,
                         detectedLanguageCode =
-                            response.language_code
+                            response.language_code,
+                        latestSpeechText = speechText
                     )
 
             } catch (e: Exception) {
@@ -188,6 +203,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun updateVoiceInteraction(
         userQuery: String,
         answerText: String,
+        speechText: String? = null,
         language: String?,
         languageCode: String?
     ) {
@@ -206,7 +222,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = false,
             error = null,
             detectedLanguage = language,
-            detectedLanguageCode = languageCode
+            detectedLanguageCode = languageCode,
+            latestSpeechText = speechText ?: answerText
         )
     }
 

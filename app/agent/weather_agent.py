@@ -1185,7 +1185,10 @@ class WeatherAgent:
             )
 
         from app.services.openrouter_chat import refine_conversational_text
-        answer = refine_conversational_text(answer)
+        from app.services.speech_sanitizer import prepare_text_for_speech
+
+        display_text = refine_conversational_text(answer)
+        speech_text = prepare_text_for_speech(display_text, language_code or "en-IN")
 
         return {
             "status":
@@ -1216,7 +1219,20 @@ class WeatherAgent:
                 script_code,
 
             "answer":
-                answer,
+                display_text,
+
+            "display_text":
+                display_text,
+
+            "speech_text":
+                speech_text,
+
+            "message": {
+                "display_text": display_text,
+                "speech_text": speech_text,
+                "language": detected_language,
+                "language_code": language_code,
+            },
 
             "tool":
                 tool_result,

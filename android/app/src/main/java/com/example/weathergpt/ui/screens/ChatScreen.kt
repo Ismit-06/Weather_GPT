@@ -233,6 +233,7 @@ fun ChatScreen(
             chatViewModel.updateVoiceInteraction(
                 userQuery = userQ,
                 answerText = displayText,
+                speechText = speechText,
                 language = lang,
                 languageCode = langCode
             )
@@ -321,7 +322,8 @@ fun ChatScreen(
             } else {
                 uiState.detectedLanguageCode ?: "en-IN"
             }
-            voiceAssistant.speak(lastMessage.content, speechLang)
+            val textToSpeak = uiState.latestSpeechText ?: lastMessage.content
+            voiceAssistant.speak(textToSpeak, speechLang)
         }
     }
 
@@ -571,8 +573,9 @@ fun ChatScreen(
                             if (isSpeaking) {
                                 voiceAssistant.stopSpeaking()
                             } else {
+                                val textToSpeak = uiState.latestSpeechText ?: latestAssistant.content
                                 voiceAssistant.speak(
-                                    latestAssistant.content,
+                                    textToSpeak,
                                     uiState.detectedLanguageCode
                                 )
                             }

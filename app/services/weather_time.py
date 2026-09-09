@@ -100,82 +100,69 @@ def normalize_time(
     minute = 0
 
     # ---------------------------------------------------------
-    # Explicit AM/PM time
+    # Explicit AM/PM time (e.g., "8 PM", "6:30 am", "8pm")
     # ---------------------------------------------------------
-
     match = re.search(
-        r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)",
+        r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)",
         time_value,
+        flags=re.IGNORECASE,
     )
 
     if match:
-
         hour = int(match.group(1))
-
-        minute = int(
-            match.group(2) or 0
-        )
-
-        meridiem = match.group(3)
+        minute = int(match.group(2) or 0)
+        meridiem = match.group(3).lower().replace(".", "")
 
         if meridiem == "pm" and hour != 12:
             hour += 12
-
         elif meridiem == "am" and hour == 12:
             hour = 0
 
     else:
-
         # -----------------------------------------------------
-        # Hindi/Romanized clock time
+        # Hindi/Romanized clock time (e.g., "8 baje", "6 बजे")
+        # or bare hours (e.g., "8", "at 8", "what about 7")
         # -----------------------------------------------------
-
-        match = re.search(
-            r"(\d{1,2})\s*(?:baje|बजे)",
+        match_baje = re.search(
+            r"(\d{1,2})(?::(\d{2}))?\s*(?:baje|बजे)",
             time_value,
+            flags=re.IGNORECASE,
         )
+        match_bare = re.search(
+            r"(?:at|around|by|about|for|what about|and)?\s*(\d{1,2})(?::(\d{2}))?",
+            time_value,
+            flags=re.IGNORECASE,
+        ) if not match_baje else None
 
-        if match:
+        matched_num = match_baje or match_bare
 
-            hour = int(
-                match.group(1)
-            )
+        if matched_num:
+            parsed_hour = int(matched_num.group(1))
+            if 1 <= parsed_hour <= 12:
+                minute = int(matched_num.group(2) or 0)
+                is_morning = any(x in day_value or x in time_value for x in ["subah", "सुबह", "morning", "am", "ఉదయం", "காலை", "সকাল", "ಬೆಳಗ್ಗೆ"])
+                is_afternoon = any(x in day_value or x in time_value for x in ["dopahar", "दोपहर", "afternoon", "మధ్యాహ్నం", "மதியம்", "দুপুর"])
+                is_evening_night = any(x in day_value or x in time_value for x in ["shaam", "शाम", "evening", "raat", "रात", "night", "pm", "సాయంత్రం", "రాత్రి", "இரவு"])
 
-            if any(
-                x in day_value
-                for x in [
-                    "raat",
-                    "रात",
-                    "night",
-                ]
-            ):
-
-                if hour < 12:
-                    hour += 12
-
-            elif any(
-                x in day_value
-                for x in [
-                    "shaam",
-                    "शाम",
-                    "evening",
-                ]
-            ):
-
-                if hour < 12:
-                    hour += 12
-
-            elif any(
-                x in day_value
-                for x in [
-                    "subah",
-                    "सुबह",
-                    "morning",
-                ]
-            ):
-
-                if hour == 12:
-                    hour = 0
+                if is_morning:
+                    hour = 0 if parsed_hour == 12 else parsed_hour
+                elif is_afternoon:
+                    hour = parsed_hour if parsed_hour >= 12 else parsed_hour + 12
+                elif is_evening_night:
+                    hour = parsed_hour if parsed_hour >= 12 else parsed_hour + 12
+                else:
+                    # Contextual heuristic when neither morning nor evening is specified:
+                    # Hours 4 to 11 without daypart default to PM (e.g. 5 -> 5 PM, 6 -> 6 PM, 7 -> 7 PM, 8 -> 8 PM, 9 -> 9 PM)
+                    # unless current time is early morning and asking about today.
+                    if 4 <= parsed_hour <= 11:
+                        if current.hour >= 12 or parsed_hour < current.hour:
+                            hour = parsed_hour + 12
+                        else:
+                            hour = parsed_hour
+                    elif parsed_hour <= 3:
+                        hour = parsed_hour + 12  # 1 PM, 2 PM, 3 PM
+                    else:
+                        hour = parsed_hour
 
     # ---------------------------------------------------------
     # Daypart when no explicit clock time exists.

@@ -52,6 +52,8 @@ data class ChatWeatherResponse(
     val language_code: String?,
     val script_code: String?,
     val answer: String?,
+    val display_text: String?,
+    val speech_text: String?,
     val source: String?,
     val updated_at: String?,
     val location: ChatLocation?,
