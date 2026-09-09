@@ -188,8 +188,33 @@ async def run_weather_tool(
             return result
 
         if target_local_time is None:
-            # If no time is specified (e.g. "Can I go for a run in Mumbai?"),
-            # automatically evaluate the best window for today / current weather
+            # For immediate activity queries (e.g. "Can I go for a run right now?" / "Can I run in Amaravati?"),
+            # evaluate current weather conditions immediately.
+            curr = await get_current_weather(latitude=latitude, longitude=longitude)
+            if curr.get("status") == "success":
+                forecast_data = curr.get("current", {})
+                curr["activity_assessment"] = assess_activity_conditions(
+                    activity=activity,
+                    forecast=forecast_data,
+                )
+                try:
+                    best_res = await get_best_activity_time(
+                        latitude=latitude,
+                        longitude=longitude,
+                        activity=activity,
+                        date_text=date_text or "today",
+                        timezone_name=timezone_name,
+                    )
+                    if best_res.get("status") == "success" and best_res.get("best_window"):
+                        curr["best_window"] = best_res.get("best_window")
+                        curr["other_windows"] = best_res.get("other_windows")
+                        curr["recommendation"] = best_res.get("recommendation")
+                except Exception:
+                    pass
+                curr["intent"] = intent
+                return curr
+
+            # Fallback to best activity time if current weather endpoint failed
             best_res = await get_best_activity_time(
                 latitude=latitude,
                 longitude=longitude,
@@ -201,23 +226,7 @@ async def run_weather_tool(
                 best_res["intent"] = intent
                 return best_res
 
-            # Fallback to current weather snapshot assessment
-            curr = await get_current_weather(latitude=latitude, longitude=longitude)
-            if curr.get("status") == "success":
-                curr["activity_assessment"] = assess_activity_conditions(
-                    activity=activity,
-                    forecast=curr.get("current", {}),
-                )
-                curr["intent"] = intent
-                return curr
-
-            return {
-                "status": "needs_clarification",
-                "intent": intent,
-                "message": (
-                    "A specific time or date is helpful for this activity assessment."
-                ),
-            }
+            return curr or {"status": "error", "intent": intent, "message": "Weather data currently unavailable"}
 
         result = await get_forecast_at_time(
             latitude=latitude,

@@ -143,7 +143,9 @@ def prepare_text_for_speech(text: str, language_code: str = "en-IN") -> str:
     t = re.sub(r"(\d+(?::\d+)?)\s*[–—\-]\s*(\d+(?::\d+)?)\s*(AM|PM|am|pm|baje)?\b", r"\1 to \2 \3", t)
     t = re.sub(r"\s*[—–]\s*", ", ", t)
 
-    # 8. Strip markdown symbols
+    # 8. Strip markdown symbols & clean non-Indic dandas
+    if not re.search(r"[\u0900-\u097F\u0B00-\u0B7F\u0A80-\u0AFF\u0A00-\u0A7F]", t):
+        t = t.replace("।", ", ")
     t = re.sub(r"[*#_`~>\[\]()|]", "", t)
 
     # 9. Clean punctuation & whitespace

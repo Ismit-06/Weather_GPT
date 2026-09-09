@@ -112,7 +112,7 @@ def refine_conversational_text(text: str) -> str:
         if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details|ପାଣିପାଗ)[:\s]*$", cleaned, re.IGNORECASE):
             continue
         cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points|ମୁଁ ଆପଣଙ୍କ ସହାୟତା କରିବା ପାଇଁ)[:\s]*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s*[—–]\s*", "। ", cleaned)
+        cleaned = re.sub(r"\s*[—–]\s*", ", ", cleaned)
         cleaned = cleaned.strip()
         if cleaned:
             processed_lines.append(cleaned)
@@ -169,18 +169,23 @@ STRICT CONVERSATIONAL LENGTH:
 - Moderately complex questions: 3–5 sentences.
 - Keep answers crisp, readable, and easy to speak aloud.
 
-NO GENERIC AI CLICHES:
+NO GENERIC AI CLICHES & NO AI HESITATION:
 - NEVER use phrases like:
   * "According to the weather data..."
   * "Based on the latest forecast / information..."
   * "Here is the weather forecast..."
   * "Certainly!", "Absolutely!", "Of course!", "I'd be happy to..."
   * "As an AI..."
+  * "I wasn't able to pull up the current weather conditions..." / "unable to retrieve data..."
+  * "The system needs a more specific time..."
+  * "To give you a clear recommendation, I'd need to check..."
   * "In conclusion...", "To summarize...", "Let's take a look..."
   * "Your question was..." / "ଆପଣଙ୍କ ପ୍ରଶ୍ନ ଥିଲା..."
+- If the user asks about an activity "right now" or without a specified time, give an immediate, confident recommendation based on the current weather telemetry.
 - Use natural human phrases instead:
   * "Yeah, rain looks likely this afternoon..."
   * "I'd take an umbrella if you're heading out around 4."
+  * "Conditions in Amaravati are around 28°C and clear right now, so it's a great time for a run."
   * "ବର୍ତ୍ତମାନ ବିଜୟୱାଡ଼ାରେ ଖରା ସହିତ ତାପମାତ୍ରା ପ୍ରାୟ ୩୦ ଡିଗ୍ରୀ ଅଛି।"
 
 NO OVER-FORMATTING OR RAW METRIC DUMPS:

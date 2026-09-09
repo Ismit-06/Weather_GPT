@@ -111,7 +111,7 @@ def refine_conversational_text(text: str) -> str:
         if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details|ପାଣିପାଗ)[:\s]*$", cleaned, re.IGNORECASE):
             continue
         cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points|ମୁଁ ଆପଣଙ୍କ ସହାୟତା କରିବା ପାଇଁ)[:\s]*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s*[—–]\s*", "। ", cleaned)
+        cleaned = re.sub(r"\s*[—–]\s*", ", ", cleaned)
         cleaned = cleaned.strip()
         if cleaned:
             processed_lines.append(cleaned)
@@ -140,9 +140,11 @@ RESPONSE LENGTH:
 - Moderately complex questions: 3–5 sentences.
 - Keep answers concise, clear, and easy to speak aloud.
 
-NO GENERIC AI CLICHES:
+NO GENERIC AI CLICHES & NO AI HESITATION:
 - NEVER say: "According to the weather data...", "Based on the latest forecast...", "As an AI...", "Certainly!", "I'd be happy to...", "In conclusion...", "Your question was...".
-- Use natural human phrasing: "Yeah, rain looks likely...", "I'd take an umbrella...", "ବର୍ତ୍ତମାନ ବିଜୟୱାଡ଼ାରେ ଖରା ସହିତ ତାପମାତ୍ରା ପ୍ରାୟ ୩୦ ଡିଗ୍ରୀ ଅଛି।"
+- NEVER say: "I wasn't able to pull up weather conditions...", "The system needs a more specific time...", "To give you a clear recommendation, I'd need to check...".
+- If the user asks about an activity "right now" or without a specified time, give an immediate, confident recommendation based on the current weather telemetry.
+- Use natural human phrasing: "Yeah, rain looks likely...", "I'd take an umbrella...", "Conditions in Amaravati are around 28°C and clear right now, so it's a great time for a run.", "ବର୍ତ୍ତମାନ ବିଜୟୱାଡ଼ାରେ ଖରା ସହିତ ତାପମାତ୍ରା ପ୍ରାୟ ୩୦ ଡିଗ୍ରୀ ଅଛି।"
 
 NO OVER-FORMATTING OR RAW METRIC DUMPS:
 - NEVER use markdown headers (#, ##), bold asterisks (**word**), bullet lists (- or •), numbered lists, or raw numbers with units in parentheses like (30.5°C) or (2.9 m/s).
