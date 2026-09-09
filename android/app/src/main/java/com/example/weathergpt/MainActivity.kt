@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         // Initialize OSMDroid configuration safely with internal cache paths
         try {
             val osmConfig = org.osmdroid.config.Configuration.getInstance()
-            osmConfig.userAgentValue = packageName
+            osmConfig.userAgentValue = "WeatherGPT/1.0 (contact@weathergpt.app; Android)"
             val osmBaseDir = java.io.File(cacheDir, "osmdroid")
             if (!osmBaseDir.exists()) osmBaseDir.mkdirs()
             val osmTileDir = java.io.File(osmBaseDir, "tiles")
