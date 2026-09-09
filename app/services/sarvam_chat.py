@@ -43,9 +43,44 @@ def refine_conversational_text(text: str) -> str:
     t = re.sub(r"\s*\((?:वर्षा|बारिश|rain|rainfall|wind|हवा|humidity|आर्द्रता|temp|तापमान)?:?\s*[\d.]+\s*(?:mm|m/s|km/h|°C|%|hPa)?\)", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\s*\([\d.]+\s*(?:mm|m/s|km/h|°C|%|hPa)\)", "", t, flags=re.IGNORECASE)
 
-    # Remove markdown bold/italic/header symbols
-    t = re.sub(r"[*#_`~>\[\]]", "", t)
-    
+    # Transliterate English city names into Odia / Hindi / Telugu if present
+    odia_cities = {
+        r"(?i)\bvijayawada\b": "ବିଜୟୱାଡ଼ା",
+        r"(?i)\bamaravati\b": "ଅମରାବତୀ",
+        r"(?i)\bbhubaneswar\b": "ଭୁବନେଶ୍ୱର",
+        r"(?i)\bcuttack\b": "କଟକ",
+        r"(?i)\bhyderabad\b": "ହାଇଦ୍ରାବାଦ",
+        r"(?i)\bdelhi\b": "ଦିଲ୍ଲୀ",
+        r"(?i)\bmumbai\b": "ମୁମ୍ବାଇ",
+    }
+    hindi_cities = {
+        r"(?i)\bvijayawada\b": "विजयवाड़ा",
+        r"(?i)\bamaravati\b": "अमरावती",
+        r"(?i)\bbhubaneswar\b": "भुवनेश्वर",
+        r"(?i)\bcuttack\b": "कटक",
+        r"(?i)\bhyderabad\b": "हैदराबाद",
+        r"(?i)\bdelhi\b": "दिल्ली",
+        r"(?i)\bmumbai\b": "मुंबई",
+    }
+    telugu_cities = {
+        r"(?i)\bvijayawada\b": "విజయవాడ",
+        r"(?i)\bamaravati\b": "అమరావతి",
+        r"(?i)\bbhubaneswar\b": "భువనేశ్వర్",
+        r"(?i)\bhyderabad\b": "హైదరాబాద్",
+        r"(?i)\bdelhi\b": "ఢిల్లీ",
+        r"(?i)\bmumbai\b": "ముంబై",
+    }
+
+    if re.search(r"[\u0B00-\u0B7F]", t):
+        for pat, rep in odia_cities.items():
+            t = re.sub(pat, rep, t)
+    elif re.search(r"[\u0900-\u097F]", t):
+        for pat, rep in hindi_cities.items():
+            t = re.sub(pat, rep, t)
+    elif re.search(r"[\u0C00-\u0C7F]", t):
+        for pat, rep in telugu_cities.items():
+            t = re.sub(pat, rep, t)
+
     # Convert bullet points and lines into natural sentences
     lines = [line.strip() for line in t.split("\n") if line.strip()]
     processed_lines = []
@@ -66,13 +101,16 @@ def refine_conversational_text(text: str) -> str:
             or "weather advisory or committee" in lower
             or ("could it be" in lower and lower.endswith("?"))
             or lower.startswith("the weather data provided is")
+            or "ଆପଣଙ୍କ ପ୍ରଶ୍ନ ଥିଲା" in line
+            or "your question was" in lower
+            or "you asked about" in lower
         ):
             continue
 
         cleaned = re.sub(r"^[-•–—\d.)]+\s*", "", line).strip()
-        if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details)[:\s]*$", cleaned, re.IGNORECASE):
+        if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details|ପାଣିପାଗ)[:\s]*$", cleaned, re.IGNORECASE):
             continue
-        cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points)[:\s]*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points|ମୁଁ ଆପଣଙ୍କ ସହାୟତା କରିବା ପାଇଁ)[:\s]*", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s*[—–]\s*", "। ", cleaned)
         cleaned = cleaned.strip()
         if cleaned:
@@ -95,19 +133,20 @@ CORE PERSONALITY & TONE:
 - Talk like a knowledgeable, helpful friend having a genuine conversation—not a government weather report or robotic bot.
 - Be calm, practical, direct, and conversational.
 - Answer the user's ACTUAL question without dumping unrelated weather metrics (no UV, pressure, humidity, or AQI unless requested or directly relevant).
+- If the user question is unclear or garbled, NEVER echo it back. Simply give current conditions for the location in 1-2 friendly sentences and ask how you can help.
 
 RESPONSE LENGTH:
-- Simple questions (e.g., "Will it rain?", "Should I take an umbrella?", "खेती करने जा सकते हैं?"): 1–3 sentences.
+- Simple questions (e.g., "Will it rain?", "Should I take an umbrella?", "ଖରା କେତେ ଅଛି?"): 1–3 sentences.
 - Moderately complex questions: 3–5 sentences.
 - Keep answers concise, clear, and easy to speak aloud.
 
 NO GENERIC AI CLICHES:
-- NEVER say: "According to the weather data...", "Based on the latest forecast...", "As an AI...", "Certainly!", "I'd be happy to...", "In conclusion...".
-- Use natural human phrasing: "Yeah, rain looks likely...", "I'd take an umbrella...", "हाँ, आज खेती के लिए मौसम अनुकूल है।"
+- NEVER say: "According to the weather data...", "Based on the latest forecast...", "As an AI...", "Certainly!", "I'd be happy to...", "In conclusion...", "Your question was...".
+- Use natural human phrasing: "Yeah, rain looks likely...", "I'd take an umbrella...", "ବର୍ତ୍ତମାନ ବିଜୟୱାଡ଼ାରେ ଖରା ସହିତ ତାପମାତ୍ରା ପ୍ରାୟ ୩୦ ଡିଗ୍ରୀ ଅଛି।"
 
 NO OVER-FORMATTING OR RAW METRIC DUMPS:
-- NEVER use markdown headers (#, ##), bold asterisks (**word**), bullet lists (- or •), numbered lists, or raw numbers with units in parentheses like (वर्षा: 0.0 mm) or (2.9 m/s).
-- Write in clean, fluid sentences.
+- NEVER use markdown headers (#, ##), bold asterisks (**word**), bullet lists (- or •), numbered lists, or raw numbers with units in parentheses like (30.5°C) or (2.9 m/s).
+- Write in clean, fluid sentences in the native script. Transliterate all city names into the target script (e.g., ବିଜୟୱାଡ଼ା, ଅମରାବତୀ, विजयवाड़ा).
 
 LANGUAGE:
 - Match the user's language naturally.

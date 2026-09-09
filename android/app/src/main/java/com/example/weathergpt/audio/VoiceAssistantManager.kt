@@ -412,10 +412,33 @@ class VoiceAssistantManager(private val context: Context) {
         content = content.replace(Regex("[\\p{So}\\p{Cn}\\p{Cs}\\p{Sk}\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}\\x{2300}-\\x{23FF}\\x{2B50}\\x{FE00}-\\x{FE0F}]"), "")
         content = content.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]"), "")
 
-        // 2. Convert time/number ranges phonetically (e.g. "4–5 PM", "4-6 PM" -> "4 to 5 PM")
+        // 2. Transliterate English location words into native scripts if Odia or Hindi is present
+        if (content.contains(Regex("[\u0B00-\u0B7F]"))) {
+            content = content.replace(Regex("(?i)\\bvijayawada\\b"), "ବିଜୟୱାଡ଼ା")
+            content = content.replace(Regex("(?i)\\bamaravati\\b"), "ଅମରାବତୀ")
+            content = content.replace(Regex("(?i)\\bbhubaneswar\\b"), "ଭୁବନେଶ୍ୱର")
+            content = content.replace(Regex("(?i)\\bcuttack\\b"), "କଟକ")
+            content = content.replace(Regex("(?i)\\bhyderabad\\b"), "ହାଇଦ୍ରାବାଦ")
+            content = content.replace(Regex("(?i)\\bdelhi\\b"), "ଦିଲ୍ଲୀ")
+            content = content.replace(Regex("(?i)\\bmumbai\\b"), "ମୁମ୍ବାଇ")
+        } else if (content.contains(Regex("[\u0900-\u097F]"))) {
+            content = content.replace(Regex("(?i)\\bvijayawada\\b"), "विजयवाड़ा")
+            content = content.replace(Regex("(?i)\\bamaravati\\b"), "अमरावती")
+            content = content.replace(Regex("(?i)\\bbhubaneswar\\b"), "भुवनेश्वर")
+            content = content.replace(Regex("(?i)\\bcuttack\\b"), "कटक")
+            content = content.replace(Regex("(?i)\\bhyderabad\\b"), "हैदराबाद")
+            content = content.replace(Regex("(?i)\\bdelhi\\b"), "दिल्ली")
+            content = content.replace(Regex("(?i)\\bmumbai\\b"), "मुंबई")
+        } else if (content.contains(Regex("[\u0C00-\u0C7F]"))) {
+            content = content.replace(Regex("(?i)\\bvijayawada\\b"), "విజయవాడ")
+            content = content.replace(Regex("(?i)\\bamaravati\\b"), "అమరావతి")
+            content = content.replace(Regex("(?i)\\bhyderabad\\b"), "హైదరాబాద్")
+        }
+
+        // 3. Convert time/number ranges phonetically (e.g. "4–5 PM", "4-6 PM" -> "4 to 5 PM")
         content = content.replace(Regex("(\\d+(?::\\d+)?)\\s*[–—\\-]\\s*(\\d+(?::\\d+)?)\\s*(AM|PM|am|pm|baje)?\\b"), "$1 to $2 $3")
 
-        // 3. Expand units phonetically for natural speaking
+        // 4. Expand units phonetically for natural speaking
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*C\\b"), "$1 degrees Celsius")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\s*F\\b"), "$1 degrees Fahrenheit")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*°\\b"), "$1 degrees")
@@ -424,13 +447,13 @@ class VoiceAssistantManager(private val context: Context) {
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*mm\\b"), "$1 millimeters")
         content = content.replace(Regex("(?i)(\\d+(?:\\.\\d+)?)\\s*%\\b"), "$1 percent")
 
-        // 4. Strip all markdown formatting, bullet points, headers, and separators
+        // 5. Strip all markdown formatting, bullet points, headers, and separators
         content = content.replace(Regex("(?m)^\\s*[-*•]\\s*"), "")
         content = content.replace(Regex("[-=]{2,}"), " ")
         content = content.replace(Regex("[#*`_~>\\[\\]()|]"), " ")
         content = content.replace(Regex("\\bhttps?://\\S+"), "")
 
-        // 5. Clean whitespace and excess punctuation
+        // 6. Clean whitespace and excess punctuation
         content = content.replace(Regex("\\s+"), " ")
         content = content.replace(Regex("\\.{2,}"), ".")
         content = content.replace(Regex("\\s+([.,!?])"), "$1")

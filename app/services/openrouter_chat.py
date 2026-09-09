@@ -44,6 +44,44 @@ def refine_conversational_text(text: str) -> str:
     # Remove markdown bold/italic/header symbols
     t = re.sub(r"[*#_`~>\[\]]", "", t)
     
+    # Transliterate English city names into Odia / Hindi / Telugu if present
+    odia_cities = {
+        r"(?i)\bvijayawada\b": "ବିଜୟୱାଡ଼ା",
+        r"(?i)\bamaravati\b": "ଅମରାବତୀ",
+        r"(?i)\bbhubaneswar\b": "ଭୁବନେଶ୍ୱର",
+        r"(?i)\bcuttack\b": "କଟକ",
+        r"(?i)\bhyderabad\b": "ହାଇଦ୍ରାବାଦ",
+        r"(?i)\bdelhi\b": "ଦିଲ୍ଲୀ",
+        r"(?i)\bmumbai\b": "ମୁମ୍ବାଇ",
+    }
+    hindi_cities = {
+        r"(?i)\bvijayawada\b": "विजयवाड़ा",
+        r"(?i)\bamaravati\b": "अमरावती",
+        r"(?i)\bbhubaneswar\b": "भुवनेश्वर",
+        r"(?i)\bcuttack\b": "कटक",
+        r"(?i)\bhyderabad\b": "हैदराबाद",
+        r"(?i)\bdelhi\b": "दिल्ली",
+        r"(?i)\bmumbai\b": "मुंबई",
+    }
+    telugu_cities = {
+        r"(?i)\bvijayawada\b": "విజయవాడ",
+        r"(?i)\bamaravati\b": "అమరావతి",
+        r"(?i)\bbhubaneswar\b": "భువనేశ్వర్",
+        r"(?i)\bhyderabad\b": "హైదరాబాద్",
+        r"(?i)\bdelhi\b": "ఢిల్లీ",
+        r"(?i)\bmumbai\b": "ముంబై",
+    }
+
+    if re.search(r"[\u0B00-\u0B7F]", t):
+        for pat, rep in odia_cities.items():
+            t = re.sub(pat, rep, t)
+    elif re.search(r"[\u0900-\u097F]", t):
+        for pat, rep in hindi_cities.items():
+            t = re.sub(pat, rep, t)
+    elif re.search(r"[\u0C00-\u0C7F]", t):
+        for pat, rep in telugu_cities.items():
+            t = re.sub(pat, rep, t)
+
     # Convert bullet points and lines into natural sentences
     lines = [line.strip() for line in t.split("\n") if line.strip()]
     processed_lines = []
@@ -64,14 +102,16 @@ def refine_conversational_text(text: str) -> str:
             or "weather advisory or committee" in lower
             or ("could it be" in lower and lower.endswith("?"))
             or lower.startswith("the weather data provided is")
+            or "ଆପଣଙ୍କ ପ୍ରଶ୍ନ ଥିଲା" in line
+            or "your question was" in lower
+            or "you asked about" in lower
         ):
             continue
 
         cleaned = re.sub(r"^[-•–—\d.)]+\s*", "", line).strip()
-        # Remove header lines
-        if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details)[:\s]*$", cleaned, re.IGNORECASE):
+        if re.search(r"(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details|forecast details|ପାଣିପାଗ)[:\s]*$", cleaned, re.IGNORECASE):
             continue
-        cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points)[:\s]*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points|ମୁଁ ଆପଣଙ୍କ ସହାୟତା କରିବା ପାଇଁ)[:\s]*", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"\s*[—–]\s*", "। ", cleaned)
         cleaned = cleaned.strip()
         if cleaned:
@@ -88,13 +128,13 @@ def get_language_instruction(language: str) -> tuple[str, str]:
     """Returns (canonical_language_name, mandatory_instruction)"""
     l = (language or "English").strip().lower()
     if any(k in l for k in ["odia", "oriya", "od-in", "or-in", "or"]):
-        return "Odia", "CRITICAL: You MUST reply directly in natural ODIA (ଓଡ଼ିଆ script). Never use bullet points, asterisks, or parenthetical metrics. Write in 1–3 clear sentences."
+        return "Odia", "CRITICAL: You MUST reply directly in natural ODIA (ଓଡ଼ିଆ script). Transliterate all English city names directly into Odia script (write ବିଜୟୱାଡ଼ା for Vijayawada, ଅମରାବତୀ for Amaravati, ଭୁବନେଶ୍ୱର for Bhubaneswar). NEVER output English letters. NEVER use bullet points, asterisks, or parenthetical metrics. Write in 1–3 clear sentences."
     if any(k in l for k in ["hinglish"]):
         return "Hinglish", "CRITICAL: You MUST reply directly in conversational Romanized Hindi (Hinglish). Use simple everyday words. Never use bullet points or asterisks. Write in 1–3 clear sentences."
     if any(k in l for k in ["hindi", "hi-in", "hi"]):
-        return "Hindi", "CRITICAL: You MUST reply directly in natural HINDI (हिन्दी script). Never use bullet points, asterisks, hyphens, or parenthetical metrics (like 0.0 mm or 2.9 m/s). Write in 1–3 fluid, conversational sentences."
+        return "Hindi", "CRITICAL: You MUST reply directly in natural HINDI (हिन्दी script). Transliterate all English city names directly into Hindi script (write विजयवाड़ा, अमरावती, भुवनेश्वर). Never output English words inside Hindi sentences. Never use bullet points, asterisks, hyphens, or parenthetical metrics (like 0.0 mm or 2.9 m/s). Write in 1–3 fluid, conversational sentences."
     if any(k in l for k in ["telugu", "te-in", "te"]):
-        return "Telugu", "CRITICAL: You MUST reply directly in natural TELUGU (తెలుగు script). Write in 1–3 clear, fluent sentences without bullets or asterisks."
+        return "Telugu", "CRITICAL: You MUST reply directly in natural TELUGU (తెలుగు script). Transliterate all city names into Telugu script (write విజయవాడ, అమరావతి). Write in 1–3 clear, fluent sentences without bullets or asterisks."
     if any(k in l for k in ["tamil", "ta-in", "ta"]):
         return "Tamil", "CRITICAL: You MUST reply directly in natural TAMIL (தமிழ் script). Write in 1–3 clear, fluent sentences without bullets or asterisks."
     if any(k in l for k in ["bengali", "bn-in", "bn"]):
@@ -122,10 +162,10 @@ CORE PERSONALITY & TONE:
 - You talk like a knowledgeable, helpful friend having a genuine conversation—not a government weather bulletin, news report, or robotic chatbot.
 - Be calm, practical, conversational, and direct.
 - Answer the user's ACTUAL question first without dumping unrelated metrics (do NOT recite UV, pressure, humidity, wind, or dew point unless the user asked or it directly explains the answer).
-- When data is confident, sound clear and practical. When uncertain, sound honest and cautious.
+- If the user's question is unclear or garbled, NEVER echo the garbled words back. Simply give the current conditions for the location in 1-2 friendly sentences and ask how you can help.
 
 STRICT CONVERSATIONAL LENGTH:
-- Simple questions (e.g., "Will it rain?", "Should I take an umbrella?", "Can I run at 6?", "खेती करने जा सकते हैं?"): 1–3 sentences.
+- Simple questions (e.g., "Will it rain?", "Should I take an umbrella?", "Can I run at 6?", "ଖରା କେତେ ଅଛି?"): 1–3 sentences.
 - Moderately complex questions: 3–5 sentences.
 - Keep answers crisp, readable, and easy to speak aloud.
 
@@ -137,21 +177,15 @@ NO GENERIC AI CLICHES:
   * "Certainly!", "Absolutely!", "Of course!", "I'd be happy to..."
   * "As an AI..."
   * "In conclusion...", "To summarize...", "Let's take a look..."
+  * "Your question was..." / "ଆପଣଙ୍କ ପ୍ରଶ୍ନ ଥିଲା..."
 - Use natural human phrases instead:
   * "Yeah, rain looks likely this afternoon..."
   * "I'd take an umbrella if you're heading out around 4."
-  * "6 PM looks pretty good—the rain should clear up by then."
-  * "हाँ, आज खेती के लिए मौसम बिल्कुल सही है।"
+  * "ବର୍ତ୍ତମାନ ବିଜୟୱାଡ଼ାରେ ଖରା ସହିତ ତାପମାତ୍ରା ପ୍ରାୟ ୩୦ ଡିଗ୍ରୀ ଅଛି।"
 
 NO OVER-FORMATTING OR RAW METRIC DUMPS:
-- NEVER use markdown headers (#, ##), bold text (**word**), bullet lists (- or •), numbered lists, markdown tables, or raw numbers with units in parentheses like (वर्षा: 0.0 mm) or (2.9 m/s).
-- Write ONLY clean, fluid, natural sentences.
-
-LANGUAGE:
-- Match the user's language naturally.
-- English: use natural contractions ("It's", "you're", "there's", "I'd").
-- Hinglish: speak natural conversational Hinglish.
-- Hindi: speak natural, everyday Hindi (e.g., "हाँ, आज खेती के लिए मौसम अनुकूल है। बारिश की संभावना नहीं है और हल्की हवा चल रही है।"). Never mix awkward English terms like "blowing रही है" or literal word salads like "बादल आश्रित".
+- NEVER use markdown headers (#, ##), bold text (**word**), bullet lists (- or •), numbered lists, markdown tables, or raw numbers with units in parentheses like (30.5°C) or (2.9 m/s).
+- Write ONLY clean, fluid, natural sentences in the native script.
 
 RESPONSE LANGUAGE MANDATE:
 Language: {lang_name}
