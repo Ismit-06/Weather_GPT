@@ -927,6 +927,24 @@ private fun GlassAssistantBubble(
         if (t.contains("<think>")) {
             t = t.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
         }
+
+        // Remove all emojis and unicode pictographs
+        t = t.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\uFE00-\uFE0F\u200D\u2300-\u23FF\u2B50\u2B55\u3030]"), "")
+
+        // Fix known transliteration / machine translation glitches
+        t = t.replace(Regex("(?i)\\bblowing\\s*रही\\s*है"), "चल रही है")
+        t = t.replace(Regex("(?i)\\bblowing\\s*रहा\\s*है"), "चल रहा है")
+        t = t.replace(Regex("(?i)\\bblowing\\b"), "चल रही है")
+        t = t.replace(Regex("\\b100%\\s*बादल\\s*आश्रित\\b"), "आसमान में बादल छाए हुए हैं")
+        t = t.replace(Regex("\\bगर्मी\\s+का\\s+तना(\\.\\.\\.)?|\\bगर्मी\\s+का\\s+तनाव\\b"), "गर्मी का असर कम रहेगा")
+
+        // Remove parenthetical metric dumps like (वर्षा: 0.0 mm), (2.9 m/s), (humidity: 60%), (0.0 mm)
+        t = t.replace(Regex("(?i)\\s*\\((?:वर्षा|बारिश|rain|rainfall|wind|हवा|humidity|आर्द्रता|temp|तापमान)?:?\\s*[\\d.]+\\s*(?:mm|m/s|km/h|°C|%|hPa)?\\)"), "")
+        t = t.replace(Regex("(?i)\\s*\\([\\d.]+\\s*(?:mm|m/s|km/h|°C|%|hPa)\\)"), "")
+
+        // Remove markdown formatting symbols
+        t = t.replace(Regex("[*#_`~>\\[\\]]"), "")
+
         val lines = t.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val filtered = lines.filterNot { line ->
             val l = line.lowercase()
@@ -943,9 +961,28 @@ private fun GlassAssistantBubble(
             l.contains("respond naturally") ||
             l.contains("weather advisory or committee") ||
             (l.contains("could it be") && l.endsWith("?")) ||
-            l.startsWith("the weather data provided is")
+            l.startsWith("the weather data provided is") ||
+            l.endsWith("मौसम की स्थिति:") ||
+            l.endsWith("मौसम की कुछ बातें:") ||
+            l.endsWith("key details:")
         }
-        if (filtered.isNotEmpty()) filtered.joinToString("\n\n") else t
+
+        val processedLines = filtered.mapNotNull { line ->
+            var cl = line.replace(Regex("^[-•–—\\d.)]+\\s*"), "").trim()
+            if (cl.matches(Regex("(?i).*(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details)[:\\s]*$"))) {
+                null
+            } else {
+                cl = cl.replace(Regex("(?i)(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points)[:\\s]*"), "")
+                cl = cl.replace(Regex("\\s*[—–]\\s*"), "। ")
+                cl.trim().ifEmpty { null }
+            }
+        }
+
+        var result = if (processedLines.isNotEmpty()) processedLines.joinToString(" ") else t
+        result = result.replace(Regex("\\s+"), " ")
+        result = result.replace(Regex("([।!?.,])\\s*([।!?.,])+"), "$1")
+        result = result.replace(Regex("\\s+([।!?.,])"), "$1")
+        result.trim()
     }
 
     var showMenu by remember { mutableStateOf(false) }
@@ -956,7 +993,7 @@ private fun GlassAssistantBubble(
             .clip(RoundedCornerShape(22.dp))
             .background(Color(0xD90A1626))
             .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(22.dp))
-            .padding(14.dp)
+            .padding(16.dp)
     ) {
         Column {
             Row(
@@ -991,16 +1028,17 @@ private fun GlassAssistantBubble(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = cleanDisplayText,
                 color = TextPrimary,
-                fontSize = 13.sp,
-                lineHeight = 19.sp
+                fontSize = 14.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Normal
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

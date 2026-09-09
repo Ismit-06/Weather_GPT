@@ -62,7 +62,9 @@ weather intelligence.
         temperature=0.2,
     )
 
-    return response.output_text
+    raw_text = response.output_text
+    from app.services.openrouter_chat import refine_conversational_text
+    return refine_conversational_text(raw_text)
 
 
 def build_fallback_answer(

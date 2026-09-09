@@ -1184,6 +1184,9 @@ class WeatherAgent:
                 tool_result=tool_result,
             )
 
+        from app.services.openrouter_chat import refine_conversational_text
+        answer = refine_conversational_text(answer)
+
         return {
             "status":
                 "success",
