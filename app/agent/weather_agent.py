@@ -1287,20 +1287,20 @@ class WeatherAgent:
                 pass
 
         if not tool_result:
-            return "Based on your location, weather conditions are being monitored. Please specify your query."
+            return "I couldn't retrieve the live forecast right now. Could you try asking again in a moment?"
 
         if isinstance(tool_result, dict):
             if tool_result.get("status") == "needs_clarification":
                 activity = self.context.activity
                 if activity:
-                    return f"To evaluate conditions for {activity}, please specify a time (for example: 'Can I {activity} today at 4 PM?' or 'What about tomorrow?')."
+                    return f"What time are you thinking of going for {activity}? (For example: around 5 PM or tomorrow morning?)"
                 msg = tool_result.get("message")
                 if msg:
                     return msg
-                return "Please specify a specific time or date for your request."
+                return "Could you specify what time or day you're asking about?"
 
             # If activity or conditions assessment was performed
-            for key in ["answer", "recommendation", "assessment", "message", "summary"]:
+            for key in ["answer", "recommendation", "assessment", "summary"]:
                 if key in tool_result and isinstance(tool_result[key], str) and tool_result[key].strip():
                     return tool_result[key].strip()
 
@@ -1308,16 +1308,17 @@ class WeatherAgent:
             if isinstance(current, dict):
                 temp = current.get("temperature_c") or current.get("temperature")
                 rain = current.get("rain_probability_pct") or current.get("rainfall_probability")
-                cond = current.get("condition") or current.get("summary")
-                parts = []
-                if temp is not None:
-                    parts.append(f"The temperature is {temp}°C.")
-                if rain is not None:
-                    parts.append(f"Rain probability is {rain}%.")
-                if cond:
-                    parts.append(f"Condition: {cond}.")
-                if parts:
-                    return " ".join(parts)
+                cond = (current.get("condition") or current.get("summary") or "clear").lower()
+                
+                if rain is not None and float(rain) > 50:
+                    rain_phrase = f"Rain looks fairly likely ({rain}% chance)."
+                elif rain is not None and float(rain) > 20:
+                    rain_phrase = "There's a slight chance of rain."
+                else:
+                    rain_phrase = "Rain shouldn't be an issue."
 
-        return "Weather conditions have been evaluated for your location. You can view the live parameters in the dashboard."
+                temp_phrase = f"It's around {temp}°C" if temp is not None else "Conditions are"
+                return f"{temp_phrase} with {cond} skies. {rain_phrase}"
+
+        return "Conditions look fairly normal right now with no severe weather detected."
 
