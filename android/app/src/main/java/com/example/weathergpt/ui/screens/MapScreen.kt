@@ -223,7 +223,7 @@ fun MapScreen(
                 val tileSource = XYTileSource(
                     "RainViewer_${frame.time}",
                     0,
-                    18,
+                    7,
                     256,
                     "/2/1_1.png",
                     arrayOf("$cleanHost$cleanPath/256/"),
@@ -312,13 +312,27 @@ fun MapScreen(
                         if (!osmTileDir.exists()) osmTileDir.mkdirs()
                         osmConfig.osmdroidBasePath = osmBaseDir
                         osmConfig.osmdroidTileCache = osmTileDir
+                        osmConfig.tileDownloadThreads = 12.toShort()
+                        osmConfig.tileFileSystemThreads = 12.toShort()
+                        osmConfig.tileDownloadMaxQueueSize = 120.toShort()
+                        osmConfig.cacheMapTileCount = 250.toShort()
+                        osmConfig.cacheMapTileOvershoot = 80.toShort()
                     } catch (_: Throwable) {}
 
                     // High-resolution MapTiler Satellite Hybrid tiles
                     setTileSource(MapTilerHybridTileSource)
                     setMultiTouchControls(true)
                     setBuiltInZoomControls(false)
-                    isTilesScaledToDpi = true
+
+                    // Critical: Do NOT scale to DPI; this avoids 4x tile explosion per screen
+                    isTilesScaledToDpi = false
+                    isHorizontalMapRepetitionEnabled = true
+                    isVerticalMapRepetitionEnabled = false
+
+                    // Seamless dark loading canvas instead of flashing white grid
+                    overlayManager.tilesOverlay.loadingBackgroundColor = AndroidColor.argb(255, 10, 22, 38)
+                    overlayManager.tilesOverlay.loadingLineColor = AndroidColor.TRANSPARENT
+
                     controller.setZoom(12.0)
                     controller.setCenter(initialLocation)
 
@@ -388,86 +402,75 @@ fun MapScreen(
         )
 
         // =================================================================
-        // HEADER BAR
+        // COMPACT TOP OVERLAYS (One-line description & Layer chips)
         // =================================================================
-        Surface(
+        Column(
             modifier = Modifier
+                .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = Color(0xD90A1626),
-            border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
+                .padding(top = 8.dp, start = 12.dp, end = 12.dp)
         ) {
+            // Minimal 1-line description badge
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xCC0A1626))
+                    .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "WEATHER INTELLIGENCE",
-                        color = SecondaryCyan,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Live Radar & Telemetry",
-                        color = TextPrimary,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(1.dp))
-                    Text(
-                        text = if (uiState.isRefreshing || uiState.isRadarLoading) {
-                            "Refreshing live data..."
-                        } else {
-                            "© MapTiler · © OpenStreetMap · Radar by RainViewer"
-                        },
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(PrimaryBlue, Color(0xFF1E40AF))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = getLayerIcon(uiState.selectedLayer),
-                        contentDescription = "Map Layer",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        contentDescription = null,
+                        tint = SecondaryCyan,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = if (uiState.isRefreshing || uiState.isRadarLoading) {
+                            "Updating live telemetry..."
+                        } else {
+                            "Live Satellite & ${uiState.selectedLayer} Telemetry"
+                        },
+                        color = TextPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 }
-            }
-        }
 
-        // =================================================================
-        // LAYER SELECTION CHIPS
-        // =================================================================
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 96.dp, start = 12.dp, end = 12.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val layers = listOf("Weather", "Rain", "Flood", "Alerts", "Dams", "Quakes")
-            layers.forEach { layer ->
-                MapLayerChip(
-                    name = layer,
-                    isSelected = uiState.selectedLayer == layer,
-                    onClick = { mapViewModel.selectLayer(layer) }
+                Text(
+                    text = "RainViewer • MapTiler",
+                    color = TextMuted,
+                    fontSize = 9.sp
                 )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // =================================================================
+            // LAYER SELECTION CHIPS
+            // =================================================================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val layers = listOf("Weather", "Rain", "Flood", "Alerts", "Dams", "Quakes")
+                layers.forEach { layer ->
+                    MapLayerChip(
+                        name = layer,
+                        isSelected = uiState.selectedLayer == layer,
+                        onClick = { mapViewModel.selectLayer(layer) }
+                    )
+                }
             }
         }
 
@@ -478,13 +481,13 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 150.dp, start = 14.dp, end = 14.dp)
+                    .padding(top = 80.dp, start = 12.dp, end = 12.dp)
                     .fillMaxWidth()
             ) {
                 // Radar Player Bar
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = Color(0xE60A1626),
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderGlass)
                 ) {
@@ -726,14 +729,15 @@ fun MapScreen(
         }
 
         // =================================================================
-        // BOTTOM AREA CARD & ANALYZE BUTTON
+        // BOTTOM AREA CARD & ANALYZE BUTTON (Compact)
         // =================================================================
         GlassCard(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            padding = 14.dp
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(18.dp),
+            padding = 10.dp
         ) {
             Column {
                 Row(
@@ -749,21 +753,21 @@ fun MapScreen(
                             imageVector = getLayerIcon(uiState.selectedLayer),
                             contentDescription = uiState.selectedLayer,
                             tint = SecondaryCyan,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
                                 text = uiState.selectedLocationName.ifBlank { "Selected Location" },
                                 color = TextPrimary,
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
                             Text(
                                 text = "Layer: ${uiState.selectedLayer}",
                                 color = TextMuted,
-                                fontSize = 11.sp
+                                fontSize = 10.sp
                             )
                         }
                     }
@@ -772,7 +776,7 @@ fun MapScreen(
                     val overallRisk = uiState.areaAnalysis?.overallRisk
                     if (overallRisk != null) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = when (overallRisk) {
                                 "SAFE", "LOW" -> Color(0x2210B981)
                                 "MODERATE" -> Color(0x22F59E0B)
@@ -794,9 +798,9 @@ fun MapScreen(
                                     "MODERATE" -> WarningAmber
                                     else -> Color(0xFFFF6B6B)
                                 },
-                                fontSize = 10.sp,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -805,10 +809,10 @@ fun MapScreen(
                 // Quick metrics row
                 val w = uiState.weatherData
                 if (w != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         AreaMetricBox(
                             label = "Temp",
@@ -828,7 +832,7 @@ fun MapScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Analyze This Area Button
                 Button(
@@ -838,8 +842,8 @@ fun MapScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
-                    shape = RoundedCornerShape(22.dp),
+                        .height(38.dp),
+                    shape = RoundedCornerShape(19.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = PrimaryBlue
                     )

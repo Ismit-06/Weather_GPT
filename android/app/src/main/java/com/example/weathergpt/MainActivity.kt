@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
         }
 
-        // Initialize OSMDroid configuration safely with internal cache paths
+        // Initialize OSMDroid configuration safely with internal cache paths and maximum performance
         try {
             val osmConfig = org.osmdroid.config.Configuration.getInstance()
             osmConfig.load(this, getSharedPreferences("osmdroid", MODE_PRIVATE))
@@ -43,6 +43,14 @@ class MainActivity : ComponentActivity() {
             if (!osmTileDir.exists()) osmTileDir.mkdirs()
             osmConfig.osmdroidBasePath = osmBaseDir
             osmConfig.osmdroidTileCache = osmTileDir
+
+            // Turbo performance: 12 parallel download threads and 250 in-memory tile cache
+            osmConfig.tileDownloadThreads = 12.toShort()
+            osmConfig.tileFileSystemThreads = 12.toShort()
+            osmConfig.tileDownloadMaxQueueSize = 120.toShort()
+            osmConfig.cacheMapTileCount = 250.toShort()
+            osmConfig.cacheMapTileOvershoot = 80.toShort()
+            osmConfig.expirationExtendedDuration = 1000L * 60 * 60 * 24 * 60
         } catch (e: Throwable) {
             android.util.Log.e("MainActivity", "OSMDroid safe init", e)
         }
