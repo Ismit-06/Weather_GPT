@@ -415,40 +415,23 @@ class WeatherAgent:
             )
 
             if not matches:
-
+                clarification_msg = (
+                    f"I couldn't find {resolved.location_text}. Could you provide another location or check the spelling?"
+                )
                 return {
-                    "status":
-                        "needs_clarification",
-
-                    "type":
-                        "LOCATION_NOT_FOUND",
-
-                    "question":
-                        question,
-
-                    "location":
-                        resolved.location_text,
-
-                    "clarification": (
-                        f"I couldn't find "
-                        f"{resolved.location_text}. "
-                        f"Could you provide another "
-                        f"location?"
-                    ),
-
-                    "language":
-                        detected_language,
-
-                    "language_code":
-                        language_code,
-
-                    "script_code":
-                        script_code,
-
-                    "context":
-                        asdict(
-                            self.context
-                        ),
+                    "status": "success",
+                    "type": "LOCATION_NOT_FOUND",
+                    "question": question,
+                    "location": resolved.location_text,
+                    "clarification": clarification_msg,
+                    "display_text": clarification_msg,
+                    "speech_text": clarification_msg,
+                    "answer": clarification_msg,
+                    "language": detected_language,
+                    "language_code": language_code,
+                    "script_code": script_code,
+                    "context": asdict(self.context),
+                    "agent_state": asdict(self.context),
                 }
 
             requested_location = matches[0]
@@ -666,37 +649,22 @@ class WeatherAgent:
         # -----------------------------------------------------
 
         if resolved.ambiguous_time:
-
+            clarification_msg = (
+                f"Do you mean {resolved.ambiguous_time} AM or {resolved.ambiguous_time} PM?"
+            )
             return {
-                "status":
-                    "needs_clarification",
-
-                "type":
-                    "AMBIGUOUS_TIME",
-
-                "question":
-                    question,
-
-                "clarification": (
-                    f"Do you mean "
-                    f"{resolved.ambiguous_time} AM "
-                    f"or "
-                    f"{resolved.ambiguous_time} PM?"
-                ),
-
-                "language":
-                    detected_language,
-
-                "language_code":
-                    language_code,
-
-                "script_code":
-                    script_code,
-
-                "context":
-                    asdict(
-                        self.context
-                    ),
+                "status": "success",
+                "type": "AMBIGUOUS_TIME",
+                "question": question,
+                "clarification": clarification_msg,
+                "display_text": clarification_msg,
+                "speech_text": clarification_msg,
+                "answer": clarification_msg,
+                "language": detected_language,
+                "language_code": language_code,
+                "script_code": script_code,
+                "context": asdict(self.context),
+                "agent_state": asdict(self.context),
             }
 
         # -----------------------------------------------------

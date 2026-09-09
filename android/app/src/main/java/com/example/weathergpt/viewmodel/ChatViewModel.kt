@@ -120,17 +120,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         response.agent_state
                 }
 
-                if (
-                    response.status != "success"
-                ) {
-
-                    throw Exception(
-                        "WeatherGPT returned an error."
-                    )
-                }
-
                 val displayText =
                     response.display_text
+                        ?.trim()
+                        .takeUnless {
+                            it.isNullOrEmpty()
+                        }
+                        ?: response.clarification
                         ?.trim()
                         .takeUnless {
                             it.isNullOrEmpty()
@@ -140,7 +136,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         .takeUnless {
                             it.isNullOrEmpty()
                         }
-                        ?: "I couldn't generate a response."
+
+                if (displayText.isNullOrEmpty()) {
+                    if (response.status != "success") {
+                        throw Exception("WeatherGPT returned an error.")
+                    }
+                    throw Exception("I couldn't generate a response.")
+                }
 
                 val speechText =
                     response.speech_text
