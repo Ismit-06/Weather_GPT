@@ -99,6 +99,7 @@ import com.example.weathergpt.viewmodel.FloodMapData
 import com.example.weathergpt.viewmodel.MapViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
@@ -110,23 +111,27 @@ import java.io.File
 import kotlin.math.abs
 
 // =================================================================
-// TILE SOURCES (CartoDB Dark Matter with OSM attribution)
+// TILE SOURCES (MapTiler Hybrid Satellite Imagery with Roads & Cities)
 // =================================================================
 
-private val CartoDarkTileSource = XYTileSource(
-    "CartoDarkMatter",
+private const val MAPTILER_API_KEY = "PdoGf1NbNNBb5nF6CYHI"
+
+private val MapTilerHybridTileSource = object : OnlineTileSourceBase(
+    "MapTilerHybrid",
     0,
-    19,
+    20,
     256,
-    ".png",
-    arrayOf(
-        "https://a.basemaps.cartocdn.com/dark_all/",
-        "https://b.basemaps.cartocdn.com/dark_all/",
-        "https://c.basemaps.cartocdn.com/dark_all/",
-        "https://d.basemaps.cartocdn.com/dark_all/"
-    ),
-    "© OpenStreetMap contributors, © CARTO"
-)
+    ".jpg",
+    arrayOf("https://api.maptiler.com/maps/hybrid-v4/256/"),
+    "© MapTiler © OpenStreetMap contributors"
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String {
+        val z = MapTileIndex.getZoom(pMapTileIndex)
+        val x = MapTileIndex.getX(pMapTileIndex)
+        val y = MapTileIndex.getY(pMapTileIndex)
+        return "$baseUrl$z/$x/$y.jpg?key=$MAPTILER_API_KEY"
+    }
+}
 
 @Composable
 fun MapScreen(
@@ -309,19 +314,8 @@ fun MapScreen(
                         osmConfig.osmdroidTileCache = osmTileDir
                     } catch (_: Throwable) {}
 
-                    // High-performance official OpenStreetMap tiles with custom dark matrix (zero watermarks, zero API key)
-                    setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
-                    val darkMatrix = android.graphics.ColorMatrix().apply {
-                        val mx = floatArrayOf(
-                            -0.75f, 0f, 0f, 0f, 210f,
-                            0f, -0.75f, 0f, 0f, 210f,
-                            0f, 0f, -0.70f, 0f, 225f,
-                            0f, 0f, 0f, 1f, 0f
-                        )
-                        set(mx)
-                    }
-                    overlayManager.tilesOverlay.setColorFilter(android.graphics.ColorMatrixColorFilter(darkMatrix))
-
+                    // High-resolution MapTiler Satellite Hybrid tiles
+                    setTileSource(MapTilerHybridTileSource)
                     setMultiTouchControls(true)
                     setBuiltInZoomControls(false)
                     isTilesScaledToDpi = true
@@ -429,7 +423,7 @@ fun MapScreen(
                         text = if (uiState.isRefreshing || uiState.isRadarLoading) {
                             "Refreshing live data..."
                         } else {
-                            "© OpenStreetMap · Radar by RainViewer"
+                            "© MapTiler · © OpenStreetMap · Radar by RainViewer"
                         },
                         color = TextMuted,
                         fontSize = 10.sp
