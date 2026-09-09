@@ -99,7 +99,7 @@ import com.example.weathergpt.viewmodel.FloodMapData
 import com.example.weathergpt.viewmodel.MapViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.MapTileProviderBasic
-import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
@@ -113,7 +113,7 @@ import kotlin.math.abs
 // TILE SOURCES (CartoDB Dark Matter with OSM attribution)
 // =================================================================
 
-private val CartoDarkTileSource = object : OnlineTileSourceBase(
+private val CartoDarkTileSource = XYTileSource(
     "CartoDarkMatter",
     0,
     19,
@@ -126,14 +126,7 @@ private val CartoDarkTileSource = object : OnlineTileSourceBase(
         "https://d.basemaps.cartocdn.com/dark_all/"
     ),
     "© OpenStreetMap contributors, © CARTO"
-) {
-    override fun getTileURLString(pMapTileIndex: Long): String {
-        val z = MapTileIndex.getZoom(pMapTileIndex)
-        val x = MapTileIndex.getX(pMapTileIndex)
-        val y = MapTileIndex.getY(pMapTileIndex)
-        return "$baseUrl$z/$x/$y.png"
-    }
-}
+)
 
 @Composable
 fun MapScreen(
@@ -170,8 +163,8 @@ fun MapScreen(
         )
     }
 
-    // Lifecycle observer for MapView
-    DisposableEffect(lifecycleOwner, mapView) {
+    // Lifecycle observer for MapView - DO NOT call onDetach() here as that nulls mWriter and breaks tile loading permanently
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
@@ -188,7 +181,6 @@ fun MapScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
             try {
                 mapView?.onPause()
-                mapView?.onDetach()
             } catch (_: Throwable) {}
         }
     }
@@ -199,7 +191,10 @@ fun MapScreen(
 
         if (uiState.selectedLayer != "Rain") {
             currentRadarOverlay?.let {
-                try { view.overlays.remove(it) } catch (_: Throwable) {}
+                try {
+                    view.overlays.remove(it)
+                    it.onDetach(view)
+                } catch (_: Throwable) {}
             }
             currentRadarOverlay = null
             try { view.invalidate() } catch (_: Throwable) {}
@@ -213,24 +208,22 @@ fun MapScreen(
         if (!host.isNullOrBlank() && frames.isNotEmpty() && idx in frames.indices) {
             val frame = frames[idx]
             try {
-                currentRadarOverlay?.let { view.overlays.remove(it) }
+                currentRadarOverlay?.let {
+                    view.overlays.remove(it)
+                    it.onDetach(view)
+                }
 
-                val tileSource = object : OnlineTileSourceBase(
+                val cleanHost = host.trimEnd('/')
+                val cleanPath = if (frame.path.startsWith("/")) frame.path else "/${frame.path}"
+                val tileSource = XYTileSource(
                     "RainViewer_${frame.time}",
                     0,
                     18,
                     256,
-                    ".png",
-                    arrayOf(host.trimEnd('/'))
-                ) {
-                    override fun getTileURLString(pMapTileIndex: Long): String {
-                        val z = MapTileIndex.getZoom(pMapTileIndex)
-                        val x = MapTileIndex.getX(pMapTileIndex)
-                        val y = MapTileIndex.getY(pMapTileIndex)
-                        val cleanPath = if (frame.path.startsWith("/")) frame.path else "/${frame.path}"
-                        return "$baseUrl$cleanPath/256/$z/$x/$y/2/1_1.png"
-                    }
-                }
+                    "/2/1_1.png",
+                    arrayOf("$cleanHost$cleanPath/256/"),
+                    "Weather data by RainViewer"
+                )
 
                 val provider = MapTileProviderBasic(context.applicationContext, tileSource)
                 val newOverlay = TilesOverlay(provider, context.applicationContext).apply {
@@ -306,6 +299,7 @@ fun MapScreen(
                 MapView(ctx).apply {
                     try {
                         val osmConfig = Configuration.getInstance()
+                        osmConfig.load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
                         osmConfig.userAgentValue = "WeatherGPT/1.0 (contact@weathergpt.app; Android)"
                         val osmBaseDir = File(ctx.cacheDir, "osmdroid")
                         if (!osmBaseDir.exists()) osmBaseDir.mkdirs()
@@ -315,9 +309,22 @@ fun MapScreen(
                         osmConfig.osmdroidTileCache = osmTileDir
                     } catch (_: Throwable) {}
 
-                    // High-performance dark map tiles
-                    setTileSource(CartoDarkTileSource)
+                    // High-performance official OpenStreetMap tiles with custom dark matrix (zero watermarks, zero API key)
+                    setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                    val darkMatrix = android.graphics.ColorMatrix().apply {
+                        val mx = floatArrayOf(
+                            -0.75f, 0f, 0f, 0f, 210f,
+                            0f, -0.75f, 0f, 0f, 210f,
+                            0f, 0f, -0.70f, 0f, 225f,
+                            0f, 0f, 0f, 1f, 0f
+                        )
+                        set(mx)
+                    }
+                    overlayManager.tilesOverlay.setColorFilter(android.graphics.ColorMatrixColorFilter(darkMatrix))
+
                     setMultiTouchControls(true)
+                    setBuiltInZoomControls(false)
+                    isTilesScaledToDpi = true
                     controller.setZoom(12.0)
                     controller.setCenter(initialLocation)
 
