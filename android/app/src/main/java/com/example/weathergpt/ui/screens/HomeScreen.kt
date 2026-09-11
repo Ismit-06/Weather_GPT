@@ -78,6 +78,7 @@ import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.data.MetWeatherClient
 import com.example.weathergpt.data.UserPreferencesStore
+import com.example.weathergpt.data.extractDailyForecast
 import com.example.weathergpt.location.DeviceLocationProvider
 import com.example.weathergpt.location.LocationStore
 import com.example.weathergpt.location.SelectedLocation
@@ -951,12 +952,13 @@ fun HomeScreen(
                     }
 
                 } else {
-                    // ── Daily / 7 Days view ───────────────────────────────────
+                    // ── 7 Days Daily view ─────────────────────────────────────
+                    val dailyList = remember(forecastList) { forecastList.extractDailyForecast(7) }
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        forecastList.take(7).forEach { item ->
+                        dailyList.forEach { day ->
                             GlassCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(18.dp),
@@ -967,29 +969,41 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = formatDay(item.time),
+                                            text = day.dayLabel,
                                             color = TextPrimary,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
-                                            text = weatherDescription(item.symbol_code),
+                                            text = weatherDescription(day.symbolCode),
                                             color = TextSecondary,
                                             fontSize = 12.sp
                                         )
                                     }
                                     RealisticWeatherIllustration(
-                                        symbolCode = item.symbol_code,
+                                        symbolCode = day.symbolCode,
                                         modifier = Modifier.size(36.dp)
                                     )
-                                    Text(
-                                        text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
-                                        color = TextPrimary,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${day.maxTempC}°",
+                                            color = TextPrimary,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${day.minTempC}°",
+                                            color = TextSecondary.copy(alpha = 0.65f),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Normal
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -4,6 +4,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import kotlin.math.roundToInt
 
 data class MetForecastItem(
     val time: String?,
@@ -20,6 +21,73 @@ data class MetForecastItem(
     val precipitation_probability_pct: Double?,
     val symbol_code: String?
 )
+
+data class DailyForecastSummary(
+    val date: java.time.LocalDate,
+    val dayLabel: String,
+    val maxTempC: Int,
+    val minTempC: Int,
+    val symbolCode: String?,
+    val precipitationProbMax: Int?,
+    val precipitationMmSum: Double?
+)
+
+fun List<MetForecastItem>.extractDailyForecast(maxDays: Int = 7): List<DailyForecastSummary> {
+    if (this.isEmpty()) return emptyList()
+
+    val zone = try { java.time.ZoneId.systemDefault() } catch (_: Exception) { java.time.ZoneId.of("UTC") }
+    val today = java.time.LocalDate.now(zone)
+
+    // Group timesteps by their local calendar date
+    val grouped = this.groupBy { item ->
+        val timeStr = item.time ?: return@groupBy null
+        try {
+            java.time.ZonedDateTime.parse(timeStr).withZoneSameInstant(zone).toLocalDate()
+        } catch (_: Exception) {
+            try { java.time.LocalDate.parse(timeStr.substring(0, 10)) } catch (_: Exception) { null }
+        }
+    }.filterKeys { it != null } as Map<java.time.LocalDate, List<MetForecastItem>>
+
+    // Only include today and upcoming days, sorted chronologically
+    val sortedDates = grouped.keys.filter { !it.isBefore(today) }.sorted()
+
+    return sortedDates.take(maxDays).mapIndexed { index, date ->
+        val items = grouped[date] ?: emptyList()
+        val temps = items.mapNotNull { it.temperature_c }
+        val maxTemp = temps.maxOrNull()?.roundToInt() ?: 30
+        val minTemp = temps.minOrNull()?.roundToInt() ?: (maxTemp - 5)
+
+        // Select representative symbol: prefer rainy/stormy if occurring, or daytime (11-16h), else midday/first
+        val repItem = items.firstOrNull { item ->
+            val code = item.symbol_code ?: ""
+            code.contains("rain") || code.contains("thunder") || code.contains("snow")
+        } ?: items.firstOrNull { item ->
+            try {
+                val hour = java.time.ZonedDateTime.parse(item.time).withZoneSameInstant(zone).hour
+                hour in 11..16
+            } catch (_: Exception) { false }
+        } ?: items.firstOrNull()
+
+        val maxPrecipProb = items.mapNotNull { it.precipitation_probability_pct }.maxOrNull()?.roundToInt()
+        val sumPrecipMm = items.mapNotNull { it.precipitation_mm }.sum()
+
+        val dayLabel = when {
+            date == today -> "Today"
+            date == today.plusDays(1) -> "Tomorrow"
+            else -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+        }
+
+        DailyForecastSummary(
+            date = date,
+            dayLabel = dayLabel,
+            maxTempC = maxTemp,
+            minTempC = minTemp,
+            symbolCode = repItem?.symbol_code ?: "fair_day",
+            precipitationProbMax = maxPrecipProb,
+            precipitationMmSum = sumPrecipMm
+        )
+    }
+}
 
 data class MetLocation(
     val latitude: Double,
