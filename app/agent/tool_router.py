@@ -192,7 +192,16 @@ async def run_weather_tool(
             # evaluate current weather conditions immediately.
             curr = await get_current_weather(latitude=latitude, longitude=longitude)
             if curr.get("status") == "success":
-                forecast_data = curr.get("current", {})
+                # Create a clean isolated forecast dict to avoid circular reference in curr['activity_assessment']['weather'] -> curr
+                forecast_data = {
+                    "temperature_c": curr.get("temperature_c"),
+                    "humidity_pct": curr.get("humidity_pct"),
+                    "wind_speed_ms": curr.get("wind_speed_ms"),
+                    "rainfall_mm": curr.get("rainfall_mm", 0.0),
+                    "condition": curr.get("condition", "clear"),
+                    "time": curr.get("time"),
+                }
+                curr["current"] = forecast_data.copy()
                 curr["activity_assessment"] = assess_activity_conditions(
                     activity=activity,
                     forecast=forecast_data,

@@ -18,62 +18,52 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.weathergpt.ui.theme.AccentPurple
 import com.example.weathergpt.ui.theme.BorderGlass
 import com.example.weathergpt.ui.theme.BorderGlassSubtle
-import com.example.weathergpt.ui.theme.CardGlassSurface
+import com.example.weathergpt.ui.theme.CloudBlue
+import com.example.weathergpt.ui.theme.CloudyGray
+import com.example.weathergpt.ui.theme.DangerRed
+import com.example.weathergpt.ui.theme.FogMuted
 import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.RiskRed
+import com.example.weathergpt.ui.theme.RainBlue
 import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.SnowIce
+import com.example.weathergpt.ui.theme.StormSlate
 import com.example.weathergpt.ui.theme.SuccessGreen
+import com.example.weathergpt.ui.theme.SunnyGold
+import com.example.weathergpt.ui.theme.SurfaceDark
 import com.example.weathergpt.ui.theme.TextMuted
 import com.example.weathergpt.ui.theme.TextPrimary
 import com.example.weathergpt.ui.theme.TextSecondary
 
 /**
- * Premium Glassmorphism Container Card.
- * Implements 24dp corner radius, subtle gradient background (translucent dark surface),
- * thin glass border rgba(120, 190, 255, 0.18), and soft inner highlight.
+ * Minimal & Classy Surface Card.
+ * Clean #FFFFFF surface, subtle #E2E5E3 border, restrained 18dp corner radius.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
-    backgroundColor: Color = Color(0xB80A1626), // 72% opacity dark surface
+    shape: Shape = RoundedCornerShape(18.dp),
+    backgroundColor: Color = SurfaceDark,
     borderColor: Color = BorderGlass,
     borderWidth: Dp = 1.dp,
-    padding: Dp = 18.dp,
+    padding: Dp = 16.dp,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        backgroundColor,
-                        backgroundColor.copy(alpha = 0.60f)
-                    )
-                ),
-                shape = shape
-            )
+            .background(backgroundColor, shape = shape)
             .border(
                 width = borderWidth,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        borderColor,
-                        borderColor.copy(alpha = 0.08f)
-                    )
-                ),
+                color = borderColor,
                 shape = shape
             )
             .padding(padding)
@@ -83,7 +73,7 @@ fun GlassCard(
 }
 
 /**
- * Translucent interactive Glass Chip / Pill (16dp radius).
+ * Clean & restrained interactive Chip (12dp radius).
  */
 @Composable
 fun GlassChip(
@@ -93,21 +83,21 @@ fun GlassChip(
     selected: Boolean = false,
     onClick: () -> Unit = {}
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
             .clip(shape)
             .background(
-                if (selected) Color(0x334DA3FF) else Color(0x14FFFFFF),
+                if (selected) PrimaryBlue else Color.White,
                 shape = shape
             )
             .border(
                 width = 1.dp,
-                color = if (selected) Color(0x4D52D9FF) else BorderGlassSubtle,
+                color = if (selected) PrimaryBlue else BorderGlass,
                 shape = shape
             )
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -121,14 +111,14 @@ fun GlassChip(
                 text = text,
                 color = if (selected) Color.White else TextPrimary,
                 fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
             )
         }
     }
 }
 
 /**
- * Translucent interactive Glass Button (20dp radius).
+ * Clean & Human-designed Button (12dp radius).
  */
 @Composable
 fun GlassButton(
@@ -137,25 +127,17 @@ fun GlassButton(
     primary: Boolean = true,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
             .clip(shape)
             .background(
-                if (primary) {
-                    Brush.horizontalGradient(
-                        listOf(PrimaryBlue.copy(alpha = 0.85f), SecondaryCyan.copy(alpha = 0.85f))
-                    )
-                } else {
-                    Brush.horizontalGradient(
-                        listOf(Color(0x1AFFFFFF), Color(0x0FFFFFFF))
-                    )
-                },
+                if (primary) PrimaryBlue else Color.White,
                 shape = shape
             )
             .border(
                 width = 1.dp,
-                color = if (primary) Color(0x66FFFFFF) else BorderGlass,
+                color = if (primary) PrimaryBlue else BorderGlass,
                 shape = shape
             )
             .clickable { onClick() }
@@ -164,7 +146,7 @@ fun GlassButton(
     ) {
         Text(
             text = text,
-            color = Color.White,
+            color = if (primary) Color.White else PrimaryBlue,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -176,43 +158,20 @@ fun AiOrb(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.size(76.dp),
+        modifier = modifier.size(52.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(70.dp)
-                .blur(18.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            SecondaryCyan.copy(0.45f),
-                            AccentPurple.copy(0.30f),
-                            Color.Transparent
-                        )
-                    ),
-                    CircleShape
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            SecondaryCyan,
-                            PrimaryBlue,
-                            AccentPurple
-                        )
-                    ),
-                    CircleShape
-                ),
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(PrimaryBlue),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "✦",
                 color = Color.White,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -220,12 +179,12 @@ fun AiOrb(
 }
 
 /**
- * 3D-styled realistic weather illustration using Compose Canvas.
+ * Clean & minimal weather illustration using the muted Quiet Sky palette.
  */
 @Composable
 fun RealisticWeatherIllustration(
     symbolCode: String?,
-    modifier: Modifier = Modifier.size(100.dp)
+    modifier: Modifier = Modifier.size(90.dp)
 ) {
     val code = symbolCode?.lowercase() ?: "clearsky_day"
     val isNight = code.contains("night") || code.contains("polar")
@@ -239,95 +198,66 @@ fun RealisticWeatherIllustration(
         val h = size.height
 
         if (isNight) {
-            val moonCenter = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.32f)
-            val moonRadius = w * 0.26f
-
+            val moonCenter = androidx.compose.ui.geometry.Offset(w * 0.60f, h * 0.38f)
+            val moonRadius = w * 0.24f
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFF7A0), Color(0xFFFFD13B), Color(0xFFF59E0B)),
-                    center = moonCenter,
-                    radius = moonRadius
-                ),
-                radius = moonRadius,
-                center = moonCenter
+                color = SunnyGold,
+                center = moonCenter,
+                radius = moonRadius
             )
             drawCircle(
-                color = Color(0xFF0A1626),
-                radius = moonRadius * 0.82f,
-                center = androidx.compose.ui.geometry.Offset(moonCenter.x - moonRadius * 0.38f, moonCenter.y - moonRadius * 0.28f)
+                color = SurfaceDark,
+                center = androidx.compose.ui.geometry.Offset(w * 0.52f, h * 0.34f),
+                radius = moonRadius * 0.88f
             )
-        } else if (!isCloudy || code.contains("fair") || code.contains("partly")) {
-            val sunCenter = androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.30f)
-            val sunRadius = w * 0.24f
-
+        } else if (!isCloudy && !isRain && !isSnow) {
+            val sunCenter = androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.50f)
             drawCircle(
-                color = Color(0x33FBBF24),
-                radius = sunRadius * 1.55f,
-                center = sunCenter
+                color = SunnyGold,
+                center = sunCenter,
+                radius = w * 0.28f
             )
+        } else {
+            val sunCenter = androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.35f)
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFFBEB), Color(0xFFFDE047), Color(0xFFF59E0B)),
-                    center = androidx.compose.ui.geometry.Offset(sunCenter.x - sunRadius * 0.3f, sunCenter.y - sunRadius * 0.3f),
-                    radius = sunRadius
-                ),
-                radius = sunRadius,
-                center = sunCenter
+                color = SunnyGold,
+                center = sunCenter,
+                radius = w * 0.22f
             )
         }
 
-        val cloudBaseY = h * 0.58f
-        val cloudColorTop = Color(0xFFFFFFFF)
-        val cloudColorMid = Color(0xFFE2E8F0)
-        val cloudColorBottom = Color(0xFF94A3B8)
-
-        val cloudBrush = Brush.verticalGradient(
-            colors = listOf(cloudColorTop, cloudColorMid, cloudColorBottom),
-            startY = h * 0.25f,
-            endY = h * 0.85f
-        )
-
-        drawRoundRect(
-            brush = cloudBrush,
-            topLeft = androidx.compose.ui.geometry.Offset(w * 0.15f, cloudBaseY),
-            size = androidx.compose.ui.geometry.Size(w * 0.72f, h * 0.26f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.13f, h * 0.13f)
-        )
-        drawCircle(
-            brush = cloudBrush,
-            radius = w * 0.22f,
-            center = androidx.compose.ui.geometry.Offset(w * 0.46f, h * 0.50f)
-        )
-        drawCircle(
-            brush = cloudBrush,
-            radius = w * 0.17f,
-            center = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.56f)
-        )
-        drawCircle(
-            brush = cloudBrush,
-            radius = w * 0.15f,
-            center = androidx.compose.ui.geometry.Offset(w * 0.28f, h * 0.62f)
-        )
-
-        drawCircle(
-            color = Color(0x66FFFFFF),
-            radius = w * 0.18f,
-            center = androidx.compose.ui.geometry.Offset(w * 0.44f, h * 0.46f)
-        )
+        if (isCloudy || isRain || isSnow || isThunder) {
+            val cloudColor = if (isThunder) StormSlate else if (isRain) RainBlue else if (isSnow) SnowIce else CloudBlue
+            
+            drawCircle(
+                color = cloudColor,
+                radius = w * 0.22f,
+                center = androidx.compose.ui.geometry.Offset(w * 0.45f, h * 0.54f)
+            )
+            drawCircle(
+                color = cloudColor,
+                radius = w * 0.18f,
+                center = androidx.compose.ui.geometry.Offset(w * 0.65f, h * 0.58f)
+            )
+            drawCircle(
+                color = cloudColor,
+                radius = w * 0.16f,
+                center = androidx.compose.ui.geometry.Offset(w * 0.28f, h * 0.62f)
+            )
+        }
 
         if (isRain) {
-            val dropColor = Color(0xFF38BDF8)
             val dropPositions = listOf(
-                androidx.compose.ui.geometry.Offset(w * 0.32f, h * 0.86f),
-                androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.90f),
-                androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.86f)
+                androidx.compose.ui.geometry.Offset(w * 0.32f, h * 0.82f),
+                androidx.compose.ui.geometry.Offset(w * 0.50f, h * 0.86f),
+                androidx.compose.ui.geometry.Offset(w * 0.68f, h * 0.82f)
             )
             for (p in dropPositions) {
                 drawLine(
-                    color = dropColor,
+                    color = RainBlue,
                     start = p,
-                    end = androidx.compose.ui.geometry.Offset(p.x - w * 0.05f, p.y + h * 0.10f),
-                    strokeWidth = w * 0.04f,
+                    end = androidx.compose.ui.geometry.Offset(p.x - w * 0.04f, p.y + h * 0.08f),
+                    strokeWidth = w * 0.035f,
                     cap = androidx.compose.ui.graphics.StrokeCap.Round
                 )
             }
@@ -343,28 +273,28 @@ fun IntelligenceBadge(
     Row(
         modifier = Modifier
             .background(
-                if (positive) SuccessGreen.copy(alpha = 0.12f) else RiskRed.copy(alpha = 0.12f),
-                RoundedCornerShape(50)
+                if (positive) SuccessGreen.copy(alpha = 0.12f) else DangerRed.copy(alpha = 0.12f),
+                RoundedCornerShape(8.dp)
             )
             .border(
                 1.dp,
-                if (positive) SuccessGreen.copy(alpha = 0.28f) else RiskRed.copy(alpha = 0.28f),
-                RoundedCornerShape(50)
+                if (positive) SuccessGreen.copy(alpha = 0.25f) else DangerRed.copy(alpha = 0.25f),
+                RoundedCornerShape(8.dp)
             )
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 9.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(6.dp)
-                .background(if (positive) SuccessGreen else RiskRed, CircleShape)
+                .size(5.dp)
+                .background(if (positive) SuccessGreen else DangerRed, CircleShape)
         )
         Spacer(modifier = Modifier.size(6.dp))
         Text(
             text = text,
-            color = if (positive) SuccessGreen else RiskRed,
+            color = if (positive) SuccessGreen else DangerRed,
             fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -379,30 +309,30 @@ fun MetricTile(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        padding = 16.dp
+        shape = RoundedCornerShape(16.dp),
+        padding = 14.dp
     ) {
         Column {
-            Text(text = icon, fontSize = 20.sp)
-            Spacer(modifier = Modifier.height(10.dp))
+            Text(text = icon, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = title,
-                color = TextMuted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Normal
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
                 color = TextPrimary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                color = TextSecondary,
-                fontSize = 11.sp
+                color = TextMuted,
+                fontSize = 10.5.sp
             )
         }
     }
@@ -417,20 +347,20 @@ fun AiSectionTitle(
     Column {
         Text(
             text = eyebrow.uppercase(),
-            color = SecondaryCyan,
-            fontWeight = FontWeight.Bold,
+            color = PrimaryBlue,
+            fontWeight = FontWeight.SemiBold,
             fontSize = 11.sp,
-            letterSpacing = 1.2.sp
+            letterSpacing = 0.8.sp
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = title,
             color = TextPrimary,
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp
         )
         subtitle?.let {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = it,
                 color = TextSecondary,

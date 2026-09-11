@@ -267,10 +267,10 @@ private fun ForecastContent(
 
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF0E1626))
-                    .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                    .background(Color.White)
+                    .border(1.dp, BorderGlass, CircleShape)
                     .clickable {
                         isSpinning = true
                         onRefresh()
@@ -280,7 +280,7 @@ private fun ForecastContent(
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh forecast",
-                    tint = if (isSpinning) SecondaryCyan else Color(0xFF8896AB),
+                    tint = if (isSpinning) PrimaryBlue else TextSecondary,
                     modifier = Modifier
                         .size(16.dp)
                         .then(if (isSpinning) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
@@ -293,32 +293,36 @@ private fun ForecastContent(
         // =========================================================
         // 3 SEGMENTED TAB SWITCHER (Glass Capsules)
         // =========================================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFFE8EBE8))
+                .padding(3.dp)
         ) {
-            listOf("Hourly", "Daily", "7 Days").forEachIndexed { index, label ->
-                val active = selectedTab == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (active) Color(0x334DA3FF) else Color(0xB30A1626))
-                        .border(
-                            1.dp,
-                            if (active) Color(0x6652D9FF) else BorderGlass,
-                            RoundedCornerShape(20.dp)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("Hourly", "7 Days").forEachIndexed { index, label ->
+                    val active = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(if (active) Color.White else Color.Transparent)
+                            .then(
+                                if (active) Modifier.border(1.dp, BorderGlass, RoundedCornerShape(11.dp))
+                                else Modifier
+                            )
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (active) TextPrimary else TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium
                         )
-                        .clickable { selectedTab = index }
-                        .padding(vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        color = if (active) Color.White else TextSecondary,
-                        fontSize = 13.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
-                    )
+                    }
                 }
             }
         }
@@ -357,7 +361,7 @@ private fun ForecastContent(
                     text = "Temperature trend",
                     color = TextPrimary,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 Text(
@@ -371,7 +375,7 @@ private fun ForecastContent(
 
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(20.dp),
                 padding = 16.dp
             ) {
                 SplineTemperatureChart(
@@ -381,7 +385,7 @@ private fun ForecastContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // =========================================================
             // 2X2 METRICS GRID (Live synced with active point in time)
@@ -414,7 +418,7 @@ private fun ForecastContent(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ForecastGridCard(
                     modifier = Modifier.weight(1f),
@@ -431,11 +435,11 @@ private fun ForecastContent(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ForecastGridCard(
                     modifier = Modifier.weight(1f),
@@ -460,7 +464,7 @@ private fun ForecastContent(
                 forecast.take(7).forEach { item ->
                     GlassCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(16.dp),
                         padding = 14.dp
                     ) {
                         Row(
@@ -489,7 +493,7 @@ private fun ForecastContent(
                                 text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
                                 color = TextPrimary,
                                 fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -513,7 +517,7 @@ private fun ForecastGridCard(
 ) {
     GlassCard(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         padding = 12.dp
     ) {
         Row(
@@ -523,13 +527,13 @@ private fun ForecastGridCard(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0x264DA3FF)),
+                    .background(Color(0x1245677D)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = SecondaryCyan,
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(17.dp)
                 )
             }
@@ -547,7 +551,7 @@ private fun ForecastGridCard(
                     text = value,
                     color = TextPrimary,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -570,12 +574,12 @@ private fun HourlyItemCard(
     Box(
         modifier = Modifier
             .width(68.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (isSelected) Color(0x334DA3FF) else Color(0xB30A1626))
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) Color(0xFFE8ECEF) else Color.White)
             .border(
                 1.dp,
-                if (isSelected) Color(0x8052D9FF) else BorderGlass,
-                RoundedCornerShape(18.dp)
+                if (isSelected) PrimaryBlue else BorderGlass,
+                RoundedCornerShape(16.dp)
             )
             .clickable { onClick() }
             .padding(vertical = 12.dp),
@@ -586,9 +590,9 @@ private fun HourlyItemCard(
         ) {
             Text(
                 text = timeLabel,
-                color = if (isSelected) SecondaryCyan else TextSecondary,
+                color = if (isSelected) PrimaryBlue else TextSecondary,
                 fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -604,7 +608,7 @@ private fun HourlyItemCard(
                 text = item.temperature_c?.roundToInt()?.let { "$it°" } ?: "--°",
                 color = TextPrimary,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -711,7 +715,7 @@ private fun SplineTemperatureChart(
                 drawPath(
                     path = fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0x334DA3FF), Color(0x054DA3FF), Color.Transparent),
+                        colors = listOf(Color(0x1845677D), Color(0x0445677D), Color.Transparent),
                         startY = 0f,
                         endY = h
                     )
@@ -720,26 +724,26 @@ private fun SplineTemperatureChart(
                 drawPath(
                     path = path,
                     color = PrimaryBlue,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                 )
 
                 // Vertical dashed / soft indicator line at selected pointer position
                 drawLine(
-                    color = Color(0x6652D9FF),
+                    color = Color(0x3345677D),
                     start = Offset(activeX, padY),
                     end = Offset(activeX, h),
-                    strokeWidth = 1.5.dp.toPx()
+                    strokeWidth = 1.dp.toPx()
                 )
 
                 // Outer halo and glowing active point on the spline curve
                 drawCircle(
-                    color = Color(0x3352D9FF),
-                    radius = 8.dp.toPx(),
+                    color = Color(0x2245677D),
+                    radius = 7.dp.toPx(),
                     center = Offset(activeX, activeY)
                 )
                 drawCircle(
                     color = Color.White,
-                    radius = 4.5.dp.toPx(),
+                    radius = 4.dp.toPx(),
                     center = Offset(activeX, activeY)
                 )
                 drawCircle(
@@ -778,22 +782,22 @@ private fun SplineTemperatureChart(
                 Box(
                     modifier = Modifier
                         .width(tooltipWidth)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xE60A1626))
-                        .border(1.dp, Color(0x4D52D9FF), RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White)
+                        .border(1.dp, BorderGlass, RoundedCornerShape(8.dp))
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "${selectedTemp.roundToInt()}°",
-                            color = Color.White,
+                            color = TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = selectedTimeLabel,
-                            color = SecondaryCyan,
+                            color = PrimaryBlue,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Medium
                         )

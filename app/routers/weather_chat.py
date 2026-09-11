@@ -37,6 +37,16 @@ class WeatherQuestion(BaseModel):
         default_factory=dict
     )
 
+    camera_observation: dict | None = Field(
+        default=None,
+        description="Structured output from Sky AI vision engine (v1.0)"
+    )
+
+    radar_observation: dict | None = Field(
+        default=None,
+        description="Structured radar echo telemetry"
+    )
+
 
 @router.post("/weather")
 async def weather_chat(
@@ -64,11 +74,14 @@ async def weather_chat(
             language=payload.language,
             history=payload.history,
             agent_state=payload.agent_state,
+            camera_observation=payload.camera_observation,
+            radar_observation=payload.radar_observation,
         )
 
         # Keep the existing API contract understandable
         # while exposing the new agent result.
         return result
+
 
     except ValueError as exc:
 

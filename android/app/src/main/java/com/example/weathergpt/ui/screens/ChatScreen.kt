@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -189,6 +190,33 @@ fun ChatScreen(
             }
         } else {
             Toast.makeText(context, "Location permission denied. Using saved location.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val skyPhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                try {
+                    val stream = context.contentResolver.openInputStream(it)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(stream)
+                    stream?.close()
+                    if (bitmap != null) {
+                        chatViewModel.analyzeSkyImage(
+                            bitmap = bitmap,
+                            latitude = activeLocation.latitude,
+                            longitude = activeLocation.longitude,
+                            locationName = activeLocation.name,
+                            language = selectedLanguage ?: "auto"
+                        )
+                    } else {
+                        Toast.makeText(context, "Could not decode sky image.", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error loading image: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -436,9 +464,9 @@ fun ChatScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xB30A1626))
-                    .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
                     .clickable { showLocationDialog = true }
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
@@ -490,9 +518,9 @@ fun ChatScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xB30A1626))
-                    .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
                     .clickable { showLanguageDialog = true }
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
@@ -509,7 +537,7 @@ fun ChatScreen(
                         Icon(
                             imageVector = Icons.Default.Language,
                             contentDescription = "Language",
-                            tint = SecondaryCyan,
+                            tint = PrimaryBlue,
                             modifier = Modifier.size(18.dp)
                         )
                         Column {
@@ -554,13 +582,13 @@ fun ChatScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x33FF4D4D))
-                        .border(1.dp, Color(0x66FF4D4D), RoundedCornerShape(16.dp))
+                        .background(Color(0x15B85D5D))
+                        .border(1.dp, Color(0x30B85D5D), RoundedCornerShape(16.dp))
                         .padding(14.dp)
                 ) {
                     Text(
                         text = uiState.error ?: "An unexpected error occurred.",
-                        color = Color(0xFFFF9999),
+                        color = Color(0xFFB85D5D),
                         fontSize = 13.sp
                     )
                 }
@@ -670,22 +698,12 @@ fun ChatScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xD90A1626))
-                .border(1.dp, BorderGlass, RoundedCornerShape(28.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
+                .clip(RoundedCornerShape(26.dp))
+                .background(Color.White)
+                .border(1.dp, BorderGlass, RoundedCornerShape(26.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Attachment / paperclip placeholder icon
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Attach",
-                tint = TextMuted,
-                modifier = Modifier.size(20.dp)
-            )
-
-            Spacer(modifier = Modifier.width(10.dp))
-
             BasicTextField(
                 value = message.value,
                 onValueChange = { message.value = it },
@@ -703,11 +721,11 @@ fun ChatScreen(
                             text = when {
                                 isListening -> "Listening… speak now"
                                 isSpeaking  -> "WeatherGPT is speaking…"
-                                else        -> "Ask anything..."
+                                else        -> "Ask anything about weather..."
                             },
                             color = when {
-                                isListening -> SecondaryCyan
-                                isSpeaking  -> Color(0xFF36E6A0)
+                                isListening -> PrimaryBlue
+                                isSpeaking  -> PrimaryBlue
                                 else        -> TextMuted
                             },
                             fontSize = 14.sp
@@ -718,6 +736,18 @@ fun ChatScreen(
             )
 
             Spacer(modifier = Modifier.width(6.dp))
+
+            // Sky Photo Analysis Button
+            Icon(
+                imageVector = Icons.Default.PhotoCamera,
+                contentDescription = "Analyze Sky Photo",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(enabled = !uiState.isLoading) { skyPhotoLauncher.launch("image/*") }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Mic icon
             val micPulse = rememberInfiniteTransition(label = "pulse")
@@ -733,7 +763,7 @@ fun ChatScreen(
             Icon(
                 imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
                 contentDescription = "Mic",
-                tint = if (isListening) Color(0xFFFF6B6B) else TextSecondary,
+                tint = if (isListening) Color(0xFFB85D5D) else TextSecondary,
                 modifier = Modifier
                     .size(22.dp)
                     .scale(if (isListening) micScale else 1f)
@@ -742,14 +772,12 @@ fun ChatScreen(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Send — blue radial gradient circle
+            // Send button circle
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(listOf(PrimaryBlue, Color(0xFF1A5BB5)))
-                    )
+                    .background(PrimaryBlue)
                     .clickable(enabled = message.value.isNotBlank() && !uiState.isLoading) {
                         sendMessage()
                     },
@@ -758,8 +786,8 @@ fun ChatScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "Send",
-                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color(0xFF7E8B9F),
-                    modifier = Modifier.size(18.dp)
+                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.size(17.dp)
                 )
             }
         }
@@ -824,7 +852,7 @@ fun ChatScreen(
 }
 
 /**
- * 20dp Corner Radius Glass Suggestion Card
+ * 16dp Corner Radius Glass Suggestion Card
  */
 @Composable
 private fun SuggestionGlassCard(
@@ -835,9 +863,9 @@ private fun SuggestionGlassCard(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xB30A1626))
-            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -874,9 +902,9 @@ private fun GlassUserBubble(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xCC0E1A2D))
-            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFE8ECEF))
+            .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -888,7 +916,7 @@ private fun GlassUserBubble(text: String) {
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF1E3557)),
+                    .background(PrimaryBlue),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -993,9 +1021,9 @@ private fun GlassAssistantBubble(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xD90A1626))
-            .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -1007,12 +1035,8 @@ private fun GlassAssistantBubble(
                 Box(
                     modifier = Modifier
                         .size(24.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(PrimaryBlue, Color(0xFF2563EB))
-                            )
-                        ),
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(PrimaryBlue),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -1025,7 +1049,7 @@ private fun GlassAssistantBubble(
 
                 Text(
                     text = "WeatherGPT",
-                    color = SecondaryCyan,
+                    color = PrimaryBlue,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1066,7 +1090,7 @@ private fun GlassAssistantBubble(
                     Icon(
                         imageVector = if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                         contentDescription = "Speak",
-                        tint = if (isSpeaking) SecondaryCyan else TextMuted,
+                        tint = if (isSpeaking) PrimaryBlue else TextMuted,
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -1087,10 +1111,10 @@ private fun GlassAssistantBubble(
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(Color(0xFF0E1A2D))
+                        modifier = Modifier.background(Color.White)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Copy full response", color = Color.White) },
+                            text = { Text("Copy full response", color = TextPrimary) },
                             onClick = {
                                 onCopy()
                                 showMenu = false
@@ -1108,9 +1132,9 @@ private fun GlassThinkingBubble() {
     Box(
         modifier = Modifier
             .fillMaxWidth(0.85f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color(0xB30A1626))
-            .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
             .padding(12.dp)
     ) {
         Row(
@@ -1119,7 +1143,7 @@ private fun GlassThinkingBubble() {
         ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(18.dp),
-                color = SecondaryCyan,
+                color = PrimaryBlue,
                 strokeWidth = 2.dp
             )
             Text(

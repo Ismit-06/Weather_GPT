@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 
 data class ChatUiMessage(
@@ -70,23 +72,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             com.example.weathergpt.data.UserPreferencesStore.recordActivityQuery(context, text)
         } catch (_: Exception) {}
 
-        val currentState =
-            _uiState.value
+        val currentState = _uiState.value
 
-        // Only keep the current active question (no accumulating previous questions)
-        val currentQuestionList = listOf(
-            ChatUiMessage(
-                role = "user",
-                content = text
-            )
+        // Maintain conversation history for multi-turn context
+        val existingMessages = currentState.messages
+        val historyToSend = existingMessages.takeLast(6).map {
+            ChatMessage(role = it.role, content = it.content)
+        }
+
+        // Show user's question and indicate thinking
+        val updatedMessages = existingMessages + ChatUiMessage(role = "user", content = text)
+        _uiState.value = currentState.copy(
+            messages = updatedMessages,
+            isLoading = true,
+            error = null
         )
-
-        _uiState.value =
-            currentState.copy(
-                messages = currentQuestionList,
-                isLoading = true,
-                error = null
-            )
 
         val requestAgentState = if (!locationName.isNullOrBlank()) {
             agentState.copy(
@@ -99,104 +99,96 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-
             try {
-
-                val response =
-                    ChatClient.api.askWeather(
-                        ChatWeatherRequest(
-                            question = text,
-                            latitude = latitude,
-                            longitude = longitude,
-                            language = language,
-                            history = emptyList(),
-                            agent_state = requestAgentState
-                        )
-                    )
-
-                // Save the latest structured agent context.
-                if (response.agent_state != null) {
-                    agentState =
-                        response.agent_state
-                }
-
-                val displayText =
-                    response.display_text
-                        ?.trim()
-                        .takeUnless {
-                            it.isNullOrEmpty()
-                        }
-                        ?: response.clarification
-                        ?.trim()
-                        .takeUnless {
-                            it.isNullOrEmpty()
-                        }
-                        ?: response.answer
-                        ?.trim()
-                        .takeUnless {
-                            it.isNullOrEmpty()
-                        }
-
-                if (displayText.isNullOrEmpty()) {
-                    if (response.status != "success") {
-                        throw Exception("WeatherGPT returned an error.")
-                    }
-                    throw Exception("I couldn't generate a response.")
-                }
-
-                val speechText =
-                    response.speech_text
-                        ?.trim()
-                        .takeUnless {
-                            it.isNullOrEmpty()
-                        }
-                        ?: displayText
-
-                val instantMessages = listOf(
-                    ChatUiMessage(
-                        role = "user",
-                        content = text
-                    ),
-                    ChatUiMessage(
-                        role = "assistant",
-                        content = displayText
+                // Query Backend AI with conversational history and location context
+                val response = ChatClient.api.askWeather(
+                    ChatWeatherRequest(
+                        question = text,
+                        latitude = latitude,
+                        longitude = longitude,
+                        language = language,
+                        history = historyToSend,
+                        agent_state = requestAgentState
                     )
                 )
 
-                _uiState.value =
-                    ChatUiState(
-                        messages = instantMessages,
+                if (response.agent_state != null) {
+                    agentState = response.agent_state
+                }
+
+                val displayText = response.display_text
+                    ?.trim()
+                    .takeUnless { it.isNullOrEmpty() }
+                    ?: response.clarification
+                        ?.trim()
+                        .takeUnless { it.isNullOrEmpty() }
+                    ?: response.answer
+                        ?.trim()
+                        .takeUnless { it.isNullOrEmpty() }
+
+                if (!displayText.isNullOrEmpty()) {
+                    val speechText = response.speech_text
+                        ?.trim()
+                        .takeUnless { it.isNullOrEmpty() }
+                        ?: displayText
+
+                    val finalMessages = updatedMessages + ChatUiMessage(role = "assistant", content = displayText)
+
+                    _uiState.value = ChatUiState(
+                        messages = finalMessages,
                         isLoading = false,
                         error = null,
-                        detectedLanguage =
-                            response.language,
-                        detectedLanguageCode =
-                            response.language_code,
+                        detectedLanguage = response.language ?: language,
+                        detectedLanguageCode = response.language_code ?: language,
                         latestSpeechText = speechText
                     )
+                    return@launch
+                } else {
+                    throw IllegalStateException("Empty response from AI assistant.")
+                }
+            } catch (cloudErr: Exception) {
+                // If cloud is unavailable or timed out, gracefully fall back to local instant weather intelligence
+                try {
+                    val cachedWeather = com.example.weathergpt.data.MetWeatherClient.getCachedWeather(latitude, longitude, context)
+                        ?: com.example.weathergpt.data.MetWeatherClient.getFastWeather(latitude, longitude, context)
 
-            } catch (e: Exception) {
+                    val fallback = com.example.weathergpt.data.FastWeatherAssistant.generateInstantResponse(
+                        query = text,
+                        weather = cachedWeather,
+                        locationName = locationName,
+                        languageCode = language
+                    )
 
-                val errorMessage = when (e) {
+                    if (fallback != null) {
+                        val fbMessages = updatedMessages + ChatUiMessage(role = "assistant", content = fallback.first)
+                        _uiState.value = ChatUiState(
+                            messages = fbMessages,
+                            isLoading = false,
+                            error = null,
+                            detectedLanguage = language,
+                            detectedLanguageCode = language,
+                            latestSpeechText = fallback.second
+                        )
+                        return@launch
+                    }
+                } catch (_: Exception) {}
+
+                val errorMessage = when (cloudErr) {
                     is java.net.SocketTimeoutException ->
-                        "Connection timed out. The cloud server may be waking up, please tap Retry."
+                        "Connection timed out. Please tap retry or check internet."
                     is java.net.UnknownHostException ->
                         "Unable to reach WeatherGPT. Please check your internet connection."
                     else ->
-                        e.message
-                            ?: "Unable to contact WeatherGPT."
+                        cloudErr.message ?: "Unable to contact WeatherGPT."
                 }
 
-                _uiState.value =
-                    ChatUiState(
-                        messages = currentQuestionList,
-                        isLoading = false,
-                        error = errorMessage,
-                        detectedLanguage =
-                            currentState.detectedLanguage,
-                        detectedLanguageCode =
-                            currentState.detectedLanguageCode
-                    )
+                _uiState.value = ChatUiState(
+                    messages = updatedMessages,
+                    isLoading = false,
+                    error = errorMessage,
+                    detectedLanguage = currentState.detectedLanguage,
+                    detectedLanguageCode = currentState.detectedLanguageCode
+                )
             }
         }
     }
@@ -240,6 +232,79 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             isLoading = true,
             error = null
         )
+    }
+
+    fun analyzeSkyImage(
+        bitmap: android.graphics.Bitmap,
+        latitude: Double,
+        longitude: Double,
+        locationName: String? = null,
+        language: String = "English"
+    ) {
+        val currentState = _uiState.value
+        val updatedMessages = currentState.messages + ChatUiMessage(
+            role = "user",
+            content = "Analyze this sky photograph for cloud patterns and short-term weather."
+        )
+        _uiState.value = currentState.copy(
+            messages = updatedMessages,
+            isLoading = true,
+            error = null
+        )
+
+        viewModelScope.launch {
+            try {
+                val bos = java.io.ByteArrayOutputStream()
+                val scaled = if (maxOf(bitmap.width, bitmap.height) > 1280) {
+                    val ratio = 1280f / maxOf(bitmap.width, bitmap.height)
+                    android.graphics.Bitmap.createScaledBitmap(
+                        bitmap,
+                        (bitmap.width * ratio).toInt().coerceAtLeast(1),
+                        (bitmap.height * ratio).toInt().coerceAtLeast(1),
+                        true
+                    )
+                } else bitmap
+                scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, bos)
+                val bytes = bos.toByteArray()
+
+                val part = com.example.weathergpt.data.SkyAiClient.createMultipartImage(bytes, "chat_sky_upload.jpg")
+                val latBody = latitude.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                val lonBody = longitude.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                val locBody = locationName?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val langBody = language.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val response = com.example.weathergpt.data.SkyAiClient.api.analyzeVisualCloud(
+                    image = part,
+                    latitude = latBody,
+                    longitude = lonBody,
+                    locationName = locBody,
+                    language = langBody
+                )
+
+                val displayText = response.explanation.ifBlank {
+                    "Sky Analysis: ${response.observation.dominant_cloud_type.replace('_', ' ').capitalize()}\n${response.assessment.next_1_hour}"
+                }
+                val speechText = "Sky analysis: ${response.observation.dominant_cloud_type.replace('_', ' ')}. ${response.assessment.next_1_hour}"
+
+                _uiState.value = ChatUiState(
+                    messages = updatedMessages + ChatUiMessage(role = "assistant", content = displayText),
+                    isLoading = false,
+                    error = null,
+                    detectedLanguage = language,
+                    detectedLanguageCode = language,
+                    latestSpeechText = speechText
+                )
+            } catch (e: Exception) {
+                _uiState.value = ChatUiState(
+                    messages = updatedMessages + ChatUiMessage(
+                        role = "assistant",
+                        content = "Unable to analyze this image. Please ensure it is a clear photograph of an open sky and try again."
+                    ),
+                    isLoading = false,
+                    error = e.message
+                )
+            }
+        }
     }
 
     fun clearChat() {

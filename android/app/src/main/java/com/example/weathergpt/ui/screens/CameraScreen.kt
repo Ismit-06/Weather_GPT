@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
 import android.view.ViewGroup
@@ -12,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
@@ -19,7 +21,6 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -58,11 +59,14 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,11 +89,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.example.weathergpt.data.MetForecastItem
-import com.example.weathergpt.data.MetWeatherClient
-import com.example.weathergpt.location.DeviceLocationProvider
-import com.example.weathergpt.location.LocationStore
-import com.example.weathergpt.location.SelectedLocation
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.weathergpt.sky.SkyDecisionState
+import com.example.weathergpt.sky.SkyWeatherFusionReport
 import com.example.weathergpt.ui.components.GlassCard
 import com.example.weathergpt.ui.theme.AccentPurple
 import com.example.weathergpt.ui.theme.BackgroundDark
@@ -102,43 +104,14 @@ import com.example.weathergpt.ui.theme.TextMuted
 import com.example.weathergpt.ui.theme.TextPrimary
 import com.example.weathergpt.ui.theme.TextSecondary
 import com.example.weathergpt.ui.theme.WarningAmber
-import kotlinx.coroutines.delay
+import com.example.weathergpt.viewmodel.SkyAiViewModel
 import kotlinx.coroutines.launch
 import java.io.InputStream
 
-data class DetectedVisionObject(
-    val label: String,
-    val icon: String,
-    val category: String, // "Atmosphere", "Architecture", "Terrain", "Vegetation", "Indoor"
-    val confidence: Int,
-    val weatherImplication: String,
-    val boundingBoxNormalized: List<Float>? = null // [top, left, bottom, right]
-)
-
-data class SkyAnalysisResult(
-    val title: String,
-    val icon: String,
-    val cloudType: String,
-    val cloudDescription: String,
-    val cloudCoveragePercent: Int,
-    val visibilityStatus: String,
-    val atmosphericCondition: String,
-    val confidenceScore: Int,
-    val estimatedRainRisk: String,
-    val explanation: String,
-    val recommendation: String,
-    val statusColor: Color,
-    val isSkyDetected: Boolean = true,
-    val skyColorDescription: String = "",
-    val lightingCondition: String = "",
-    val detectedObjects: List<DetectedVisionObject> = emptyList(),
-    val environmentSceneType: String = "Outdoor Open Sky",
-    val microclimateImpact: String = ""
-)
-
 @Composable
 fun CameraScreen(
-    onNavigateToRadar: () -> Unit = {}
+    onNavigateToRadar: () -> Unit = {},
+    skyViewModel: SkyAiViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -158,29 +131,31 @@ fun CameraScreen(
     ) { isGranted ->
         hasCameraPermission = isGranted
         if (!isGranted) {
-            Toast.makeText(context, "Camera permission is required to analyze the sky.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Camera permission needed to observe the sky.", Toast.LENGTH_SHORT).show()
         }
     }
 
     var cameraLensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
-    var isAnalyzing by remember { mutableStateOf(false) }
-    var analysisResult by remember { mutableStateOf<SkyAnalysisResult?>(null) }
-    var selectedLocation by remember { mutableStateOf<SelectedLocation?>(null) }
-    var currentWeather by remember { mutableStateOf<MetForecastItem?>(null) }
+
+    val liveState by skyViewModel.liveDecisionState.collectAsState()
+    val liveEvaluation by skyViewModel.liveEvaluation.collectAsState()
+    val isAnalyzing by skyViewModel.isAnalyzing.collectAsState()
+    val fusionReport by skyViewModel.fusionReport.collectAsState()
+    val debugTelemetry by skyViewModel.debugTelemetry.collectAsState()
+
+    DisposableEffect(Unit) {
+        skyViewModel.startSensors()
+        onDispose {
+            skyViewModel.stopSensors()
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
-        val loc = LocationStore.getLocation(context)
-        selectedLocation = loc
-        try {
-            val weatherResponse = MetWeatherClient.api.getWeather(loc.latitude, loc.longitude)
-            currentWeather = weatherResponse.forecast.firstOrNull()
-        } catch (e: Exception) {
-            Log.e("CameraScreen", "Failed to fetch weather: ${e.message}")
-        }
+        skyViewModel.refreshLocationAndWeather()
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -188,31 +163,22 @@ fun CameraScreen(
     ) { uri: Uri? ->
         uri?.let {
             scope.launch {
-                isAnalyzing = true
-                delay(1200)
                 val bitmap = loadBitmapFromUri(context, it)
-                analysisResult = performSkyAnalysis(bitmap, currentWeather)
-                isAnalyzing = false
+                if (bitmap != null) {
+                    skyViewModel.analyzeCapturedBitmap(bitmap)
+                } else {
+                    Toast.makeText(context, "Could not load selected image.", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "scanline")
-    val scanProgress by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "scanProgress"
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(Color.Black)
     ) {
+        // Fullscreen Live Viewfinder
         if (hasCameraPermission) {
             AndroidView(
                 factory = { ctx ->
@@ -235,6 +201,16 @@ fun CameraScreen(
                             .build()
                         imageCapture = capture
 
+                        val analysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                            .build()
+                            .also {
+                                it.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                                    skyViewModel.processLiveFrame(imageProxy)
+                                }
+                            }
+
                         val cameraSelector = CameraSelector.Builder()
                             .requireLensFacing(cameraLensFacing)
                             .build()
@@ -245,7 +221,8 @@ fun CameraScreen(
                                 lifecycleOwner,
                                 cameraSelector,
                                 preview,
-                                capture
+                                capture,
+                                analysis
                             )
                         } catch (exc: Exception) {
                             Log.e("CameraScreen", "Camera binding failed", exc)
@@ -257,58 +234,59 @@ fun CameraScreen(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
+            // Minimal Permission State
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color(0xCC0D1520))
+                        .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(24.dp))
+                        .padding(28.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
                             contentDescription = "Camera",
-                            tint = SecondaryCyan,
-                            modifier = Modifier.size(54.dp)
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Camera Access Required",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "WeatherGPT needs camera access to observe cloud formations, sky darkness, and visibility conditions in real time.",
+                            text = "Enable camera to observe cloud conditions and sky features in real time.",
                             fontSize = 13.sp,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center
+                            color = Color(0xFF9EABB9),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 18.sp
                         )
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(22.dp))
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(PrimaryBlue, SecondaryCyan)
-                                    )
-                                )
-                                .clickable {
-                                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                                }
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White)
+                                .clickable { permissionLauncher.launch(Manifest.permission.CAMERA) }
                                 .padding(horizontal = 24.dp, vertical = 12.dp)
                         ) {
                             Text(
-                                text = "Grant Permission",
-                                color = BackgroundDark,
+                                text = "Allow Camera",
+                                color = Color(0xFF0D1520),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             )
                         }
                     }
@@ -316,129 +294,119 @@ fun CameraScreen(
             }
         }
 
+        // Minimal Clean Focus Bracket (Classy subtle white/green corners)
+        val bracketColor = when {
+            liveState == SkyDecisionState.VALID_SKY -> Color.White.copy(alpha = 0.75f)
+            liveState == SkyDecisionState.CEILING || liveState == SkyDecisionState.INDOOR || liveState == SkyDecisionState.BEDSHEET_OR_FABRIC || liveState == SkyDecisionState.NO_SKY_DETECTED -> DangerRed.copy(alpha = 0.85f)
+            liveState == SkyDecisionState.TOO_BLURRY || liveState == SkyDecisionState.CAMERA_MOVING || liveState == SkyDecisionState.INSUFFICIENT_SKY || liveState == SkyDecisionState.OBSTRUCTED_SKY -> WarningAmber.copy(alpha = 0.85f)
+            else -> Color.White.copy(alpha = 0.45f)
+        }
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
             val height = size.height
-            val reticleSize = width * 0.72f
-            val left = (width - reticleSize) / 2f
-            val top = height * 0.18f
+            val frameSize = width * 0.72f
+            val left = (width - frameSize) / 2f
+            val top = height * 0.22f
+            val cornerLen = 24f
+            val strokeW = 1.5.dp.toPx()
 
-            // Main Viewfinder Reticle
-            drawRoundRect(
-                color = Color(0x6652D9FF),
-                topLeft = Offset(left, top),
-                size = Size(reticleSize, reticleSize),
-                style = Stroke(
-                    width = 2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(30f, 20f), 0f)
-                )
-            )
+            // Top-left corner
+            drawLine(bracketColor, Offset(left, top), Offset(left + cornerLen, top), strokeW)
+            drawLine(bracketColor, Offset(left, top), Offset(left, top + cornerLen), strokeW)
 
-            val cornerLen = 36f
-            val strokeW = 4.dp.toPx()
-            val cyanColor = Color(0xFF52D9FF)
+            // Top-right corner
+            drawLine(bracketColor, Offset(left + frameSize, top), Offset(left + frameSize - cornerLen, top), strokeW)
+            drawLine(bracketColor, Offset(left + frameSize, top), Offset(left + frameSize - cornerLen, top), strokeW)
 
-            drawLine(cyanColor, Offset(left, top), Offset(left + cornerLen, top), strokeW)
-            drawLine(cyanColor, Offset(left, top), Offset(left, top + cornerLen), strokeW)
-            drawLine(cyanColor, Offset(left + reticleSize, top), Offset(left + reticleSize - cornerLen, top), strokeW)
-            drawLine(cyanColor, Offset(left + reticleSize, top), Offset(left + reticleSize, top + cornerLen), strokeW)
-            drawLine(cyanColor, Offset(left, top + reticleSize), Offset(left + cornerLen, top + reticleSize), strokeW)
-            drawLine(cyanColor, Offset(left, top + reticleSize), Offset(left, top + reticleSize - cornerLen), strokeW)
-            drawLine(cyanColor, Offset(left + reticleSize, top + reticleSize), Offset(left + reticleSize - cornerLen, top + reticleSize), strokeW)
-            drawLine(cyanColor, Offset(left + reticleSize, top + reticleSize), Offset(left + reticleSize, top + cornerLen), strokeW)
+            // Bottom-left corner
+            drawLine(bracketColor, Offset(left, top + frameSize), Offset(left + cornerLen, top + frameSize), strokeW)
+            drawLine(bracketColor, Offset(left, top + frameSize), Offset(left, top + frameSize - cornerLen), strokeW)
 
-            // Dynamic Vision Bounding Boxes for detected objects (Buildings, Trees, Horizon, Clouds)
-            analysisResult?.detectedObjects?.forEach { obj ->
-                obj.boundingBoxNormalized?.let { box ->
-                    if (box.size == 4) {
-                        val bTop = box[0] * height
-                        val bLeft = box[1] * width
-                        val bBottom = box[2] * height
-                        val bRight = box[3] * width
-                        val boxColor = when (obj.category) {
-                            "Architecture" -> Color(0xFFF59E0B) // Amber
-                            "Vegetation" -> Color(0xFF10B981)   // Green
-                            "Atmosphere" -> Color(0xFF38BDF8)   // Sky Cyan
-                            else -> Color(0xFFA855F7)           // Purple
-                        }
-
-                        drawRoundRect(
-                            color = boxColor.copy(alpha = 0.85f),
-                            topLeft = Offset(bLeft, bTop),
-                            size = Size(bRight - bLeft, bBottom - bTop),
-                            style = Stroke(width = 1.5.dp.toPx()),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
-                        )
-                    }
-                }
-            }
-
-            if (isAnalyzing) {
-                val scanY = top + (reticleSize * scanProgress)
-                drawLine(
-                    brush = Brush.horizontalGradient(
-                        listOf(Color.Transparent, Color(0xFF52D9FF), Color.White, Color(0xFF52D9FF), Color.Transparent)
-                    ),
-                    start = Offset(left, scanY),
-                    end = Offset(left + reticleSize, scanY),
-                    strokeWidth = 3.dp.toPx()
-                )
-            }
+            // Bottom-right corner
+            drawLine(bracketColor, Offset(left + frameSize, top + frameSize), Offset(left + frameSize - cornerLen, top + frameSize), strokeW)
+            drawLine(bracketColor, Offset(left + frameSize, top + frameSize), Offset(left + frameSize, top + frameSize - cornerLen), strokeW)
         }
 
+        // Minimal Top Floating Bar (Clean pill badge & utility controls)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Classy minimal status capsule
+                val statusDotColor = when {
+                    isAnalyzing -> WarningAmber
+                    liveState == SkyDecisionState.VALID_SKY -> SuccessGreen
+                    liveState == SkyDecisionState.CEILING || liveState == SkyDecisionState.INDOOR || liveState == SkyDecisionState.BEDSHEET_OR_FABRIC || liveState == SkyDecisionState.NO_SKY_DETECTED -> DangerRed
+                    liveState == SkyDecisionState.TOO_BLURRY || liveState == SkyDecisionState.CAMERA_MOVING || liveState == SkyDecisionState.INSUFFICIENT_SKY || liveState == SkyDecisionState.OBSTRUCTED_SKY -> WarningAmber
+                    else -> Color.White.copy(alpha = 0.6f)
+                }
+
+                val statusLabel = when {
+                    isAnalyzing -> "Analyzing..."
+                    liveState == SkyDecisionState.VALID_SKY -> "Sky in view"
+                    liveState == SkyDecisionState.BEDSHEET_OR_FABRIC -> "Fabric detected"
+                    liveState == SkyDecisionState.CEILING -> "Ceiling detected"
+                    liveState == SkyDecisionState.INDOOR -> "Indoor scene"
+                    liveState == SkyDecisionState.NO_SKY_DETECTED -> "No sky in view"
+                    liveState == SkyDecisionState.INSUFFICIENT_SKY -> "Tilt camera up"
+                    liveState == SkyDecisionState.OBSTRUCTED_SKY -> "Sky obstructed"
+                    liveState == SkyDecisionState.TOO_BLURRY -> "Blurry"
+                    liveState == SkyDecisionState.CAMERA_MOVING -> "Stabilizing..."
+                    liveState == SkyDecisionState.TOO_DARK -> "Too dark"
+                    liveState == SkyDecisionState.OVEREXPOSED || liveState == SkyDecisionState.EXCESSIVE_GLARE -> "High glare"
+                    else -> "Aim at sky"
+                }
+
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xCC0A1626))
-                        .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .background(Color(0xB30B121C))
+                        .border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
-                                .background(if (isAnalyzing) WarningAmber else SuccessGreen)
+                                .background(statusDotColor)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isAnalyzing) "AI SCANNING SKY..." else "LIVE VISION FEED",
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
+                            text = statusLabel,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Clean Action buttons (Photo Library, Flip Camera)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A1626))
-                            .border(1.dp, BorderGlass, CircleShape)
-                            .clickable {
-                                galleryLauncher.launch("image/*")
-                            },
+                            .background(Color(0xB30B121C))
+                            .border(1.dp, Color(0x1AFFFFFF), CircleShape)
+                            .clickable { galleryLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PhotoLibrary,
-                            contentDescription = "Gallery",
-                            tint = SecondaryCyan,
-                            modifier = Modifier.size(18.dp)
+                            contentDescription = "Import Image",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
@@ -446,8 +414,8 @@ fun CameraScreen(
                         modifier = Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(Color(0xCC0A1626))
-                            .border(1.dp, BorderGlass, CircleShape)
+                            .background(Color(0xB30B121C))
+                            .border(1.dp, Color(0x1AFFFFFF), CircleShape)
                             .clickable {
                                 cameraLensFacing = if (cameraLensFacing == CameraSelector.LENS_FACING_BACK) {
                                     CameraSelector.LENS_FACING_FRONT
@@ -459,172 +427,163 @@ fun CameraScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cameraswitch,
-                            contentDescription = "Flip",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(18.dp)
+                            contentDescription = "Flip Camera",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Subtle Hint strip (only if non-sky or issue)
+            if (liveState != SkyDecisionState.VALID_SKY && liveState != SkyDecisionState.UNCERTAIN && !isAnalyzing) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xD90B121C))
+                        .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = liveState.userMessage,
+                        color = Color(0xFFCAD5E2),
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x99050A12))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "Point camera at open sky or cloud cover to identify structure",
-                    color = TextSecondary,
-                    fontSize = 11.sp
-                )
+            // Development Debug Telemetry Badge (if available from server response)
+            debugTelemetry?.let { dbg ->
+                Spacer(modifier = Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xCC050A10))
+                        .border(1.dp, Color(0x3338BDF8), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "Sky AI Debug: ${dbg.modelVersion} | Sky: ${dbg.skyDetected} (${(dbg.confidence * 100).toInt()}%) | Scene: ${dbg.sceneType} | ${dbg.latencyMs}ms",
+                        color = Color(0xFF7DD3FC),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
             }
         }
 
+        // Bottom Controls & Clean Slide-up Sheet
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = 80.dp)
+                .padding(bottom = 76.dp)
         ) {
+            // Elegant Result Sheet
             AnimatedVisibility(
-                visible = analysisResult != null && !isAnalyzing,
+                visible = fusionReport != null && !isAnalyzing,
                 enter = fadeIn() + slideInVertically { it / 2 },
                 exit = fadeOut()
             ) {
-                analysisResult?.let { result ->
-                    SkyResultOverlayCard(
-                        result = result,
-                        onDismiss = { analysisResult = null },
+                fusionReport?.let { report ->
+                    SkyFusionMinimalResult(
+                        report = report,
+                        onDismiss = { skyViewModel.clearResult() },
                         onCheckRadar = onNavigateToRadar
                     )
                 }
             }
 
+            // Shutter Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                    .padding(horizontal = 28.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Left: Quick Observe Button
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xCC0A1626))
-                            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xB30B121C))
+                            .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))
                             .clickable(enabled = !isAnalyzing) {
-                                scope.launch {
-                                    isAnalyzing = true
-                                    triggerCaptureAndAnalyze(
-                                        context = context,
-                                        imageCapture = imageCapture,
-                                        currentWeather = currentWeather,
-                                        onResult = { res ->
-                                            analysisResult = res
-                                            isAnalyzing = false
-                                        }
-                                    )
+                                triggerCapture(context, imageCapture) { bmp ->
+                                    if (bmp != null) {
+                                        skyViewModel.analyzeCapturedBitmap(bmp)
+                                    } else {
+                                        Toast.makeText(context, "Could not capture viewfinder frame.", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Quick AI",
-                                tint = SecondaryCyan,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Instant Scan",
-                                color = TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = "Observe",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
+                    // Center: Minimal Shutter Button
                     Box(
                         modifier = Modifier
-                            .size(76.dp)
+                            .size(70.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(
-                                        Color(0x3352D9FF),
-                                        Color(0x664DA3FF)
-                                    )
-                                )
-                            )
-                            .border(2.dp, SecondaryCyan, CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.8f), CircleShape)
                             .clickable(enabled = !isAnalyzing) {
-                                scope.launch {
-                                    isAnalyzing = true
-                                    triggerCaptureAndAnalyze(
-                                        context = context,
-                                        imageCapture = imageCapture,
-                                        currentWeather = currentWeather,
-                                        onResult = { res ->
-                                            analysisResult = res
-                                            isAnalyzing = false
-                                        }
-                                    )
+                                triggerCapture(context, imageCapture) { bmp ->
+                                    if (bmp != null) {
+                                        skyViewModel.analyzeCapturedBitmap(bmp)
+                                    } else {
+                                        Toast.makeText(context, "Failed to capture.", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
-                            .padding(6.dp),
+                            .padding(5.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape)
-                                .background(if (isAnalyzing) WarningAmber else Color.White)
-                        ) {
-                            if (isAnalyzing) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(4.dp),
-                                    color = BackgroundDark,
-                                    strokeWidth = 3.dp
-                                )
-                            }
+                        if (isAnalyzing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                color = Color.White,
+                                strokeWidth = 2.5.dp
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                            )
                         }
                     }
 
+                    // Right: Clear/Reset
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xCC0A1626))
-                            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
-                            .clickable {
-                                analysisResult = null
-                            }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xB30B121C))
+                            .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))
+                            .clickable { skyViewModel.clearResult() }
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Reset",
-                                tint = TextMuted,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Clear",
-                                color = TextMuted,
-                                fontSize = 12.sp
-                            )
-                        }
+                        Text(
+                            text = "Reset",
+                            color = Color(0xFFAAB6C7),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
@@ -632,9 +591,12 @@ fun CameraScreen(
     }
 }
 
+/**
+ * Minimal, Classy, Lightweight Weather Observation Card
+ */
 @Composable
-private fun SkyResultOverlayCard(
-    result: SkyAnalysisResult,
+private fun SkyFusionMinimalResult(
+    report: SkyWeatherFusionReport,
     onDismiss: () -> Unit,
     onCheckRadar: () -> Unit
 ) {
@@ -644,358 +606,167 @@ private fun SkyResultOverlayCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xF0081220))
-            .border(1.5.dp, BorderGlass, RoundedCornerShape(24.dp))
-            .padding(18.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xEE0B121C))
+            .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(22.dp))
+            .padding(20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
         ) {
+            // Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = result.icon,
-                        fontSize = 22.sp
+                        text = report.visualSkyCondition,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = result.title,
-                            color = TextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "AI Visual Sky Observation",
-                            color = SecondaryCyan,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    val coverageText = report.visualSkyCoveragePct?.let { "$it% Sky Visibility  •  " } ?: ""
+                    val modelInfo = report.modelVersion?.let { " ($it)" } ?: ""
+                    Text(
+                        text = "$coverageText${report.aiConfidenceLabel}$modelInfo",
+                        color = Color(0xFF9EABB9),
+                        fontSize = 12.sp
+                    )
                 }
 
                 Box(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(Color(0x33FFFFFF))
+                        .background(Color(0x22FFFFFF))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("✕", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("✕", color = Color(0xFFCAD5E2), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Observation & Context Paragraph
+            Text(
+                text = report.visualObservationSummary,
+                color = Color(0xFFE2E8F0),
+                fontSize = 13.5.sp,
+                lineHeight = 19.sp
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x224DA3FF))
-                        .border(1.dp, Color(0x334DA3FF), RoundedCornerShape(14.dp))
-                        .padding(10.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = "CLOUD TYPE",
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = result.cloudType,
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2252D9FF))
-                        .border(1.dp, Color(0x3352D9FF), RoundedCornerShape(14.dp))
-                        .padding(10.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = if (result.isSkyDetected) "COVERAGE (${result.cloudCoveragePercent}%)" else "ATMOSPHERE",
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = if (result.isSkyDetected) "${result.cloudCoveragePercent}% Overcast" else result.visibilityStatus,
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(result.statusColor.copy(alpha = 0.15f))
-                        .border(1.dp, result.statusColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                        .padding(10.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = "RISK LEVEL",
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = result.estimatedRainRisk,
-                            color = result.statusColor,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0x400A1626))
-                    .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
-                    .padding(12.dp)
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = AccentPurple,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "AI Sky Assessment",
-                            color = AccentPurple,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = result.explanation,
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-
-            // Microclimate & Environmental Context Card
-            if (result.isSkyDetected && result.microclimateImpact.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
+            // Short-Term Outlook Section (0-1h, 1-3h, 3-6h)
+            if (report.shortTermOutlook1h != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0x2A0D9488))
-                        .border(1.dp, Color(0x4D14B8A6), RoundedCornerShape(14.dp))
-                        .padding(12.dp)
+                        .background(Color(0x331E293B))
+                        .border(1.dp, Color(0x2238BDF8), RoundedCornerShape(14.dp))
+                        .padding(14.dp)
                 ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "🌐",
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "ENVIRONMENT & MICROCLIMATE: ${result.environmentSceneType.uppercase()}",
-                                color = Color(0xFF5EEAD4),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = result.microclimateImpact,
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
+                            text = "SHORT-TERM OUTLOOK",
+                            color = Color(0xFF7DD3FC),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
                         )
-                    }
-                }
-            }
-
-            // Detected Objects & Horizon Features
-            if (result.detectedObjects.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = "COMPUTER VISION DETECTIONS (${result.detectedObjects.size})",
-                    color = TextMuted,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    result.detectedObjects.forEach { obj ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0x26FFFFFF))
-                                .border(1.dp, BorderGlass, RoundedCornerShape(10.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(text = obj.icon, fontSize = 14.sp)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
-                                        Text(
-                                            text = "${obj.label} (${obj.confidence}%)",
-                                            color = TextPrimary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = obj.weatherImplication,
-                                            color = TextSecondary,
-                                            fontSize = 10.sp,
-                                            lineHeight = 13.sp
-                                        )
-                                    }
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            when (obj.category) {
-                                                "Architecture" -> Color(0x33F59E0B)
-                                                "Vegetation" -> Color(0x3310B981)
-                                                "Atmosphere" -> Color(0x3338BDF8)
-                                                else -> Color(0x33A855F7)
-                                            }
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = obj.category.uppercase(),
-                                        color = when (obj.category) {
-                                            "Architecture" -> Color(0xFFFBBF24)
-                                            "Vegetation" -> Color(0xFF34D399)
-                                            "Atmosphere" -> Color(0xFF7DD3FC)
-                                            else -> Color(0xFFC084FC)
-                                        },
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(text = "Next 1h: ", color = Color(0xFFBAE6FD), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = report.shortTermOutlook1h, color = Color.White, fontSize = 12.sp)
+                        }
+                        if (report.shortTermOutlook3h != null) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(text = "Next 1–3h: ", color = Color(0xFFBAE6FD), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(text = report.shortTermOutlook3h, color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                        if (report.shortTermOutlook6h != null) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text(text = "Next 3–6h: ", color = Color(0xFF94A3B8), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                                Text(text = report.shortTermOutlook6h, color = Color(0xFFCBD5E1), fontSize = 11.5.sp)
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Telemetry Clean Minimal Chip Row
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x44141E2D))
+                    .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Text(
+                    text = report.meteorologicalSummary,
+                    color = Color(0xFFA5B4CB),
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // Disclaimer strip
+            Text(
+                text = report.limitsAndDisclaimer,
+                color = Color(0xFF64748B),
+                fontSize = 10.5.sp,
+                lineHeight = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Radar Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color(0x334DA3FF), Color(0x3352D9FF))
-                        )
-                    )
-                    .border(1.dp, Color(0x4452D9FF), RoundedCornerShape(12.dp))
+                    .background(Color(0x3338BDF8))
+                    .border(1.dp, Color(0x3338BDF8), RoundedCornerShape(12.dp))
                     .clickable { onCheckRadar() }
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Radar,
-                        contentDescription = "Radar",
-                        tint = SecondaryCyan,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = result.recommendation,
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "Disclaimer",
-                    tint = TextMuted,
-                    modifier = Modifier.size(12.dp)
+                    imageVector = Icons.Default.Radar,
+                    contentDescription = null,
+                    tint = Color(0xFF7DD3FC),
+                    modifier = Modifier.size(16.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Camera analysis is an observational AI estimate, not a replacement for official radar or Doppler telemetry.",
-                    color = TextMuted,
-                    fontSize = 10.sp,
-                    lineHeight = 13.sp
+                    text = "View Precipitation Radar",
+                    color = Color.White,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
     }
 }
 
-private fun triggerCaptureAndAnalyze(
+private fun triggerCapture(
     context: Context,
     imageCapture: ImageCapture?,
-    currentWeather: MetForecastItem?,
-    onResult: (SkyAnalysisResult) -> Unit
+    onBitmapReady: (Bitmap?) -> Unit
 ) {
     if (imageCapture == null) {
-        onResult(performSkyAnalysis(null, currentWeather))
+        onBitmapReady(null)
         return
     }
 
@@ -1006,13 +777,12 @@ private fun triggerCaptureAndAnalyze(
             override fun onCaptureSuccess(image: ImageProxy) {
                 val bitmap = imageProxyToBitmap(image)
                 image.close()
-                val result = performSkyAnalysis(bitmap, currentWeather)
-                onResult(result)
+                onBitmapReady(bitmap)
             }
 
             override fun onError(exception: ImageCaptureException) {
                 Log.e("CameraScreen", "Capture failed: ${exception.message}", exception)
-                onResult(performSkyAnalysis(null, currentWeather))
+                onBitmapReady(null)
             }
         }
     )
@@ -1023,7 +793,7 @@ private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
         val bitmap = image.toBitmap()
         val rotationDegrees = image.imageInfo.rotationDegrees
         if (rotationDegrees != 0) {
-            val matrix = android.graphics.Matrix().apply {
+            val matrix = Matrix().apply {
                 postRotate(rotationDegrees.toFloat())
             }
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
@@ -1042,452 +812,5 @@ private fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
         BitmapFactory.decodeStream(inputStream)
     } catch (e: Exception) {
         null
-    }
-}
-
-private fun performSkyAnalysis(bitmap: Bitmap?, weather: MetForecastItem?): SkyAnalysisResult {
-    if (bitmap == null) {
-        return SkyAnalysisResult(
-            title = "No Viewfinder Image",
-            icon = "📷",
-            cloudType = "Unknown",
-            cloudDescription = "Could not capture image from viewfinder frame",
-            cloudCoveragePercent = 0,
-            visibilityStatus = "Indeterminate",
-            atmosphericCondition = "Sensor Offline",
-            confidenceScore = 0,
-            estimatedRainRisk = "N/A",
-            explanation = "Unable to process camera sensor data. Please ensure camera lens is unobstructed and point at the open sky or outdoor scenery.",
-            recommendation = "Point camera towards the sky, buildings, or landscape and try again.",
-            statusColor = WarningAmber,
-            isSkyDetected = false,
-            skyColorDescription = "N/A",
-            lightingCondition = "Unknown",
-            detectedObjects = emptyList(),
-            environmentSceneType = "Indeterminate",
-            microclimateImpact = ""
-        )
-    }
-
-    val sampleW = 128
-    val sampleH = 128
-    val scaled = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
-
-    // Analyze three distinct vertical zones:
-    // Zone 1: Upper Sky & Clouds (0% to 50%)
-    // Zone 2: Horizon & Mid Skyline / Architecture (40% to 75%)
-    // Zone 3: Ground / Vegetation / Streets / Surfaces (70% to 100%)
-    val skyZoneLimitY = (sampleH * 0.55).toInt()
-    val horizonZoneStartY = (sampleH * 0.35).toInt()
-    val horizonZoneEndY = (sampleH * 0.80).toInt()
-    val groundZoneStartY = (sampleH * 0.65).toInt()
-
-    val totalPixels = sampleW * sampleH
-    val lumGrid = Array(sampleW) { DoubleArray(sampleH) }
-    val hsv = FloatArray(3)
-
-    var totalLum = 0.0
-    var totalSat = 0.0
-
-    // Sky Region Counts (Upper)
-    var skyZonePixelCount = 0
-    var skyBluePixels = 0
-    var brightWhiteCloudPixels = 0
-    var grayCloudPixels = 0
-    var darkStormCloudPixels = 0
-    var sunsetGoldenPixels = 0
-
-    // Environmental Object / Horizon Counts
-    var vegetationTreePixels = 0
-    var buildingStructurePixels = 0
-    var terrainSoilPixels = 0
-    var indoorObstructionPixels = 0
-
-    // Gradient Edge Maps for architectural and texture identification
-    var verticalBuildingEdges = 0
-    var horizontalHorizonEdges = 0
-    var randomTextureEdges = 0
-
-    // Bounding Box estimation accumulators [minX, minY, maxX, maxY]
-    var cloudMinX = sampleW; var cloudMinY = sampleH; var cloudMaxX = 0; var cloudMaxY = 0; var cloudPointCount = 0
-    var bldgMinX = sampleW; var bldgMinY = sampleH; var bldgMaxX = 0; var bldgMaxY = 0; var bldgPointCount = 0
-    var vegMinX = sampleW; var vegMinY = sampleH; var vegMaxX = 0; var vegMaxY = 0; var vegPointCount = 0
-
-    for (x in 0 until sampleW) {
-        for (y in 0 until sampleH) {
-            val pixel = scaled.getPixel(x, y)
-            val r = (pixel shr 16) and 0xff
-            val g = (pixel shr 8) and 0xff
-            val b = pixel and 0xff
-            val lum = 0.299 * r + 0.587 * g + 0.114 * b
-            lumGrid[x][y] = lum
-            totalLum += lum
-
-            android.graphics.Color.RGBToHSV(r, g, b, hsv)
-            val hue = hsv[0]
-            val sat = hsv[1]
-            val value = hsv[2]
-            totalSat += sat
-
-            val isSkyRegion = y <= skyZoneLimitY
-
-            // 1. Sky & Atmospheric Signatures
-            val isSkyBlue = hue in 185f..245f && sat >= 0.18f && (b >= r + 10)
-            val isSunsetGold = hue in 12f..55f && sat in 0.25f..0.85f && (r > b + 25)
-            val isAchromaticAtmosphere = sat < 0.20f && isSkyRegion
-
-            if (isSkyRegion) {
-                skyZonePixelCount++
-                if (isSkyBlue) {
-                    skyBluePixels++
-                } else if (isSunsetGold) {
-                    sunsetGoldenPixels++
-                } else if (isAchromaticAtmosphere) {
-                    when {
-                        lum >= 170 -> {
-                            brightWhiteCloudPixels++
-                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
-                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
-                            cloudPointCount++
-                        }
-                        lum in 100.0..169.0 -> {
-                            grayCloudPixels++
-                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
-                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
-                            cloudPointCount++
-                        }
-                        lum in 25.0..99.0 -> {
-                            darkStormCloudPixels++
-                            cloudMinX = minOf(cloudMinX, x); cloudMinY = minOf(cloudMinY, y)
-                            cloudMaxX = maxOf(cloudMaxX, x); cloudMaxY = maxOf(cloudMaxY, y)
-                            cloudPointCount++
-                        }
-                    }
-                }
-            }
-
-            // 2. Vegetation & Trees (Green hues, distinct organic chlorophyll reflection)
-            val isVegetation = hue in 68f..165f && sat in 0.22f..0.88f && value in 0.15f..0.85f
-            if (isVegetation) {
-                vegetationTreePixels++
-                vegMinX = minOf(vegMinX, x); vegMinY = minOf(vegMinY, y)
-                vegMaxX = maxOf(vegMaxX, x); vegMaxY = maxOf(vegMaxY, y)
-                vegPointCount++
-            }
-
-            // 3. Architecture & Built Urban Structures (Concrete, Glass, Steel, Brick)
-            // Found in mid/horizon and lower zones: neutral grays with sharp geometric profiles or brick tones
-            val isBrickOrConcrete = (sat < 0.25f && lum in 40.0..210.0 && y >= horizonZoneStartY) ||
-                    (hue in 5f..35f && sat in 0.20f..0.55f && y in horizonZoneStartY..horizonZoneEndY)
-            if (isBrickOrConcrete && !isVegetation) {
-                buildingStructurePixels++
-                bldgMinX = minOf(bldgMinX, x); bldgMinY = minOf(bldgMinY, y)
-                bldgMaxX = maxOf(bldgMaxX, x); bldgMaxY = maxOf(bldgMaxY, y)
-                bldgPointCount++
-            }
-
-            // 4. Ground Soil / Pavement / Roads
-            val isRoadOrGround = y >= groundZoneStartY && sat < 0.20f && lum < 120.0
-            if (isRoadOrGround) {
-                terrainSoilPixels++
-            }
-
-            // 5. Indoor / Desk artifacts (Unnatural neon, intense warmth close-up)
-            if (sat > 0.85f || (hue in 260f..350f && sat > 0.40f) || (lum < 20.0 && sat > 0.5f)) {
-                indoorObstructionPixels++
-            }
-        }
-    }
-
-    // Gradient Edge Convolution for Geometric Edge Orientation (detects building pillars vs horizontal cloud strata)
-    for (x in 1 until sampleW - 1) {
-        for (y in 1 until sampleH - 1) {
-            val gx = (lumGrid[x + 1][y] - lumGrid[x - 1][y])
-            val gy = (lumGrid[x][y + 1] - lumGrid[x][y - 1])
-            val mag = kotlin.math.sqrt(gx * gx + gy * gy)
-            if (mag > 35.0) {
-                if (kotlin.math.abs(gx) > kotlin.math.abs(gy) * 1.6) {
-                    verticalBuildingEdges++
-                } else if (kotlin.math.abs(gy) > kotlin.math.abs(gx) * 1.6) {
-                    horizontalHorizonEdges++
-                } else {
-                    randomTextureEdges++
-                }
-            }
-        }
-    }
-
-    val avgLum = totalLum / totalPixels.coerceAtLeast(1)
-    val avgSat = (totalSat / totalPixels.coerceAtLeast(1)).toFloat()
-
-    val skySampleCount = skyZonePixelCount.coerceAtLeast(1)
-    val totalValidSkyPixels = (skyBluePixels + brightWhiteCloudPixels + grayCloudPixels + darkStormCloudPixels + sunsetGoldenPixels).coerceAtLeast(1)
-    val cloudPixels = brightWhiteCloudPixels + grayCloudPixels + darkStormCloudPixels
-    val cloudCoverageFraction = (cloudPixels.toFloat() / totalValidSkyPixels).coerceIn(0f, 1f)
-    val cloudPercent = (cloudCoverageFraction * 100).toInt().coerceIn(0, 100)
-
-    val vegetationRatio = vegetationTreePixels.toFloat() / totalPixels.coerceAtLeast(1)
-    val buildingRatio = buildingStructurePixels.toFloat() / totalPixels.coerceAtLeast(1)
-    val indoorRatio = indoorObstructionPixels.toFloat() / totalPixels.coerceAtLeast(1)
-    val edgeRatio = (verticalBuildingEdges + horizontalHorizonEdges + randomTextureEdges).toFloat() / totalPixels.coerceAtLeast(1)
-
-    // Build Detected Objects List
-    val detectedObjects = mutableListOf<DetectedVisionObject>()
-
-    // 1. Cloud Layer Object
-    if (cloudPointCount > (sampleW * 10)) {
-        val cloudName = when {
-            darkStormCloudPixels > (totalValidSkyPixels * 0.35f) -> "Cumulonimbus Storm Cell"
-            brightWhiteCloudPixels > (totalValidSkyPixels * 0.50f) -> "Altostratus / Stratus Layer"
-            cloudPercent in 20..65 -> "Cumulus Cloud Formations"
-            else -> "Atmospheric Cloud Layer"
-        }
-        val topN = (cloudMinY.toFloat() / sampleH).coerceIn(0f, 0.45f)
-        val leftN = (cloudMinX.toFloat() / sampleW).coerceIn(0f, 0.9f)
-        val botN = (cloudMaxY.toFloat() / sampleH).coerceIn(topN + 0.15f, 0.65f)
-        val rightN = (cloudMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
-
-        detectedObjects.add(
-            DetectedVisionObject(
-                label = cloudName,
-                icon = if (darkStormCloudPixels > totalValidSkyPixels * 0.35f) "⛈️" else "☁️",
-                category = "Atmosphere",
-                confidence = 94,
-                weatherImplication = if (darkStormCloudPixels > totalValidSkyPixels * 0.35f) "Active precipitation & squall risk" else "Stable optical atmospheric layer",
-                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
-            )
-        )
-    }
-
-    // 2. Architecture / Buildings Object
-    if (buildingRatio > 0.12f || verticalBuildingEdges > (sampleW * 6)) {
-        val topN = (bldgMinY.toFloat() / sampleH).coerceIn(0.25f, 0.60f)
-        val leftN = (bldgMinX.toFloat() / sampleW).coerceIn(0f, 0.85f)
-        val botN = (bldgMaxY.toFloat() / sampleH).coerceIn(topN + 0.2f, 0.95f)
-        val rightN = (bldgMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
-
-        detectedObjects.add(
-            DetectedVisionObject(
-                label = "Urban Buildings & Skyline",
-                icon = "🏢",
-                category = "Architecture",
-                confidence = 91,
-                weatherImplication = "Urban heat island effect; wind channeling through street canyons",
-                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
-            )
-        )
-    }
-
-    // 3. Trees & Vegetation Object
-    if (vegetationRatio > 0.08f) {
-        val topN = (vegMinY.toFloat() / sampleH).coerceIn(0.35f, 0.70f)
-        val leftN = (vegMinX.toFloat() / sampleW).coerceIn(0f, 0.85f)
-        val botN = (vegMaxY.toFloat() / sampleH).coerceIn(topN + 0.2f, 0.98f)
-        val rightN = (vegMaxX.toFloat() / sampleW).coerceIn(leftN + 0.2f, 1.0f)
-
-        detectedObjects.add(
-            DetectedVisionObject(
-                label = "Canopy / Vegetation",
-                icon = "🌳",
-                category = "Vegetation",
-                confidence = 88,
-                weatherImplication = "Natural shade cooling (-2°C ambient buffer) & ground moisture retention",
-                boundingBoxNormalized = listOf(topN, leftN, botN, rightN)
-            )
-        )
-    }
-
-    // Scene Type Classification
-    val sceneType = when {
-        buildingRatio > 0.22f -> "Urban Skyline & Built Environment"
-        vegetationRatio > 0.20f -> "Parkland & Natural Landscape"
-        skyZonePixelCount > (totalPixels * 0.6f) -> "Open Horizon Sky"
-        else -> "Mixed Outdoor Environment"
-    }
-
-    val microclimateNote = when {
-        buildingRatio > 0.20f && darkStormCloudPixels > (totalValidSkyPixels * 0.3f) ->
-            "Urban microclimate: High surface runoff and wind funneling between building facades."
-        buildingRatio > 0.20f && skyBluePixels > (totalValidSkyPixels * 0.4f) ->
-            "Urban microclimate: Concrete & asphalt surfaces radiate stored solar heat (+1.5°C feels-like)."
-        vegetationRatio > 0.18f ->
-            "Vegetation microclimate: Transpiration provides natural humidity buffer and localized wind moderation."
-        else ->
-            "Standard open air microclimate: Unobstructed radiative cooling and ambient atmospheric exchange."
-    }
-
-    // Strict Non-Outdoor / Indoor Rejection (Desk, Close-up walls, Blank screen)
-    val isTotallyIndoor = indoorRatio > 0.30f || (skyBluePixels == 0 && brightWhiteCloudPixels == 0 && darkStormCloudPixels == 0 && vegetationRatio < 0.04f && buildingRatio < 0.06f)
-
-    if (isTotallyIndoor) {
-        return SkyAnalysisResult(
-            title = "Indoor Surface Detected",
-            icon = "🚫",
-            cloudType = "Non-Atmospheric Object",
-            cloudDescription = "Desk, wall, room, or digital display detected",
-            cloudCoveragePercent = 0,
-            visibilityStatus = "Obstructed / Non-Sky",
-            atmosphericCondition = "Camera Aimed Indoors",
-            confidenceScore = 98,
-            estimatedRainRisk = "N/A",
-            explanation = "Computer vision detected indoor textures, desk surface, or close-range objects. To observe live cloud dynamics, building microclimates, and weather patterns, point the camera outdoors.",
-            recommendation = "Aim camera out of a window or step outside to scan buildings, trees, and sky.",
-            statusColor = WarningAmber,
-            isSkyDetected = false,
-            skyColorDescription = "Indoor Texture Spectrum",
-            lightingCondition = "Artificial Interior Lighting",
-            detectedObjects = emptyList(),
-            environmentSceneType = "Indoor / Non-Weather Scene",
-            microclimateImpact = "Indoor temperature control isolated from atmospheric flow."
-        )
-    }
-
-    val rainMm = weather?.precipitation_mm ?: 0.0
-
-    // Full Meteorological & Computer Vision Synthesis
-    return when {
-        // Storm & Severe Squall
-        darkStormCloudPixels > (totalValidSkyPixels * 0.38f) || (avgLum < 85 && cloudCoverageFraction > 0.70f && (rainMm > 0.6 || darkStormCloudPixels > totalValidSkyPixels * 0.20f)) -> {
-            SkyAnalysisResult(
-                title = "Storm Development Detected",
-                icon = "⛈️",
-                cloudType = "Cumulonimbus (Cb) / Nimbostratus",
-                cloudDescription = "Dense storm anvil with dark vertical convective precipitation base",
-                cloudCoveragePercent = cloudPercent.coerceAtLeast(85),
-                visibilityStatus = "Low (< 4 km in showers)",
-                atmosphericCondition = "Intense Convective Squall",
-                confidenceScore = 96,
-                estimatedRainRisk = "High ⚠️ (Active Storm)",
-                explanation = "Heavy optical extinction detected in the upper quadrant (${detectedObjects.size} scene elements mapped). Cloud base luminance is under 85 with towering vertical cumulus profiles consistent with severe showers and gusty downdrafts.",
-                recommendation = "Check live Doppler radar. Take shelter inside stable structures away from trees.",
-                statusColor = DangerRed,
-                isSkyDetected = true,
-                skyColorDescription = "Dark Charcoal / Slate Gray",
-                lightingCondition = "Dim Convective Overcast",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
-
-        // Broken Stratocumulus / Altocumulus Deck
-        cloudCoverageFraction in 0.40f..0.85f && grayCloudPixels > (totalValidSkyPixels * 0.22f) -> {
-            SkyAnalysisResult(
-                title = "Stratocumulus Cloud Deck",
-                icon = "☁️",
-                cloudType = "Stratocumulus (Sc) / Altocumulus (Ac)",
-                cloudDescription = "Patchy dappled rolls and broken cloud sheets above the horizon",
-                cloudCoveragePercent = cloudPercent,
-                visibilityStatus = "Moderate to Good (6–10 km)",
-                atmosphericCondition = "Boundary Layer Moisture Deck",
-                confidenceScore = 93,
-                estimatedRainRisk = if (rainMm > 0.5) "Moderate 🌦️" else "Low to Moderate 🌥️",
-                explanation = "Layered cloud elements detected with structural contrast against the surrounding landscape ($cloudPercent% coverage). Typical of maritime moisture flow and mild diurnal mixing.",
-                recommendation = "Ideal for outdoor activities, walking, and commuting. Keep a light layer handy.",
-                statusColor = SecondaryCyan,
-                isSkyDetected = true,
-                skyColorDescription = "Silver Gray & Sky Blue",
-                lightingCondition = "Diffused Daylight",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
-
-        // Solid Stratus / Overcast Inversion
-        brightWhiteCloudPixels + grayCloudPixels > (totalValidSkyPixels * 0.78f) -> {
-            SkyAnalysisResult(
-                title = "Overcast Stratus Layer",
-                icon = "☁️",
-                cloudType = "Stratus Nebulosus (St) / Altostratus",
-                cloudDescription = "Uniform featureless gray-white blanket covering the skyline",
-                cloudCoveragePercent = cloudPercent.coerceAtLeast(90),
-                visibilityStatus = "Moderate (Diffused Haze 5–8 km)",
-                atmosphericCondition = "Stable Inversion Layer",
-                confidenceScore = 94,
-                estimatedRainRisk = "Moderate 🌦️ (Drizzle Risk)",
-                explanation = "Extensive diffuse cloud deck obscuring direct solar illumination across the skyline. High humidity trapping particulates and creating soft ambient lighting.",
-                recommendation = "Carry a compact umbrella. Roads and urban pavements may remain slick.",
-                statusColor = WarningAmber,
-                isSkyDetected = true,
-                skyColorDescription = "Uniform Matte White / Mist",
-                lightingCondition = "Soft Ambient Inversion",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
-
-        // Sunset / Golden Hour Rayleigh Glow
-        sunsetGoldenPixels > (totalValidSkyPixels * 0.18f) || (avgSat > 0.35f && sunsetGoldenPixels > (totalValidSkyPixels * 0.10f)) -> {
-            SkyAnalysisResult(
-                title = "Sunset / Golden Hour Sky",
-                icon = "🌅",
-                cloudType = "Cirrus / Altocumulus Twilight",
-                cloudDescription = "Warm golden-amber Rayleigh scattering illuminating clouds and architecture",
-                cloudCoveragePercent = cloudPercent,
-                visibilityStatus = "Excellent (> 12 km)",
-                atmosphericCondition = "Low Solar Angle / Evening Transition",
-                confidenceScore = 95,
-                estimatedRainRisk = "Very Low 🟢",
-                explanation = "Warm golden optical dispersion detected ($sunsetGoldenPixels spectral signatures). Horizon architecture and trees exhibit soft golden highlights with cooling boundary temperatures.",
-                recommendation = "Optimal window for photography, outdoor dining, running, and cycling.",
-                statusColor = SuccessGreen,
-                isSkyDetected = true,
-                skyColorDescription = "Golden Amber & Twilight Cyan",
-                lightingCondition = "Golden Hour Sunlight",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
-
-        // Clear Sky & High Solar UV
-        skyBluePixels > (totalValidSkyPixels * 0.50f) && cloudCoverageFraction < 0.25f -> {
-            SkyAnalysisResult(
-                title = "Clear Sky & High Solar UV",
-                icon = "☀️",
-                cloudType = "Cirrus Fibratus (Ci) / Cavok (Clear)",
-                cloudDescription = "Crystal-clear high visibility with minimal tropospheric obstruction",
-                cloudCoveragePercent = cloudPercent.coerceAtMost(20),
-                visibilityStatus = "Exceptional (> 15 km)",
-                atmosphericCondition = "High Pressure Anticyclone",
-                confidenceScore = 97,
-                estimatedRainRisk = "Zero to Minimal 🟢",
-                explanation = "Dominant high-frequency Rayleigh blue wavelength across the upper visual field with sharp architectural contrast. Maximum solar radiance reaching the surface.",
-                recommendation = "Great conditions for sports. Use SPF 30+ UV protection when outdoors in direct sun.",
-                statusColor = SuccessGreen,
-                isSkyDetected = true,
-                skyColorDescription = "Deep Azure & Cobalt Blue",
-                lightingCondition = "Direct Solar Radiance",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
-
-        // Fair-Weather Cumulus (Default Balanced Outdoor)
-        else -> {
-            SkyAnalysisResult(
-                title = "Fair-Weather Cumulus",
-                icon = "⛅",
-                cloudType = "Cumulus Humilis (Cu)",
-                cloudDescription = "Bright white convective puffs floating above the surrounding skyline",
-                cloudCoveragePercent = cloudPercent.coerceIn(20, 50),
-                visibilityStatus = "Great (10–12 km)",
-                atmosphericCondition = "Diurnal Thermal Convection",
-                confidenceScore = 92,
-                estimatedRainRisk = "Low 🟢",
-                explanation = "Convective white cumulus clouds ($cloudPercent% coverage) hovering above the urban and natural horizon. Excellent atmospheric stability with pleasant ambient comfort.",
-                recommendation = "Great weather for outdoor workouts, travel, and sightseeing.",
-                statusColor = SecondaryCyan,
-                isSkyDetected = true,
-                skyColorDescription = "Bright Blue with White Clouds",
-                lightingCondition = "Intermittent Sun & Shade",
-                detectedObjects = detectedObjects,
-                environmentSceneType = sceneType,
-                microclimateImpact = microclimateNote
-            )
-        }
     }
 }

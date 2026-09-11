@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,10 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,10 +39,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.weathergpt.ui.theme.AccentPurple
+import com.example.weathergpt.R
 import com.example.weathergpt.ui.theme.BackgroundDark
 import com.example.weathergpt.ui.theme.PrimaryBlue
 import com.example.weathergpt.ui.theme.SecondaryCyan
@@ -177,7 +175,7 @@ fun AnimatedSplashScreen(
             )
 
             drawCircle(
-                color = AccentPurple.copy(alpha = (pulseAlpha * 0.25f)),
+                color = Color(0xFF38BDF8).copy(alpha = (pulseAlpha * 0.25f)),
                 center = center,
                 radius = 220f * pulseScale,
                 style = Stroke(width = 1.dp.toPx())
@@ -188,85 +186,56 @@ fun AnimatedSplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Glowing Orb Icon Container
+            // New Official Logo Container with layered ambient lighting
             Box(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(130.dp)
                     .scale(logoScale.value)
                     .alpha(logoAlpha.value),
                 contentAlignment = Alignment.Center
             ) {
-                // Background Ambient Glow
+                // Soft warm/blue multi-chromatic halo behind the new sun & cloud logo
                 Box(
                     modifier = Modifier
-                        .size(110.dp)
+                        .size(125.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
                                 listOf(
-                                    SecondaryCyan.copy(alpha = 0.45f),
-                                    AccentPurple.copy(alpha = 0.2f),
+                                    Color(0x5538BDF8),
+                                    Color(0x33F59E0B),
                                     Color.Transparent
                                 )
                             )
                         )
                 )
 
-                // Glass Orb
+                // White/Ice Circular Backplate for crisp logo contrast
                 Box(
                     modifier = Modifier
-                        .size(86.dp)
+                        .size(106.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(0xFF1E3A5F),
-                                    Color(0xFF0D1B2E)
-                                )
-                            )
-                        )
+                        .background(Color.White)
                         .border(
                             1.5.dp,
                             Brush.sweepGradient(
                                 listOf(
-                                    SecondaryCyan,
-                                    PrimaryBlue,
-                                    AccentPurple,
-                                    SecondaryCyan
+                                    Color(0xFF38BDF8),
+                                    Color(0xFFFBBF24),
+                                    Color(0xFF0284C7),
+                                    Color(0xFF38BDF8)
                                 )
                             ),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Cloud,
+                    Image(
+                        painter = painterResource(id = R.drawable.app_logo),
                         contentDescription = "WeatherGPT Logo",
-                        tint = SecondaryCyan,
-                        modifier = Modifier.size(46.dp)
-                    )
-                }
-
-                // Orbiting Sparkle Star
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-4).dp, y = 4.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(AccentPurple, SecondaryCyan)
-                            )
-                        )
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "AI Glow",
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
                     )
                 }
             }
@@ -283,14 +252,14 @@ fun AnimatedSplashScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Weather",
-                        color = TextPrimary,
+                        color = Color.White,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
                     Text(
                         text = "GPT",
-                        color = SecondaryCyan,
+                        color = Color(0xFF38BDF8),
                         fontSize = 32.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 0.5.sp
@@ -301,22 +270,22 @@ fun AnimatedSplashScreen(
 
                 Text(
                     text = "Hyperlocal AI Intelligence & Telemetry",
-                    color = TextSecondary,
+                    color = Color(0xFF94A3B8),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 0.3.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
             // Engine Version / Status Chip
             Box(
                 modifier = Modifier
                     .alpha(chipAlpha.value)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0x224DA3FF))
-                    .border(1.dp, Color(0x3352D9FF), RoundedCornerShape(20.dp))
+                    .background(Color(0x2238BDF8))
+                    .border(1.dp, Color(0x3338BDF8), RoundedCornerShape(20.dp))
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -324,12 +293,12 @@ fun AnimatedSplashScreen(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(SecondaryCyan)
+                            .background(Color(0xFF38BDF8))
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "METEOROLOGICAL AI 2.0",
-                        color = SecondaryCyan,
+                        color = Color(0xFF38BDF8),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp

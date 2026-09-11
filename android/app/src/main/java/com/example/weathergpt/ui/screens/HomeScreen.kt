@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -56,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -69,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import com.example.weathergpt.data.LocationReverseClient
 import com.example.weathergpt.data.MetForecastItem
 import com.example.weathergpt.data.MetWeatherClient
@@ -93,7 +98,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -130,6 +137,7 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(initialCache == null) }
     var hasError by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
+    var airQualityState by remember { mutableStateOf<com.example.weathergpt.data.AirQualityCurrent?>(null) }
     var showLocationDialog by remember { mutableStateOf(false) }
 
     // ── Weather loading effect (UNCHANGED) ───────────────────────────────────
@@ -157,29 +165,27 @@ fun HomeScreen(
                         if (deviceLocation != null) {
                             latitude = deviceLocation.latitude
                             longitude = deviceLocation.longitude
-                            coroutineScope.launch(Dispatchers.IO) {
-                                try {
-                                    var cityName = activeLocation.name
-                                    var stateName = activeLocation.admin1
-                                    var countryName = activeLocation.country
-                                    val rev = LocationReverseClient.api.reverse(
-                                        deviceLocation.latitude, deviceLocation.longitude
-                                    )
-                                    if (!rev.name.isNullOrBlank()) cityName = rev.name
-                                    if (!rev.state.isNullOrBlank()) stateName = rev.state
-                                    if (!rev.country.isNullOrBlank()) countryName = rev.country
-                                    val updated = SelectedLocation(
-                                        name = cityName,
-                                        latitude = deviceLocation.latitude,
-                                        longitude = deviceLocation.longitude,
-                                        country = countryName,
-                                        admin1 = stateName,
-                                        timezone = "Asia/Kolkata"
-                                    )
-                                    LocationStore.useGps(context, updated)
-                                    activeLocation = updated
-                                } catch (_: Exception) {}
-                            }
+                            try {
+                                var cityName = activeLocation.name
+                                var stateName = activeLocation.admin1
+                                var countryName = activeLocation.country
+                                val rev = LocationReverseClient.api.reverse(
+                                    deviceLocation.latitude, deviceLocation.longitude
+                                )
+                                if (!rev.name.isNullOrBlank()) cityName = rev.name
+                                if (!rev.state.isNullOrBlank()) stateName = rev.state
+                                if (!rev.country.isNullOrBlank()) countryName = rev.country
+                                val updated = SelectedLocation(
+                                    name = cityName,
+                                    latitude = deviceLocation.latitude,
+                                    longitude = deviceLocation.longitude,
+                                    country = countryName,
+                                    admin1 = stateName,
+                                    timezone = "Asia/Kolkata"
+                                )
+                                LocationStore.useGps(context, updated)
+                                activeLocation = updated
+                            } catch (_: Exception) {}
                         }
                     } catch (_: Exception) {}
                 }
@@ -193,6 +199,14 @@ fun HomeScreen(
                 currentWeather = response.forecast.firstOrNull()
                 forecastList = response.forecast
                 hasError = false
+
+                // Fetch real live Air Quality concurrently
+                try {
+                    val aqiData = com.example.weathergpt.data.AirQualityClient.getLiveAirQuality(latitude, longitude)
+                    if (aqiData != null) {
+                        airQualityState = aqiData
+                    }
+                } catch (_: Exception) {}
             } catch (_: Exception) {
                 if (currentWeather == null) hasError = true
             } finally {
@@ -227,19 +241,18 @@ fun HomeScreen(
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        // Atmospheric depth — subtle top blue glow
+        // Atmospheric depth — ultra subtle soft sky tint
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0x0D4DA3FF),
-                            Color(0x064DA3FF),
+                            PrimaryBlue.copy(alpha = 0.04f),
                             Color.Transparent
                         ),
                         startY = 0f,
-                        endY = 700f
+                        endY = 500f
                     )
                 )
         )
@@ -309,12 +322,12 @@ fun HomeScreen(
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(
-                                if (userPreferences.isOptInEnabled) Color(0x2038BDF8)
-                                else Color(0x120A1626)
+                                if (userPreferences.isOptInEnabled) PrimaryBlue.copy(alpha = 0.10f)
+                                else Color.White
                             )
                             .border(
                                 1.dp,
-                                if (userPreferences.isOptInEnabled) Color(0x5038BDF8) else BorderGlass,
+                                if (userPreferences.isOptInEnabled) PrimaryBlue else BorderGlass,
                                 CircleShape
                             )
                             .clickable { showPersonalizationDialog = true },
@@ -323,7 +336,7 @@ fun HomeScreen(
                         Text(
                             text = "✦",
                             fontSize = 14.sp,
-                            color = if (userPreferences.isOptInEnabled) SecondaryCyan else TextMuted
+                            color = if (userPreferences.isOptInEnabled) PrimaryBlue else TextMuted
                         )
                     }
                     // Refresh
@@ -331,7 +344,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color(0x120A1626))
+                            .background(Color.White)
                             .border(1.dp, BorderGlass, CircleShape)
                             .clickable {
                                 refreshTrigger++
@@ -346,7 +359,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh weather",
-                            tint = if (isLoading) SecondaryCyan else Color(0xFF7A8FA6),
+                            tint = if (isLoading) PrimaryBlue else TextSecondary,
                             modifier = Modifier
                                 .size(16.dp)
                                 .then(
@@ -419,16 +432,11 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    if (isToday) Brush.radialGradient(
-                                        listOf(PrimaryBlue, Color(0xFF1A4F8A))
-                                    ) else Brush.radialGradient(
-                                        listOf(Color(0x10FFFFFF), Color(0x06FFFFFF))
-                                    )
-                                )
-                                .then(
-                                    if (isToday) Modifier.border(1.dp, Color(0x5552D9FF), CircleShape)
-                                    else Modifier
+                                .background(if (isToday) PrimaryBlue else Color.White)
+                                .border(
+                                    1.dp,
+                                    if (isToday) PrimaryBlue else BorderGlass,
+                                    CircleShape
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -436,21 +444,21 @@ fun HomeScreen(
                                 text = "$dayNum",
                                 color = when {
                                     isToday -> Color.White
-                                    isPast  -> TextMuted.copy(alpha = 0.35f)
+                                    isPast  -> TextMuted.copy(alpha = 0.45f)
                                     else    -> TextSecondary
                                 },
                                 fontSize = 13.sp,
-                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Medium
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // ══════════════════════════════════════════════════════════════════
-            // WEATHER HERO CARD  (metrics moved inside as right column)
+            // WEATHER HERO CARD (Clean: Temp + Condition + Illustration)
             // ══════════════════════════════════════════════════════════════════
             val feelsLikeTemp = currentWeather?.dew_point_c?.roundToInt()
                 ?: currentWeather?.temperature_c?.roundToInt()?.minus(2)
@@ -458,114 +466,137 @@ fun HomeScreen(
 
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                backgroundColor = Color(0xA80A1626),
-                padding = 18.dp
+                shape = RoundedCornerShape(20.dp),
+                padding = 20.dp
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // ── LEFT: condition · temp · feels like · Why? ─────────
+                    // ── LEFT: Condition · Large Temp · Feels Like · Why? ──
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = weatherDescription(currentWeather?.symbol_code),
                             color = TextSecondary,
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Normal
                         )
+
+                        Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
                             text = currentWeather?.temperature_c?.roundToInt()
                                 ?.let { "$it°" } ?: "--°",
                             color = TextPrimary,
                             fontSize = 64.sp,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.Bold,
                             lineHeight = 68.sp
                         )
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        Row(verticalAlignment = Alignment.Top) {
-                            // Blue accent bar
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
                                     .width(2.dp)
-                                    .height(42.dp)
+                                    .height(24.dp)
                                     .clip(RoundedCornerShape(2.dp))
                                     .background(PrimaryBlue)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Column {
+                            Text(
+                                text = "Feels like $feelsLikeTemp°",
+                                color = TextSecondary,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.08f))
+                                    .border(1.dp, BorderGlass, RoundedCornerShape(8.dp))
+                                    .clickable { onOpenChat() }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = "Feels like $feelsLikeTemp°",
-                                    color = TextSecondary,
-                                    fontSize = 13.sp
+                                    text = "Why? 💡",
+                                    color = PrimaryBlue,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(modifier = Modifier.height(5.dp))
-                                // Why? pill
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0x2638BDF8))
-                                        .border(1.dp, Color(0x5038BDF8), RoundedCornerShape(10.dp))
-                                        .clickable { onOpenChat() }
-                                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Why? 💡",
-                                        color = SecondaryCyan,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
                             }
                         }
                     }
 
-                    // ── CENTER: weather illustration ───────────────────────
+                    // ── RIGHT: Weather Illustration ──
                     RealisticWeatherIllustration(
                         symbolCode = currentWeather?.symbol_code,
-                        modifier = Modifier.size(90.dp)
+                        modifier = Modifier.size(105.dp)
                     )
+                }
+            }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                    // ── RIGHT: compact metric column ───────────────────────
-                    Column(
-                        modifier = Modifier.width(74.dp),
-                        horizontalAlignment = Alignment.End,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        HeroMetricItem(
-                            icon = Icons.Default.WaterDrop,
-                            value = currentWeather?.relative_humidity_pct
-                                ?.roundToInt()?.let { "$it%" } ?: "--",
-                            label = "Humidity"
-                        )
-                        HeroMetricItem(
-                            icon = Icons.Default.Air,
-                            value = currentWeather?.wind_speed_ms
-                                ?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "--",
-                            label = "Wind"
-                        )
-                        HeroMetricItem(
-                            icon = Icons.Default.Speed,
-                            value = currentWeather?.pressure_hpa
-                                ?.roundToInt()?.let { "${it}" } ?: "--",
-                            label = "hPa"
-                        )
-                        HeroMetricItem(
-                            icon = Icons.Default.CloudQueue,
-                            value = currentWeather?.precipitation_mm
-                                ?.let { "${"%.1f".format(it)} mm" }
-                                ?: currentWeather?.precipitation_probability_pct
-                                    ?.roundToInt()?.let { "$it%" }
-                                ?: "0.0 mm",
-                            label = "Rain"
-                        )
-                    }
+            // ══════════════════════════════════════════════════════════════════
+            // COMPACT 4-METRICS ROW (SPACE-SAVING HORIZONTAL STRIP)
+            // ══════════════════════════════════════════════════════════════════
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                padding = 12.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CompactHomeMetric(
+                        icon = Icons.Default.WaterDrop,
+                        value = currentWeather?.relative_humidity_pct?.roundToInt()?.let { "$it%" } ?: "--",
+                        label = "Humidity",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(BorderGlass)
+                    )
+                    CompactHomeMetric(
+                        icon = Icons.Default.Air,
+                        value = currentWeather?.wind_speed_ms?.let { "${(it * 3.6).roundToInt()} km/h" } ?: "--",
+                        label = "Wind",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(BorderGlass)
+                    )
+                    CompactHomeMetric(
+                        icon = Icons.Default.Speed,
+                        value = currentWeather?.pressure_hpa?.roundToInt()?.let { "$it" } ?: "--",
+                        label = "hPa",
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(BorderGlass)
+                    )
+                    CompactHomeMetric(
+                        icon = Icons.Default.CloudQueue,
+                        value = currentWeather?.precipitation_mm?.let { "${"%.1f".format(it)} mm" }
+                            ?: currentWeather?.precipitation_probability_pct?.roundToInt()?.let { "$it%" }
+                            ?: "0.0 mm",
+                        label = "Rain",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
 
@@ -738,10 +769,10 @@ fun HomeScreen(
                 // Eyebrow label
                 Text(
                     text = "FORECAST",
-                    color = SecondaryCyan,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.5.sp
+                    color = PrimaryBlue,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.2.sp
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -750,32 +781,29 @@ fun HomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xA80A1626))
-                        .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(PrimaryBlue.copy(alpha = 0.06f))
                         .padding(3.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("Hourly", "Daily", "7 Days").forEachIndexed { index, label ->
+                        listOf("Hourly", "7 Days").forEachIndexed { index, label ->
                             val active = selectedForecastTab == index
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .background(
-                                        if (active) Brush.horizontalGradient(
-                                            listOf(Color(0xFF2B6CB0), Color(0xFF1A4F8A))
-                                        ) else Brush.horizontalGradient(
-                                            listOf(Color.Transparent, Color.Transparent)
-                                        )
+                                    .clip(RoundedCornerShape(11.dp))
+                                    .background(if (active) Color.White else Color.Transparent)
+                                    .then(
+                                        if (active) Modifier.border(1.dp, BorderGlass, RoundedCornerShape(11.dp))
+                                        else Modifier
                                     )
                                     .clickable { selectedForecastTab = index }
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 7.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = label,
-                                    color = if (active) Color.White else TextSecondary,
+                                    color = if (active) TextPrimary else TextSecondary,
                                     fontSize = 13.sp,
                                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium
                                 )
@@ -801,7 +829,7 @@ fun HomeScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // ── Temperature trend card ────────────────────────────────
                     GlassCard(
@@ -821,12 +849,31 @@ fun HomeScreen(
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                                Text(
-                                    text = "↗",
-                                    color = PrimaryBlue,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                val headerActiveItem = next24Hours.getOrNull(selectedHourIndex.coerceIn(0, next24Hours.size - 1))
+                                if (headerActiveItem != null) {
+                                    val headerTemp = headerActiveItem.temperature_c?.roundToInt() ?: 0
+                                    val headerTime = formatHour(headerActiveItem.time)
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = PrimaryBlue.copy(alpha = 0.12f),
+                                        border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.25f))
+                                    ) {
+                                        Text(
+                                            text = "$headerTemp° · $headerTime",
+                                            color = PrimaryBlue,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = "↗",
+                                        color = PrimaryBlue,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                             Spacer(modifier = Modifier.height(10.dp))
                             SplineTemperatureChart(
@@ -971,9 +1018,13 @@ fun HomeScreen(
                 }
 
                 val (sunriseTime, sunsetTime) = remember(
-                    activeLocation.latitude, activeLocation.longitude
+                    activeLocation.latitude, activeLocation.longitude, activeLocation.timezone
                 ) {
-                    computeSunriseSunset(activeLocation.latitude, activeLocation.longitude)
+                    computeSunriseSunset(
+                        lat = activeLocation.latitude,
+                        lon = activeLocation.longitude,
+                        timezoneId = activeLocation.timezone?.ifBlank { "Asia/Kolkata" } ?: "Asia/Kolkata"
+                    )
                 }
 
                 Row(
@@ -1001,7 +1052,18 @@ fun HomeScreen(
                         }
                     }
 
-                    // Air Quality
+                    // Air Quality — Real-Time Sensor Telemetry
+                    val liveAqi = airQualityState?.usAqi ?: airQualityState?.europeanAqi
+                    val aqiValueStr = liveAqi?.toInt()?.toString() ?: "--"
+                    val (aqiLabel, aqiColor) = when {
+                        liveAqi == null -> Pair("Live", SuccessGreen)
+                        liveAqi <= 50   -> Pair("Good", SuccessGreen)
+                        liveAqi <= 100  -> Pair("Moderate", WarningAmber)
+                        liveAqi <= 150  -> Pair("Sensitive", Color(0xFFFF9800))
+                        liveAqi <= 200  -> Pair("Unhealthy", Color(0xFFFF5252))
+                        else            -> Pair("Hazardous", Color(0xFF9C27B0))
+                    }
+
                     GlassCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(18.dp),
@@ -1012,12 +1074,12 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(text = "Air Quality", color = TextMuted, fontSize = 10.sp)
                             Text(
-                                text = "--",
+                                text = aqiValueStr,
                                 color = TextPrimary,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(text = "Good", color = SuccessGreen, fontSize = 10.sp)
+                            Text(text = aqiLabel, color = aqiColor, fontSize = 10.sp)
                         }
                     }
 
@@ -1085,19 +1147,31 @@ fun HomeScreen(
                                     countryName = rev.country
                                 } catch (_: Exception) {
                                     try {
-                                        @Suppress("DEPRECATION")
                                         val geocoder = android.location.Geocoder(
                                             context, java.util.Locale.getDefault()
                                         )
-                                        val addrs = geocoder.getFromLocation(
-                                            devLoc.latitude, devLoc.longitude, 1
-                                        )
-                                        val a = addrs?.firstOrNull()
-                                        if (a != null) {
-                                            val n = a.locality ?: a.subAdminArea ?: a.adminArea
-                                            if (!n.isNullOrBlank()) cityName = n
-                                            stateName = a.adminArea
-                                            countryName = a.countryName
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                            geocoder.getFromLocation(devLoc.latitude, devLoc.longitude, 1) { addrs ->
+                                                val a = addrs.firstOrNull()
+                                                if (a != null) {
+                                                    val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                                                    if (!n.isNullOrBlank()) cityName = n
+                                                    stateName = a.adminArea
+                                                    countryName = a.countryName
+                                                }
+                                            }
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            val addrs = geocoder.getFromLocation(
+                                                devLoc.latitude, devLoc.longitude, 1
+                                            )
+                                            val a = addrs?.firstOrNull()
+                                            if (a != null) {
+                                                val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                                                if (!n.isNullOrBlank()) cityName = n
+                                                stateName = a.adminArea
+                                                countryName = a.countryName
+                                            }
                                         }
                                     } catch (_: Exception) {}
                                 }
@@ -1187,13 +1261,13 @@ private fun HeroMetricItem(
             modifier = Modifier
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(Color(0x1A4DA3FF)),
+                .background(PrimaryBlue.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = SecondaryCyan,
+                tint = PrimaryBlue,
                 modifier = Modifier.size(11.dp)
             )
         }
@@ -1214,6 +1288,51 @@ private fun HeroMetricItem(
         }
     }
 }
+// ════════════════════════════════════════════════════════════════════════════
+// COMPACT HOME METRIC — sleek, vertical column with icon, value, and label
+// ════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun CompactHomeMetric(
+    icon: ImageVector,
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(PrimaryBlue.copy(alpha = 0.08f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = PrimaryBlue,
+                modifier = Modifier.size(13.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            color = TextPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        Text(
+            text = label,
+            color = TextMuted,
+            fontSize = 10.sp,
+            maxLines = 1
+        )
+    }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // METRIC GRID CARD — 2x2 grid (Home hero, unchanged)
@@ -1225,19 +1344,19 @@ private fun MockupGridMetricCard(
     value: String,
     label: String
 ) {
-    GlassCard(modifier = modifier, shape = RoundedCornerShape(22.dp), padding = 14.dp) {
+    GlassCard(modifier = modifier, shape = RoundedCornerShape(20.dp), padding = 14.dp) {
         Column {
             Box(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0x264DA3FF)),
+                    .background(PrimaryBlue.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = SecondaryCyan,
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -1281,19 +1400,19 @@ private fun ForecastGridCard(
     title: String,
     value: String
 ) {
-    GlassCard(modifier = modifier, shape = RoundedCornerShape(20.dp), padding = 12.dp) {
+    GlassCard(modifier = modifier, shape = RoundedCornerShape(18.dp), padding = 12.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0x264DA3FF)),
+                    .background(PrimaryBlue.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = SecondaryCyan,
+                    tint = PrimaryBlue,
                     modifier = Modifier.size(17.dp)
                 )
             }
@@ -1301,7 +1420,7 @@ private fun ForecastGridCard(
             Column {
                 Text(text = title, color = TextSecondary, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(text = value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(text = value, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -1321,12 +1440,12 @@ private fun HourlyItemCard(
     Box(
         modifier = Modifier
             .width(68.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (isSelected) Color(0x334DA3FF) else Color(0xA80A1626))
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) PrimaryBlue.copy(alpha = 0.08f) else Color.White)
             .border(
                 1.dp,
-                if (isSelected) Color(0x8052D9FF) else BorderGlass,
-                RoundedCornerShape(18.dp)
+                if (isSelected) PrimaryBlue else BorderGlass,
+                RoundedCornerShape(16.dp)
             )
             .clickable { onClick() }
             .padding(vertical = 12.dp),
@@ -1335,9 +1454,9 @@ private fun HourlyItemCard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = timeLabel,
-                color = if (isSelected) SecondaryCyan else TextSecondary,
+                color = if (isSelected) PrimaryBlue else TextSecondary,
                 fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
             )
             Spacer(modifier = Modifier.height(8.dp))
             RealisticWeatherIllustration(
@@ -1357,7 +1476,6 @@ private fun HourlyItemCard(
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPLINE TEMPERATURE CHART — interactive drag/tap pointer (UNCHANGED)
-// ════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun SplineTemperatureChart(
     forecastItems: List<MetForecastItem>,
@@ -1379,6 +1497,7 @@ private fun SplineTemperatureChart(
     val selectedTemp = selectedItem?.temperature_c ?: temps[safeSelectedIndex]
     val selectedTimeLabel = formatHour(selectedItem?.time)
 
+    // X-axis 5 interval time labels computed from actual forecast telemetry
     val xAxisLabels = remember(forecastItems) {
         if (forecastItems.size >= 5) {
             val step = (forecastItems.size - 1) / 4.0
@@ -1400,8 +1519,7 @@ private fun SplineTemperatureChart(
                     detectTapGestures { offset ->
                         val w = size.width.toFloat()
                         val step = w / (forecastItems.size - 1).coerceAtLeast(1)
-                        val nearest = (offset.x / step).roundToInt()
-                            .coerceIn(0, forecastItems.size - 1)
+                        val nearest = (offset.x / step).roundToInt().coerceIn(0, forecastItems.size - 1)
                         onSelectIndex(nearest)
                     }
                 }
@@ -1409,8 +1527,7 @@ private fun SplineTemperatureChart(
                     detectHorizontalDragGestures { change, _ ->
                         val w = size.width.toFloat()
                         val step = w / (forecastItems.size - 1).coerceAtLeast(1)
-                        val nearest = (change.position.x / step).roundToInt()
-                            .coerceIn(0, forecastItems.size - 1)
+                        val nearest = (change.position.x / step).roundToInt().coerceIn(0, forecastItems.size - 1)
                         onSelectIndex(nearest)
                     }
                 }
@@ -1441,8 +1558,9 @@ private fun SplineTemperatureChart(
                 for (i in 0 until points.size - 1) {
                     val p0 = points[i]
                     val p1 = points[i + 1]
-                    val cx = (p0.x + p1.x) / 2f
-                    path.cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+                    val cx1 = (p0.x + p1.x) / 2f
+                    val cx2 = cx1
+                    path.cubicTo(cx1, p0.y, cx2, p1.y, p1.x, p1.y)
                 }
 
                 val fillPath = Path()
@@ -1454,64 +1572,99 @@ private fun SplineTemperatureChart(
                 drawPath(
                     path = fillPath,
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color(0x334DA3FF), Color(0x054DA3FF), Color.Transparent),
-                        startY = 0f, endY = h
+                        colors = listOf(PrimaryBlue.copy(alpha = 0.18f), PrimaryBlue.copy(alpha = 0.02f), Color.Transparent),
+                        startY = 0f,
+                        endY = h
                     )
                 )
+
                 drawPath(
                     path = path,
                     color = PrimaryBlue,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                 )
+
+                // Vertical indicator line at selected pointer position
                 drawLine(
-                    color = Color(0x6652D9FF),
+                    color = PrimaryBlue.copy(alpha = 0.30f),
                     start = Offset(activeX, padY),
                     end = Offset(activeX, h),
-                    strokeWidth = 1.5.dp.toPx()
+                    strokeWidth = 1.dp.toPx()
                 )
-                drawCircle(color = Color(0x3352D9FF), radius = 8.dp.toPx(), center = Offset(activeX, activeY))
-                drawCircle(color = Color.White,       radius = 4.5.dp.toPx(), center = Offset(activeX, activeY))
-                drawCircle(color = PrimaryBlue,       radius = 2.5.dp.toPx(), center = Offset(activeX, activeY))
+
+                // Active point on the spline curve
+                drawCircle(
+                    color = PrimaryBlue.copy(alpha = 0.20f),
+                    radius = 7.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 4.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
+                drawCircle(
+                    color = PrimaryBlue,
+                    radius = 2.5.dp.toPx(),
+                    center = Offset(activeX, activeY)
+                )
             }
 
-            Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 4.dp, bottom = 4.dp)) {
-                Text(
-                    text = "${minTemp.roundToInt()}°",
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            // Min temp label at bottom-left (dimmed if pointer tooltip is nearby to avoid overlap)
+            val isPointerNearMinTemp = safeSelectedIndex == 0 && activeY > (canvasHeight - 60f)
+            if (!isPointerNearMinTemp) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 4.dp, bottom = 4.dp)
+                ) {
+                    Text(
+                        text = "${minTemp.roundToInt()}°",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
+            // Dynamic Tooltip Callout tracking the active pointer X position smoothly
             val tooltipWidth = 64.dp
             val density = androidx.compose.ui.platform.LocalDensity.current
             val tooltipWidthPx = with(density) { tooltipWidth.toPx() }
             val clampedTooltipX = (activeX - tooltipWidthPx / 2f)
-                .coerceIn(0f, (canvasWidth - tooltipWidthPx).coerceAtLeast(0f))
+                .coerceIn(4f, (canvasWidth - tooltipWidthPx - 4f).coerceAtLeast(4f))
             val tooltipOffsetDp = with(density) { clampedTooltipX.toDp() }
 
-            Box(modifier = Modifier.padding(start = tooltipOffsetDp, top = 2.dp)) {
-                Box(
+            // Position tooltip badge floating above the active point or top of chart
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(5f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.White,
+                    shadowElevation = 4.dp,
+                    border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.35f)),
                     modifier = Modifier
+                        .offset(x = tooltipOffsetDp, y = 4.dp)
                         .width(tooltipWidth)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xE60A1626))
-                        .border(1.dp, Color(0x4D52D9FF), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                    ) {
                         Text(
                             text = "${selectedTemp.roundToInt()}°",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            color = PrimaryBlue,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                         Text(
                             text = selectedTimeLabel,
-                            color = SecondaryCyan,
+                            color = TextSecondary,
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -1520,12 +1673,17 @@ private fun SplineTemperatureChart(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // X-axis timeline labels
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             xAxisLabels.forEach { label ->
-                Text(text = label, color = TextSecondary, fontSize = 11.sp)
+                Text(
+                    text = label,
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
             }
         }
     }
@@ -1550,7 +1708,7 @@ private fun formatDay(raw: String?): String {
 // ════════════════════════════════════════════════════════════════════════════
 // SUNRISE / SUNSET — approximate computation from lat/lon + date
 // ════════════════════════════════════════════════════════════════════════════
-private fun computeSunriseSunset(lat: Double, lon: Double): Pair<String, String> {
+private fun computeSunriseSunset(lat: Double, lon: Double, timezoneId: String = "Asia/Kolkata"): Pair<String, String> {
     return try {
         val dayOfYear = LocalDate.now().dayOfYear
         val bRad = Math.toRadians(360.0 / 365.0 * (dayOfYear - 81))
@@ -1560,10 +1718,10 @@ private fun computeSunriseSunset(lat: Double, lon: Double): Pair<String, String>
         if (cosH > 1.0 || cosH < -1.0) return Pair("--:--", "--:--")
         val haDeg = Math.toDegrees(acos(cosH))
         val solarNoonUTC = 12.0 - lon / 15.0
-        // IST = UTC + 5.5 h
-        val offset = 5.5
-        val sunriseLocal = (solarNoonUTC - haDeg / 15.0 + offset + 24.0) % 24.0
-        val sunsetLocal  = (solarNoonUTC + haDeg / 15.0 + offset + 24.0) % 24.0
+        val zone = try { ZoneId.of(timezoneId) } catch (_: Exception) { ZoneId.systemDefault() }
+        val offsetHours = zone.rules.getOffset(Instant.now()).totalSeconds / 3600.0
+        val sunriseLocal = (solarNoonUTC - haDeg / 15.0 + offsetHours + 24.0) % 24.0
+        val sunsetLocal  = (solarNoonUTC + haDeg / 15.0 + offsetHours + 24.0) % 24.0
         fun fmt(h: Double): String {
             val hh = h.toInt().coerceIn(0, 23)
             val mm = ((h - h.toInt()) * 60).roundToInt().coerceIn(0, 59)
@@ -1591,7 +1749,7 @@ private fun PersonalizationPreferencesDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(20.dp),
             padding = 18.dp
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -1607,14 +1765,14 @@ private fun PersonalizationPreferencesDialog(
                             text = "Activity Preferences",
                             color = TextPrimary,
                             fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                     Box(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .background(Color(0x26FFFFFF))
+                            .background(Color(0x0A000000))
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1627,9 +1785,9 @@ private fun PersonalizationPreferencesDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x660A1626))
-                        .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(BackgroundDark)
+                        .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -1656,8 +1814,8 @@ private fun PersonalizationPreferencesDialog(
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = PrimaryBlue,
-                            uncheckedThumbColor = Color(0xFF64748B),
-                            uncheckedTrackColor = Color(0xFF1E293B)
+                            uncheckedThumbColor = TextMuted.copy(alpha = 0.4f),
+                            uncheckedTrackColor = BorderGlass
                         )
                     )
                 }
@@ -1666,9 +1824,9 @@ private fun PersonalizationPreferencesDialog(
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
                         text = "PRIMARY FOCUS ACTIVITY",
-                        color = SecondaryCyan,
+                        color = PrimaryBlue,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.5.sp
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1687,14 +1845,14 @@ private fun PersonalizationPreferencesDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(
-                                        if (isSelected) Color(0x3338BDF8) else Color(0x400A1626)
+                                        if (isSelected) PrimaryBlue.copy(alpha = 0.08f) else Color.White
                                     )
                                     .border(
                                         1.dp,
-                                        if (isSelected) SecondaryCyan else BorderGlass,
-                                        RoundedCornerShape(14.dp)
+                                        if (isSelected) PrimaryBlue else BorderGlass,
+                                        RoundedCornerShape(12.dp)
                                     )
                                     .clickable { onSelectPrimaryActivity(name) }
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -1710,14 +1868,14 @@ private fun PersonalizationPreferencesDialog(
                                     Column {
                                         Text(
                                             text = name,
-                                            color = if (isSelected) Color.White else TextSecondary,
+                                            color = if (isSelected) PrimaryBlue else TextPrimary,
                                             fontSize = 13.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                         )
                                         if (isLearned) {
                                             Text(
                                                 text = "Learned preference",
-                                                color = Color(0xFF34D399),
+                                                color = SuccessGreen,
                                                 fontSize = 9.sp
                                             )
                                         }
@@ -1726,13 +1884,13 @@ private fun PersonalizationPreferencesDialog(
                                 if (isSelected) {
                                     Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0x3310B981))
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(PrimaryBlue.copy(alpha = 0.12f))
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "ACTIVE",
-                                            color = Color(0xFF34D399),
+                                            color = PrimaryBlue,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold
                                         )

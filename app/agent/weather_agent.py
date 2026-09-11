@@ -225,6 +225,8 @@ class WeatherAgent:
         language: str = "auto",
         history: list[dict] | None = None,
         agent_state: dict | None = None,
+        camera_observation: dict | None = None,
+        radar_observation: dict | None = None,
     ) -> dict:
 
         question = question.strip()
@@ -233,6 +235,7 @@ class WeatherAgent:
             raise ValueError(
                 "Question cannot be empty."
             )
+
 
         # Restore structured conversation context
         # from the history supplied by the client.
@@ -1104,8 +1107,54 @@ class WeatherAgent:
             if "current" in tool_result and isinstance(tool_result["current"], dict):
                 c = tool_result["current"]
                 summary_lines.append(
-                    f"Current: {c.get('temperature_c', c.get('temperature'))}°C, {c.get('condition', c.get('summary', 'clear'))}"
+                    f"Current: {c.get('temperature_c', c.get('temperature'))}°C, {c.get('condition', c.get('summary', 'clear'))}, Humidity: {c.get('humidity_pct', 'N/A')}%, Rain: {c.get('rainfall_mm', 0.0)} mm, Wind: {c.get('wind_speed_ms', 0.0)} m/s"
                 )
+            elif "temperature_c" in tool_result:
+                summary_lines.append(
+                    f"Current: {tool_result.get('temperature_c')}°C, {tool_result.get('condition', 'clear')}, Humidity: {tool_result.get('humidity_pct', 'N/A')}%, Rain: {tool_result.get('rainfall_mm', 0.0)} mm, Wind: {tool_result.get('wind_speed_ms', 0.0)} m/s"
+                )
+
+            if "activity_assessment" in tool_result and isinstance(tool_result["activity_assessment"], dict):
+                aa = tool_result["activity_assessment"]
+                summary_lines.append(
+                    f"Activity Suitability: {aa.get('decision', 'Acceptable')} (Score: {aa.get('score', 'N/A')}/100, Level: {aa.get('level', 'Good')})"
+                )
+                if aa.get("reasons"):
+                    summary_lines.append(f"Activity Factors: {'; '.join(aa['reasons'])}")
+
+        # -----------------------------------------------------
+        # Phase 9: Camera Vision and Radar Grounding Rules
+        # -----------------------------------------------------
+        if camera_observation:
+            weather_context["camera_observation"] = camera_observation
+            sky_det = camera_observation.get("sky_detected", False)
+            if sky_det:
+                c_cond = (camera_observation.get("cloud_condition") or "sky").replace("_", " ")
+                c_cov = int((camera_observation.get("cloud_coverage") or 0.0) * 100)
+                c_precip = "visible rain falling" if camera_observation.get("visible_precipitation") else "no visible rain"
+                summary_lines.append(
+                    f"CAMERA VISUAL OBSERVATION: Genuine natural outdoor sky detected. Observed: {c_cond} ({c_cov}% cloud cover), {c_precip}."
+                )
+            else:
+                scene = camera_observation.get("scene_type", "non-sky surface")
+                summary_lines.append(
+                    f"CAMERA VISUAL OBSERVATION: No reliable sky detected (scene identified as {scene}). DO NOT describe sky from camera imagery."
+                )
+            summary_lines.append(
+                "REASONING RULES:\n"
+                "- Clearly distinguish camera visual observations from weather station measurements.\n"
+                "- NEVER infer exact numerical temperature, humidity, or air pressure from the camera.\n"
+                "- If camera and weather reports disagree, explain the difference (e.g. localized cloud breaks) rather than claiming one is wrong."
+            )
+
+        if radar_observation:
+            weather_context["radar_observation"] = radar_observation
+            r_precip = radar_observation.get("precipitation_detected", False)
+            r_age = radar_observation.get("updated_minutes_ago", 5)
+            if r_precip:
+                summary_lines.append(f"RADAR OBSERVATION: Precipitation echoes detected nearby (updated {r_age} min ago).")
+            else:
+                summary_lines.append(f"RADAR OBSERVATION: No precipitation echoes detected nearby (updated {r_age} min ago).")
 
         import json
         weather_summary_text = "\n".join(summary_lines)
@@ -1115,6 +1164,7 @@ class WeatherAgent:
             ensure_ascii=False,
             default=str,
         )
+
 
         # -----------------------------------------------------
         # Generate final grounded answer (OpenRouter / Sarvam / Fallback).
@@ -1290,6 +1340,12 @@ class WeatherAgent:
             for key in ["answer", "recommendation", "assessment", "summary"]:
                 if key in tool_result and isinstance(tool_result[key], str) and tool_result[key].strip():
                     return tool_result[key].strip()
+
+            if "activity_assessment" in tool_result and isinstance(tool_result["activity_assessment"], dict):
+                aa = tool_result["activity_assessment"]
+                dec = aa.get("decision", "Acceptable")
+                reasons = " ".join(aa.get("reasons", []))
+                return f"{dec}. {reasons}".strip()
 
             current = tool_result.get("current") or tool_result.get("conditions")
             if isinstance(current, dict):

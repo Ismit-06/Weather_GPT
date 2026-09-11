@@ -43,6 +43,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.weathergpt.data.DamClient
 import com.example.weathergpt.data.DamItem
 import com.example.weathergpt.ui.components.GlassCard
@@ -57,144 +60,52 @@ import com.example.weathergpt.ui.theme.TextPrimary
 import com.example.weathergpt.ui.theme.TextSecondary
 import com.example.weathergpt.ui.theme.WarningAmber
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-
-private val FALLBACK_ALERT_DAMS = listOf(
-    DamItem(
-        id = 1,
-        name = "Srisailam Reservoir",
-        state = "Andhra Pradesh",
-        region = "Southern",
-        district = "Kurnool / Nandyal",
-        basin = "Krishna Basin",
-        latitude = 16.0864,
-        longitude = 78.8986,
-        frl_m = 269.75,
-        current_level_m = 268.20,
-        live_capacity_bcm = 8.90,
-        live_storage_bcm = 8.12,
-        storage_percent = 91.2,
-        last_year_storage_percent = 84.5,
-        normal_storage_percent = 75.0,
-        irrigation_cca = 190000.0,
-        hydel_mw = 1670.0,
-        observation_date = "2026-09-05",
-        source = "CWC",
-        source_type = "OFFICIAL_DATA",
-        official_warning = true
-    ),
-    DamItem(
-        id = 2,
-        name = "Nagarjuna Sagar",
-        state = "Andhra Pradesh / Telangana",
-        region = "Southern",
-        district = "Guntur / Nalgonda",
-        basin = "Krishna Basin",
-        latitude = 16.5772,
-        longitude = 79.3138,
-        frl_m = 179.83,
-        current_level_m = 177.40,
-        live_capacity_bcm = 9.37,
-        live_storage_bcm = 8.01,
-        storage_percent = 85.5,
-        last_year_storage_percent = 78.2,
-        normal_storage_percent = 72.0,
-        irrigation_cca = 895000.0,
-        hydel_mw = 816.0,
-        observation_date = "2026-09-05",
-        source = "CWC",
-        source_type = "OFFICIAL_DATA",
-        official_warning = true
-    ),
-    DamItem(
-        id = 3,
-        name = "Hirakud Reservoir",
-        state = "Odisha",
-        region = "Eastern",
-        district = "Sambalpur",
-        basin = "Mahanadi Basin",
-        latitude = 21.5276,
-        longitude = 83.8711,
-        frl_m = 192.02,
-        current_level_m = 190.15,
-        live_capacity_bcm = 5.82,
-        live_storage_bcm = 5.04,
-        storage_percent = 86.6,
-        last_year_storage_percent = 80.1,
-        normal_storage_percent = 78.0,
-        irrigation_cca = 267000.0,
-        hydel_mw = 347.5,
-        observation_date = "2026-09-05",
-        source = "CWC",
-        source_type = "OFFICIAL_DATA",
-        official_warning = true
-    ),
-    DamItem(
-        id = 4,
-        name = "Rengali Dam",
-        state = "Odisha",
-        region = "Eastern",
-        district = "Angul",
-        basin = "Brahmani Basin",
-        latitude = 21.2800,
-        longitude = 85.0300,
-        frl_m = 123.50,
-        current_level_m = 121.20,
-        live_capacity_bcm = 3.43,
-        live_storage_bcm = 2.98,
-        storage_percent = 86.9,
-        last_year_storage_percent = 81.0,
-        normal_storage_percent = 76.0,
-        irrigation_cca = 423000.0,
-        hydel_mw = 250.0,
-        observation_date = "2026-09-05",
-        source = "CWC",
-        source_type = "OFFICIAL_DATA",
-        official_warning = true
-    ),
-    DamItem(
-        id = 5,
-        name = "Tungabhadra Dam",
-        state = "Karnataka",
-        region = "Southern",
-        district = "Vijayanagara",
-        basin = "Krishna Basin",
-        latitude = 15.2630,
-        longitude = 76.3370,
-        frl_m = 497.74,
-        current_level_m = 494.80,
-        live_capacity_bcm = 3.12,
-        live_storage_bcm = 2.76,
-        storage_percent = 88.5,
-        last_year_storage_percent = 81.0,
-        normal_storage_percent = 76.0,
-        irrigation_cca = 362000.0,
-        hydel_mw = 127.0,
-        observation_date = "2026-09-05",
-        source = "CWC",
-        source_type = "OFFICIAL_DATA",
-        official_warning = true
-    )
-)
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 
 @Composable
-fun AlertsScreen(
-    onOpenDams: () -> Unit
-) {
-    var damItems by remember { mutableStateOf(FALLBACK_ALERT_DAMS) }
+fun AlertsScreen() {
+    var damItems by remember { mutableStateOf(DamClient.OFFICIAL_CWC_RESERVOIRS) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    var lastUpdatedText by remember { mutableStateOf("Just now") }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf("All") }
+    var showAllDams by remember { mutableStateOf(false) }
 
+    // Periodic time-to-time automatic updating (every 5 minutes) + immediate manual refresh
     LaunchedEffect(refreshKey) {
-        try {
-            val response = withContext(Dispatchers.IO) {
-                DamClient.service.getDams(limit = 20)
+        while (isActive) {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    DamClient.service.getDams(limit = 200)
+                }
+                val list = response.reservoirs
+                if (!list.isNullOrEmpty()) {
+                    damItems = list.sortedByDescending { it.storage_percent ?: 0.0 }
+                } else {
+                    damItems = DamClient.OFFICIAL_CWC_RESERVOIRS
+                }
+                val now = LocalTime.now()
+                lastUpdatedText = now.format(DateTimeFormatter.ofPattern("h:mm:ss a"))
+            } catch (_: Exception) {
+                if (damItems.isEmpty()) {
+                    damItems = DamClient.OFFICIAL_CWC_RESERVOIRS
+                }
+                val now = LocalTime.now()
+                lastUpdatedText = now.format(DateTimeFormatter.ofPattern("h:mm:ss a"))
             }
-            val list = response.reservoirs
-            if (!list.isNullOrEmpty()) {
-                damItems = list.sortedByDescending { it.storage_percent ?: 0.0 }
-            }
-        } catch (_: Exception) {
-            // Keep fallback
+            // Auto refresh every 5 minutes in background
+            delay(5 * 60 * 1000L)
         }
     }
 
@@ -229,11 +140,19 @@ fun AlertsScreen(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
-                    Text(
-                        text = "Live warning intelligence",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Live warning intelligence",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "• Updated $lastUpdatedText",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
                 var isSpinning by remember { mutableStateOf(false) }
@@ -257,10 +176,10 @@ fun AlertsScreen(
 
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF0E1626))
-                        .border(1.dp, Color(0x2EFFFFFF), CircleShape)
+                        .background(Color.White)
+                        .border(1.dp, BorderGlass, CircleShape)
                         .clickable {
                             isSpinning = true
                             refreshKey++
@@ -270,9 +189,9 @@ fun AlertsScreen(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh alerts",
-                        tint = if (isSpinning) SecondaryCyan else Color(0xFF8896AB),
+                        tint = if (isSpinning) PrimaryBlue else TextSecondary,
                         modifier = Modifier
-                            .size(17.dp)
+                            .size(16.dp)
                             .then(if (isSpinning) Modifier.graphicsLayer { rotationZ = spinAngle } else Modifier)
                     )
                 }
@@ -285,7 +204,7 @@ fun AlertsScreen(
             // =========================================================
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(20.dp),
                 padding = 16.dp
             ) {
                 Column {
@@ -316,8 +235,8 @@ fun AlertsScreen(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0x2636E6A0))
-                                .border(1.dp, Color(0x4036E6A0), RoundedCornerShape(12.dp))
+                                .background(Color(0x185A8E72))
+                                .border(1.dp, Color(0x305A8E72), RoundedCornerShape(12.dp))
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Row(
@@ -483,52 +402,244 @@ fun AlertsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.WaterDrop,
-                            contentDescription = null,
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.WaterDrop,
+                        contentDescription = null,
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
                         Text(
-                            text = "Dam & reservoir alerts",
+                            text = "Reservoir Status",
                             color = TextPrimary,
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "CWC Monitored Reservoirs (${damItems.size} across India)",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = "Central Water Commission (CWC) live storage",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
                 }
 
-                Text(
-                    text = "View all →",
-                    color = PrimaryBlue,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onOpenDams() }
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0x1838BDF8))
+                        .border(1.dp, Color(0x4038BDF8), RoundedCornerShape(10.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
+                ) {
+                    Text(
+                        text = "$criticalDamsCount Critical",
+                        color = if (criticalDamsCount > 0) DangerRed else SuccessGreen,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            damItems.take(6).forEach { dam ->
-                DamAlertCard(
-                    dam = dam,
-                    onClick = onOpenDams
+            // Search Bar for Reservoirs
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF1E2633))
+                    .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search dams",
+                        tint = TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (searchQuery.isEmpty()) {
+                            Text(
+                                text = "Search by dam, state, district, or basin...",
+                                color = TextMuted,
+                                fontSize = 13.sp
+                            )
+                        }
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                color = TextPrimary,
+                                fontSize = 13.sp
+                            ),
+                            cursorBrush = SolidColor(PrimaryBlue),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    if (searchQuery.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear search",
+                            tint = TextMuted,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { searchQuery = "" }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Filter Chips: All, Critical, Southern, Northern, Western, Eastern, Central
+            val filterOptions = listOf(
+                "All",
+                "Critical (>85%)",
+                "Southern",
+                "Northern",
+                "Western",
+                "Eastern",
+                "Central"
+            )
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filterOptions) { option ->
+                    val isSelected = selectedFilter == option
+                    val chipBg = if (isSelected) PrimaryBlue else Color(0xFF1E2633)
+                    val chipTextColor = if (isSelected) Color.White else TextSecondary
+                    val chipBorderColor = if (isSelected) PrimaryBlue else BorderGlass
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(chipBg)
+                            .border(1.dp, chipBorderColor, RoundedCornerShape(20.dp))
+                            .clickable { selectedFilter = option }
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = option,
+                            color = chipTextColor,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Filter calculation
+            val query = searchQuery.trim().lowercase()
+            val filteredDams = damItems.filter { dam ->
+                val matchesQuery = query.isEmpty() ||
+                    (dam.name?.lowercase()?.contains(query) == true) ||
+                    (dam.state?.lowercase()?.contains(query) == true) ||
+                    (dam.district?.lowercase()?.contains(query) == true) ||
+                    (dam.basin?.lowercase()?.contains(query) == true)
+
+                val matchesFilter = when (selectedFilter) {
+                    "Critical (>85%)" -> (dam.storage_percent ?: 0.0) >= 85.0
+                    "Southern" -> dam.region.equals("Southern", ignoreCase = true)
+                    "Northern" -> dam.region.equals("Northern", ignoreCase = true)
+                    "Western" -> dam.region.equals("Western", ignoreCase = true)
+                    "Eastern" -> dam.region.equals("Eastern", ignoreCase = true)
+                    "Central" -> dam.region.equals("Central", ignoreCase = true)
+                    else -> true
+                }
+
+                matchesQuery && matchesFilter
+            }
+
+            // Results count badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Showing ${filteredDams.size} reservoirs",
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                if (filteredDams.size > 10) {
+                    Text(
+                        text = if (showAllDams) "Collapse" else "View all ${filteredDams.size}",
+                        color = PrimaryBlue,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { showAllDams = !showAllDams }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (filteredDams.isEmpty()) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    padding = 24.dp
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = "🔍", fontSize = 28.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No reservoirs found",
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Try clearing the search or changing the region filter.",
+                            color = TextMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            } else {
+                val displayedDams = if (showAllDams) filteredDams else filteredDams.take(10)
+                displayedDams.forEach { dam ->
+                    DamAlertCard(dam = dam)
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                if (!showAllDams && filteredDams.size > 10) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color(0xFF1E2633))
+                            .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
+                            .clickable { showAllDams = true }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Show All ${filteredDams.size} Reservoirs",
+                            color = PrimaryBlue,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -627,8 +738,7 @@ private fun MockupAlertCard(
 
 @Composable
 private fun DamAlertCard(
-    dam: DamItem,
-    onClick: () -> Unit
+    dam: DamItem
 ) {
     val pct = dam.storage_percent ?: 0.0
     val statusColor = when {
@@ -637,10 +747,15 @@ private fun DamAlertCard(
         else -> SuccessGreen
     }
 
+    val riskLabel = when {
+        pct >= 90.0 -> "CRITICAL SPILL RISK"
+        pct >= 85.0 -> "HIGH FLOOD WATCH"
+        pct >= 70.0 -> "MODERATE STORAGE"
+        else -> "NORMAL CAPACITY"
+    }
+
     GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         padding = 14.dp
     ) {
@@ -654,30 +769,126 @@ private fun DamAlertCard(
                     Text(
                         text = dam.name ?: "Reservoir",
                         color = TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${dam.state ?: ""} • ${dam.basin ?: ""}",
+                        text = "${dam.district?.let { "$it, " } ?: ""}${dam.state ?: ""} • ${dam.basin ?: ""}",
                         color = TextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(statusColor.copy(alpha = 0.15f))
-                        .border(1.dp, statusColor.copy(alpha = 0.30f), RoundedCornerShape(8.dp))
+                        .border(1.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = "${"%.1f".format(pct)}%",
                         color = statusColor,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Storage Level Progress Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xFF232B36))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth((pct / 100.0).coerceIn(0.0, 1.0).toFloat())
+                        .fillMaxSize()
+                        .background(statusColor)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Telemetry Grid: Current Level vs FRL | Live Storage vs Capacity
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "WATER LEVEL",
+                        color = TextMuted,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "${dam.current_level_m?.let { "%.1f m".format(it) } ?: "N/A"} / ${dam.frl_m?.let { "%.1f m".format(it) } ?: "N/A"} FRL",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "LIVE STORAGE",
+                        color = TextMuted,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "${dam.live_storage_bcm?.let { "%.2f".format(it) } ?: "N/A"} / ${dam.live_capacity_bcm?.let { "%.2f BCM".format(it) } ?: "N/A"}",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Footer: Flood Risk Tag & Observation Date
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = riskLabel,
+                        color = statusColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Text(
+                    text = "Observed: ${dam.observation_date ?: "Live"}",
+                    color = TextMuted,
+                    fontSize = 10.sp
+                )
             }
         }
     }

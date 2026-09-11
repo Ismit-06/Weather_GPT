@@ -58,19 +58,18 @@ android {
     }
 
     buildTypes {
-
+        debug {
+            isMinifyEnabled = false
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -83,7 +82,14 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
+    implementation(platform(libs.androidx.compose.bom))
     implementation("androidx.compose.material:material-icons-extended")
 
     // CameraX for AI Weather from Camera
@@ -91,6 +97,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // ML Kit for on-device scene & object labeling (Ceiling, Room, Lighting, Sky, Cloud)
+    implementation("com.google.mlkit:image-labeling:17.0.9")
 
     implementation(
         "com.maptiler:maptiler-sdk-kotlin:1.3.0"
@@ -118,12 +127,6 @@ dependencies {
 
     implementation(
         "androidx.navigation:navigation-compose:2.8.8"
-    )
-
-    implementation(
-        platform(
-            libs.androidx.compose.bom
-        )
     )
 
     implementation(

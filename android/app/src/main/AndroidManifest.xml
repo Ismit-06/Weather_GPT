@@ -40,9 +40,9 @@
     <application
         android:usesCleartextTraffic="true"
         android:allowBackup="true"
-        android:icon="@drawable/weather_gpt_icon"
+        android:icon="@drawable/app_logo"
         android:label="WeatherGPT"
-        android:roundIcon="@drawable/weather_gpt_icon"
+        android:roundIcon="@drawable/app_logo"
         android:supportsRtl="true"
         android:theme="@style/Theme.WeatherGPT">
 

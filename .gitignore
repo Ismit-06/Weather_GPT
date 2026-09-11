@@ -24,6 +24,8 @@ app_phase1_backup_*/
 android/local.properties
 android/.gradle/
 android/.idea/
+android/.kotlin/
+.kotlin/
 android/**/build/
 android/ui-backups/
 android/**/*.before-*.kt

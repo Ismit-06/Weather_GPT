@@ -36,6 +36,13 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.weathergpt.ui.theme.CloudBlue
+import com.example.weathergpt.ui.theme.DangerRed
+import com.example.weathergpt.ui.theme.PrimaryBlue
+import com.example.weathergpt.ui.theme.SecondaryCyan
+import com.example.weathergpt.ui.theme.StormSlate
+import com.example.weathergpt.ui.theme.TextMuted
+import com.example.weathergpt.ui.theme.TextPrimary
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -300,22 +307,22 @@ private fun DrawScope.drawLivingOrbLayers(
     val c = Offset(size.width / 2f, size.height / 2f)
     val r = size.minDimension * 0.36f
 
-    // Organic color scheme
+    // Enhanced contrast palette for Orb
     val cyanColor = when (orbState) {
-        OrbState.ERROR -> Color(0xFFFF6B6B)
-        OrbState.OFFLINE -> Color(0xFF5E6B7C)
-        else -> Color(0xFF52D9FF)
+        OrbState.ERROR -> DangerRed
+        OrbState.OFFLINE -> TextMuted
+        else -> SecondaryCyan
     }
     val blueColor = when (orbState) {
-        OrbState.ERROR -> Color(0xFFCC4444)
-        OrbState.OFFLINE -> Color(0xFF3A4758)
-        else -> Color(0xFF4DA3FF)
+        OrbState.ERROR -> DangerRed
+        OrbState.OFFLINE -> CloudBlue
+        else -> PrimaryBlue
     }
     val purpleColor = when (orbState) {
-        OrbState.OFFLINE -> Color(0xFF2D3A4A)
-        else -> Color(0xFF8B7CFF)
+        OrbState.OFFLINE -> CloudBlue
+        else -> StormSlate
     }
-    val deepColor = Color(0xFF050A12)
+    val deepColor = TextPrimary
 
     // ------------------------------------------------------------------
     // LAYER 1 — Ambient Respiration Halo (Bioluminescent Atmosphere)

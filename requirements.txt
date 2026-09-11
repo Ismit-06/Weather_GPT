@@ -42,3 +42,4 @@ watchfiles==1.2.0
 websockets==17.1
 pypdf==6.0.0
 python-multipart==0.0.32
+pillow>=10.0.0

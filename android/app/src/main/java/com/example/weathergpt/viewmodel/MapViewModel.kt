@@ -182,18 +182,32 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectMapLocation(lat: Double, lon: Double, preferredName: String? = null) {
         viewModelScope.launch {
-            val name = preferredName ?: reverseGeocodePlace(lat, lon)
+            val initialName = preferredName ?: "Selected Location"
             _uiState.update {
                 it.copy(
                     selectedLatitude = lat,
                     selectedLongitude = lon,
-                    selectedLocationName = name,
+                    selectedLocationName = initialName,
                     areaAnalysis = null,
                     aiAnalysisAnswer = null,
                     aiAnalysisSpeech = null
                 )
             }
-            fetchWeatherForLocation(lat, lon, name)
+            // Fetch weather immediately in parallel
+            fetchWeatherForLocation(lat, lon, initialName)
+
+            // Resolve place name asynchronously in background if not already provided
+            if (preferredName == null) {
+                val resolvedName = reverseGeocodePlace(lat, lon)
+                if (resolvedName.isNotBlank() && resolvedName != "Selected Location") {
+                    _uiState.update {
+                        it.copy(
+                            selectedLocationName = resolvedName,
+                            weatherData = it.weatherData?.copy(placeName = resolvedName)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -349,31 +363,39 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                         "&hourly=precipitation_probability&forecast_days=1"
                 )
                 val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 6000
-                conn.readTimeout = 6000
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                conn.setRequestProperty("User-Agent", "WeatherGPT/1.0 (Android)")
                 conn.setRequestProperty("Accept", "application/json")
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val code = conn.responseCode
+                val body = if (code in 200..299) {
+                    conn.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
                 conn.disconnect()
 
-                val root = JSONObject(body)
-                val curr = root.optJSONObject("current")
-                val hourly = root.optJSONObject("hourly")
-                val wCode = curr?.optInt("weather_code", -1)?.takeIf { it >= 0 }
+                if (body.isNotBlank()) {
+                    val root = JSONObject(body)
+                    val curr = root.optJSONObject("current")
+                    val hourly = root.optJSONObject("hourly")
+                    val wCode = curr?.optInt("weather_code", -1)?.takeIf { it >= 0 }
 
-                val weather = AnyLocationWeather(
-                    latitude = lat,
-                    longitude = lon,
-                    placeName = placeName,
-                    temperature = curr?.optDouble("temperature_2m", Double.NaN)?.takeUnless { it.isNaN() },
-                    apparentTemperature = curr?.optDouble("apparent_temperature", Double.NaN)?.takeUnless { it.isNaN() },
-                    humidity = curr?.optDouble("relative_humidity_2m", Double.NaN)?.takeUnless { it.isNaN() },
-                    windSpeed = curr?.optDouble("wind_speed_10m", Double.NaN)?.takeUnless { it.isNaN() },
-                    pressure = curr?.optDouble("surface_pressure", Double.NaN)?.takeUnless { it.isNaN() },
-                    rainProbability = hourly?.optJSONArray("precipitation_probability")?.optDouble(0, Double.NaN)?.takeUnless { it.isNaN() },
-                    weatherCode = wCode,
-                    conditionText = getWeatherConditionText(wCode)
-                )
-                _uiState.update { it.copy(weatherData = weather) }
+                    val weather = AnyLocationWeather(
+                        latitude = lat,
+                        longitude = lon,
+                        placeName = _uiState.value.selectedLocationName.ifBlank { placeName },
+                        temperature = curr?.optDouble("temperature_2m", Double.NaN)?.takeUnless { it.isNaN() },
+                        apparentTemperature = curr?.optDouble("apparent_temperature", Double.NaN)?.takeUnless { it.isNaN() },
+                        humidity = curr?.optDouble("relative_humidity_2m", Double.NaN)?.takeUnless { it.isNaN() },
+                        windSpeed = curr?.optDouble("wind_speed_10m", Double.NaN)?.takeUnless { it.isNaN() },
+                        pressure = curr?.optDouble("surface_pressure", Double.NaN)?.takeUnless { it.isNaN() },
+                        rainProbability = hourly?.optJSONArray("precipitation_probability")?.optDouble(0, Double.NaN)?.takeUnless { it.isNaN() },
+                        weatherCode = wCode,
+                        conditionText = getWeatherConditionText(wCode)
+                    )
+                    _uiState.update { it.copy(weatherData = weather) }
+                }
             } catch (e: Exception) {
                 Log.w("MapViewModel", "Weather fetch error: ${e.message}")
             }
