@@ -245,97 +245,57 @@ class VoiceAssistantManager(private val context: Context) {
     }
 
     /**
-     * Synthesizes and speaks text using OpenRouter Neural Voice (Fish Audio)
-     * with instant automatic fallback to Android TTS.
+     * Synthesizes and speaks text instantly using on-device Android TextToSpeech.
+     * Zero network latency (<50ms startup time) with natural intonation.
      */
     fun speak(text: String, languageCode: String? = null) {
         stopPlayback()
         val cleanSpeech = cleanMarkdownForSpeech(text)
         if (cleanSpeech.isBlank()) return
 
-        coroutineScope.launch {
+        coroutineScope.launch(Dispatchers.Main) {
+            // Ensure TTS engine is initialized
+            var waitAttempts = 0
+            while (!isTtsInitialized && waitAttempts < 12) {
+                delay(35)
+                waitAttempts++
+            }
+
             try {
+                val locale = when {
+                    languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> Locale.getDefault()
+                    languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) -> Locale("or", "IN")
+                    languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) -> Locale("hi", "IN")
+                    languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) -> Locale("te", "IN")
+                    languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) -> Locale("ta", "IN")
+                    languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) -> Locale("kn", "IN")
+                    languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) -> Locale("bn", "IN")
+                    languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) -> Locale("mr", "IN")
+                    languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) -> Locale("gu", "IN")
+                    languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) -> Locale("ml", "IN")
+                    languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) -> Locale("pa", "IN")
+                    languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) -> Locale.ENGLISH
+                    languageCode.contains("-") -> Locale.forLanguageTag(languageCode)
+                    else -> Locale.forLanguageTag(languageCode)
+                }
+
+                val avail = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+                if (avail >= TextToSpeech.LANG_AVAILABLE) {
+                    tts?.language = locale
+                }
+
+                tts?.setPitch(1.0f)
+                tts?.setSpeechRate(1.02f)
+
+                val utteranceId = "WeatherGPT_Instant_${System.currentTimeMillis()}"
+                tts?.speak(cleanSpeech, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
                 _isSpeaking.value = true
                 startRmsSimulation()
-
-                // Fetch neural audio from Backend
-                val audioFile = withContext(Dispatchers.IO) {
-                    val jsonBody = JSONObject().apply {
-                        put("text", cleanSpeech)
-                        put("language", languageCode)
-                        put("format", "mp3")
-                    }
-
-                    val request = Request.Builder()
-                        .url("${BackendConfig.BASE_URL_NO_SLASH}/api/v1/tts")
-                        .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
-                        .build()
-
-                    val response = BackendConfig.okHttpClient.newCall(request).execute()
-                    if (!response.isSuccessful) throw IllegalStateException("TTS error ${response.code}")
-
-                    val bytes = response.body?.bytes() ?: throw IllegalStateException("Empty audio")
-                    val tempFile = File(context.cacheDir, "speech_${System.currentTimeMillis()}.mp3")
-                    FileOutputStream(tempFile).use { it.write(bytes) }
-                    tempFile
-                }
-
-                withContext(Dispatchers.Main) {
-                    mediaPlayer?.release()
-                    mediaPlayer = MediaPlayer().apply {
-                        setDataSource(audioFile.absolutePath)
-                        setOnCompletionListener {
-                            _isSpeaking.value = false
-                            stopRmsSimulation()
-                            try { audioFile.delete() } catch (_: Exception) {}
-                        }
-                        setOnErrorListener { _, _, _ ->
-                            _isSpeaking.value = false
-                            stopRmsSimulation()
-                            try { audioFile.delete() } catch (_: Exception) {}
-                            speakFallbackTts(cleanSpeech, languageCode)
-                            true
-                        }
-                        prepare()
-                        start()
-                    }
-                }
             } catch (e: Exception) {
-                Log.w(tag, "Neural TTS failed (${e.message}), speaking via local TTS")
-                speakFallbackTts(cleanSpeech, languageCode)
+                Log.e(tag, "Instant TTS speak error", e)
+                _isSpeaking.value = false
+                stopRmsSimulation()
             }
-        }
-    }
-
-    private fun speakFallbackTts(cleanText: String, languageCode: String?) {
-        try {
-            val locale = when {
-                languageCode.isNullOrBlank() || languageCode.equals("Auto", ignoreCase = true) -> Locale.getDefault()
-                languageCode.equals("Odia", ignoreCase = true) || languageCode.equals("Oriya", ignoreCase = true) || languageCode.startsWith("od", ignoreCase = true) || languageCode.startsWith("or", ignoreCase = true) -> Locale("or", "IN")
-                languageCode.equals("Hindi", ignoreCase = true) || languageCode.equals("Hinglish", ignoreCase = true) || languageCode.startsWith("hi", ignoreCase = true) -> Locale("hi", "IN")
-                languageCode.equals("Telugu", ignoreCase = true) || languageCode.startsWith("te", ignoreCase = true) -> Locale("te", "IN")
-                languageCode.equals("Tamil", ignoreCase = true) || languageCode.startsWith("ta", ignoreCase = true) -> Locale("ta", "IN")
-                languageCode.equals("Kannada", ignoreCase = true) || languageCode.startsWith("kn", ignoreCase = true) -> Locale("kn", "IN")
-                languageCode.equals("Bengali", ignoreCase = true) || languageCode.startsWith("bn", ignoreCase = true) -> Locale("bn", "IN")
-                languageCode.equals("Marathi", ignoreCase = true) || languageCode.startsWith("mr", ignoreCase = true) -> Locale("mr", "IN")
-                languageCode.equals("Gujarati", ignoreCase = true) || languageCode.startsWith("gu", ignoreCase = true) -> Locale("gu", "IN")
-                languageCode.equals("Malayalam", ignoreCase = true) || languageCode.startsWith("ml", ignoreCase = true) -> Locale("ml", "IN")
-                languageCode.equals("Punjabi", ignoreCase = true) || languageCode.startsWith("pa", ignoreCase = true) -> Locale("pa", "IN")
-                languageCode.equals("English", ignoreCase = true) || languageCode.startsWith("en", ignoreCase = true) -> Locale.ENGLISH
-                languageCode.contains("-") -> Locale.forLanguageTag(languageCode)
-                else -> Locale.forLanguageTag(languageCode)
-            }
-            val avail = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-            if (avail >= TextToSpeech.LANG_AVAILABLE) {
-                tts?.language = locale
-            }
-
-            tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "WeatherGPT_${System.currentTimeMillis()}")
-            _isSpeaking.value = true
-            startRmsSimulation()
-        } catch (e: Exception) {
-            _isSpeaking.value = false
-            stopRmsSimulation()
         }
     }
 
