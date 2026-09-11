@@ -449,7 +449,7 @@ fun AlertsScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF1E2633))
+                    .background(Color.White)
                     .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
@@ -516,8 +516,8 @@ fun AlertsScreen() {
             ) {
                 items(filterOptions) { option ->
                     val isSelected = selectedFilter == option
-                    val chipBg = if (isSelected) PrimaryBlue else Color(0xFF1E2633)
-                    val chipTextColor = if (isSelected) Color.White else TextSecondary
+                    val chipBg = if (isSelected) PrimaryBlue else Color.White
+                    val chipTextColor = if (isSelected) Color.White else TextPrimary
                     val chipBorderColor = if (isSelected) PrimaryBlue else BorderGlass
 
                     Box(
@@ -626,7 +626,7 @@ fun AlertsScreen() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF1E2633))
+                            .background(Color.White)
                             .border(1.dp, BorderGlass, RoundedCornerShape(14.dp))
                             .clickable { showAllDams = true }
                             .padding(vertical = 12.dp),
@@ -810,7 +810,7 @@ private fun DamAlertCard(
                     .fillMaxWidth()
                     .height(5.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(Color(0xFF232B36))
+                    .background(Color(0xFFE2E8F0))
             ) {
                 Box(
                     modifier = Modifier
