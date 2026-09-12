@@ -1324,7 +1324,8 @@ fun MapScreen(
                 val shareBody = "📍 ${payload.name} shared their weather & location from ${payload.cityName}!\n" +
                         "🌤️ ${payload.condition} • ${"%.1f".format(payload.temperature)}°C\n" +
                         "💧 Humidity: ${payload.humidity}% • 💨 Wind: ${"%.1f".format(payload.windSpeed)} m/s\n\n" +
-                        "View where I am on WeatherGPT:\n$webUrl"
+                        "📱 View on WeatherGPT:\n$webUrl\n\n" +
+                        "(Tip: In WeatherGPT ➔ Map ➔ tap 'Locate Friend' and paste this text to drop the pin!)"
 
                 val sendIntent = Intent().apply {
                     action = Intent.ACTION_SEND
