@@ -48,16 +48,33 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
 
             <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-                <action
-                    android:name="android.intent.action.MAIN" />
+            <!-- Deep link: https://weathergpt.app/share?... -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="weathergpt.app"
+                    android:pathPrefix="/share" />
+            </intent-filter>
 
-                <category
-                    android:name="android.intent.category.LAUNCHER" />
-
+            <!-- Deep link: weathergpt://share?... -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="weathergpt"
+                    android:host="share" />
             </intent-filter>
 
         </activity>

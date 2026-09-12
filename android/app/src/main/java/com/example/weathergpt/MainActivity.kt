@@ -53,12 +53,33 @@ class MainActivity : ComponentActivity() {
                 MODE_PRIVATE
             )
 
+        // Process deep link if launched via share link
+        handleIncomingShareIntent(intent)
+
         setContent {
             WeatherGPTTheme(
                 darkTheme = true
             ) {
                 AppNavigation()
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingShareIntent(intent)
+    }
+
+    private fun handleIncomingShareIntent(intent: android.content.Intent?) {
+        val uri = intent?.data ?: return
+        try {
+            val friendData = com.example.weathergpt.data.SharedFriendWeather.parseFromUri(uri.toString())
+            if (friendData != null) {
+                com.example.weathergpt.data.SharedFriendStore.setSharedFriend(friendData, triggerNavigation = true)
+            }
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "Error parsing friend share deep link", e)
         }
     }
 }

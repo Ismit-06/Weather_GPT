@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,22 @@ fun AppNavigation() {
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    val shouldNavigateToMap by com.example.weathergpt.data.SharedFriendStore.navigateToMapTrigger.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(shouldNavigateToMap) {
+        if (shouldNavigateToMap) {
+            if (currentRoute != Screen.Map.route) {
+                navController.navigate(Screen.Map.route) {
+                    popUpTo(Screen.Home.route) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+            com.example.weathergpt.data.SharedFriendStore.resetNavigationTrigger()
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundDark,

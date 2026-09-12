@@ -54,6 +54,24 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.drawable.BitmapDrawable
+import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.window.Dialog
+import com.example.weathergpt.data.SharedFriendStore
+import com.example.weathergpt.data.SharedFriendWeather
+import com.example.weathergpt.ui.theme.SurfaceDark
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -148,6 +166,62 @@ fun MapScreen(
     var userLocationMarker by remember { mutableStateOf<Marker?>(null) }
     var selectedLocationMarker by remember { mutableStateOf<Marker?>(null) }
     var currentRadarOverlay by remember { mutableStateOf<TilesOverlay?>(null) }
+
+    // Shared Friend Weather & Location Pin state
+    val sharedFriend by SharedFriendStore.sharedFriend.collectAsState()
+    var friendMarkerOverlay by remember { mutableStateOf<Marker?>(null) }
+    var isFriendCardVisible by remember { mutableStateOf(true) }
+    var showShareDialog by remember { mutableStateOf(false) }
+    var showPasteDialog by remember { mutableStateOf(false) }
+
+    val friendDistanceKm = remember(sharedFriend, savedLocation) {
+        sharedFriend?.let { f ->
+            SharedFriendWeather.computeDistanceKm(
+                lat1 = savedLocation.latitude,
+                lon1 = savedLocation.longitude,
+                lat2 = f.latitude,
+                lon2 = f.longitude
+            )
+        }
+    }
+
+    // Sync Friend Location Pin on osmdroid Map
+    LaunchedEffect(sharedFriend, mapView) {
+        val view = mapView ?: return@LaunchedEffect
+        val friend = sharedFriend
+
+        friendMarkerOverlay?.let {
+            try {
+                view.overlays.remove(it)
+                it.onDetach(view)
+            } catch (_: Throwable) {}
+            friendMarkerOverlay = null
+        }
+
+        if (friend != null) {
+            try {
+                val pt = GeoPoint(friend.latitude, friend.longitude)
+                val marker = Marker(view).apply {
+                    position = pt
+                    title = "🧑 ${friend.name} • ${"%.1f".format(friend.temperature)}°C"
+                    snippet = "${friend.condition} • ${friend.cityName}"
+                    icon = createFriendMarkerDrawable(context, friend.name, friend.temperature)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    setOnMarkerClickListener { _, _ ->
+                        isFriendCardVisible = true
+                        view.controller.animateTo(pt)
+                        true
+                    }
+                }
+                view.overlays.add(marker)
+                friendMarkerOverlay = marker
+                view.controller.animateTo(pt)
+                view.controller.setZoom(13.5)
+                view.invalidate()
+                isFriendCardVisible = true
+            } catch (_: Throwable) {}
+        }
+    }
 
     // Initialize MapViewModel with location
     LaunchedEffect(savedLocation) {
@@ -462,6 +536,88 @@ fun MapScreen(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // =================================================================
+            // SHARE & FRIEND PIN ACTION BAR
+            // =================================================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Share My Weather Pin
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { showShareDialog = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Share My Pin",
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Friend's Pin / Locate Friend
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (sharedFriend != null) PrimaryBlue.copy(alpha = 0.12f) else Color.White,
+                    border = BorderStroke(1.dp, if (sharedFriend != null) PrimaryBlue else BorderGlass),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            if (sharedFriend != null) {
+                                sharedFriend?.let { f ->
+                                    mapView?.controller?.animateTo(GeoPoint(f.latitude, f.longitude))
+                                    mapView?.controller?.setZoom(13.5)
+                                    isFriendCardVisible = true
+                                }
+                            } else {
+                                showPasteDialog = true
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (sharedFriend != null) Icons.Default.LocationOn else Icons.Default.Link,
+                            contentDescription = "Friend Pin",
+                            tint = if (sharedFriend != null) PrimaryBlue else TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (sharedFriend != null) "🧑 ${sharedFriend!!.name}'s Pin" else "Locate Friend",
+                            color = if (sharedFriend != null) PrimaryBlue else TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
         }
 
         // =================================================================
@@ -708,16 +864,232 @@ fun MapScreen(
         }
 
         // =================================================================
-        // BOTTOM WEATHER DETAILS CARD (COMPACT INLINE GLASS CARD)
+        // BOTTOM WEATHER DETAILS CARD (OR FRIEND WEATHER CARD)
         // =================================================================
-        GlassCard(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
-            shape = RoundedCornerShape(18.dp),
-            padding = 12.dp
-        ) {
+        val activeFriend = sharedFriend
+        if (activeFriend != null && isFriendCardVisible) {
+            GlassCard(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
+                shape = RoundedCornerShape(18.dp),
+                padding = 12.dp
+            ) {
+                Column {
+                    // Header Row: Friend Info + Distance + Close
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x1845677D))
+                                    .border(1.5.dp, PrimaryBlue, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "🧑",
+                                    fontSize = 18.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${activeFriend.name}'s Location",
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = PrimaryBlue.copy(alpha = 0.12f),
+                                        border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.35f))
+                                    ) {
+                                        Text(
+                                            text = "FRIEND PIN",
+                                            color = PrimaryBlue,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "${activeFriend.cityName} • 📍 ${friendDistanceKm?.let { "%.1f km away".format(it) } ?: "Shared location"}",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { isFriendCardVisible = false },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Minimize card",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Temperature and Condition row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "%.1f°C".format(activeFriend.temperature),
+                                color = TextPrimary,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Shared ${SharedFriendWeather.formatRelativeTime(activeFriend.timestamp)}",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(bottom = 3.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0x1245677D),
+                            border = BorderStroke(1.dp, BorderGlass)
+                        ) {
+                            Text(
+                                text = activeFriend.condition,
+                                color = PrimaryBlue,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 3-column metric tiles
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AreaMetricBox(
+                            label = "Humidity",
+                            value = "${activeFriend.humidity}%",
+                            modifier = Modifier.weight(1f)
+                        )
+                        AreaMetricBox(
+                            label = "Wind Speed",
+                            value = "%.1f m/s".format(activeFriend.windSpeed),
+                            modifier = Modifier.weight(1f)
+                        )
+                        AreaMetricBox(
+                            label = "Distance",
+                            value = friendDistanceKm?.let { "%.1f km".format(it) } ?: "--",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                try {
+                                    mapView?.controller?.animateTo(GeoPoint(activeFriend.latitude, activeFriend.longitude))
+                                    mapView?.controller?.setZoom(14.0)
+                                } catch (_: Throwable) {}
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Center", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val gmmIntentUri = Uri.parse("google.navigation:q=${activeFriend.latitude},${activeFriend.longitude}")
+                                    val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+                                        setPackage("com.google.android.apps.maps")
+                                    }
+                                    context.startActivity(mapIntent)
+                                } catch (_: Throwable) {
+                                    try {
+                                        val webMap = Intent(Intent.ACTION_VIEW, Uri.parse("https://maps.google.com/?q=${activeFriend.latitude},${activeFriend.longitude}"))
+                                        context.startActivity(webMap)
+                                    } catch (_: Throwable) {}
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x1845677D)),
+                            border = BorderStroke(1.dp, BorderGlass),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NearMe,
+                                contentDescription = null,
+                                tint = TextPrimary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Navigate", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Button(
+                            onClick = {
+                                SharedFriendStore.clearSharedFriend()
+                                isFriendCardVisible = false
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0x15EF4444)),
+                            border = BorderStroke(1.dp, Color(0x33EF4444)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Clear Pin", color = Color(0xFFEF4444), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        } else {
+            GlassCard(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp, start = 12.dp, end = 12.dp),
+                shape = RoundedCornerShape(18.dp),
+                padding = 12.dp
+            ) {
             Column {
                 // Header Row: Layer & Location Info + Risk Badge
                 Row(
@@ -927,6 +1299,53 @@ fun MapScreen(
             }
         }
     }
+
+    // Dialogs
+    if (showShareDialog) {
+        ShareWeatherDialog(
+            currentLocationName = savedLocation.name,
+            latitude = savedLocation.latitude,
+            longitude = savedLocation.longitude,
+            weather = uiState.weatherData,
+            onDismiss = { showShareDialog = false },
+            onShare = { name ->
+                val payload = SharedFriendWeather(
+                    name = name,
+                    latitude = savedLocation.latitude,
+                    longitude = savedLocation.longitude,
+                    cityName = savedLocation.name,
+                    temperature = uiState.weatherData?.temperature ?: 0.0,
+                    condition = uiState.weatherData?.conditionText ?: "Clear",
+                    humidity = uiState.weatherData?.humidity?.toInt() ?: 0,
+                    windSpeed = uiState.weatherData?.windSpeed ?: 0.0,
+                    timestamp = System.currentTimeMillis()
+                )
+                val webUrl = SharedFriendWeather.encodeToWebUri(payload)
+                val shareBody = "📍 ${payload.name} shared their weather & location from ${payload.cityName}!\n" +
+                        "🌤️ ${payload.condition} • ${"%.1f".format(payload.temperature)}°C\n" +
+                        "💧 Humidity: ${payload.humidity}% • 💨 Wind: ${"%.1f".format(payload.windSpeed)} m/s\n\n" +
+                        "View where I am on WeatherGPT:\n$webUrl"
+
+                val sendIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, shareBody)
+                    type = "text/plain"
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Share Weather & Location Pin"))
+            }
+        )
+    }
+
+    if (showPasteDialog) {
+        PasteFriendLinkDialog(
+            onDismiss = { showPasteDialog = false },
+            onFriendLoaded = { friend ->
+                SharedFriendStore.setSharedFriend(friend, triggerNavigation = false)
+                isFriendCardVisible = true
+            }
+        )
+    }
+    }
 }
 
 // =================================================================
@@ -1026,7 +1445,10 @@ private fun getLayerIcon(layer: String): ImageVector {
 private fun clearFeatureOverlays(map: MapView) {
     try {
         val markersToRemove = map.overlays.filter { overlay ->
-            overlay is Marker && !overlay.title.orEmpty().contains("Your Location") && !overlay.title.orEmpty().contains("Selected Location")
+            overlay is Marker &&
+            !overlay.title.orEmpty().contains("Your Location") &&
+            !overlay.title.orEmpty().contains("Selected Location") &&
+            !overlay.title.orEmpty().contains("🧑")
         }
         map.overlays.removeAll(markersToRemove)
 
@@ -1108,3 +1530,283 @@ private fun addFloodPolygon(map: MapView, flood: FloodMapData) {
         map.overlays.add(polygon)
     } catch (_: Throwable) {}
 }
+
+private fun createFriendMarkerDrawable(context: Context, name: String, temp: Double): BitmapDrawable {
+    val density = context.resources.displayMetrics.density
+    val width = (136 * density).toInt()
+    val height = (52 * density).toInt()
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // Pill background
+    val rect = RectF(3 * density, 3 * density, (133 * density), (40 * density))
+    val bgPaint = Paint().apply {
+        isAntiAlias = true
+        color = AndroidColor.argb(245, 15, 23, 42)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(rect, 13 * density, 13 * density, bgPaint)
+
+    // Neon border
+    val borderPaint = Paint().apply {
+        isAntiAlias = true
+        color = AndroidColor.argb(255, 56, 189, 248)
+        style = Paint.Style.STROKE
+        strokeWidth = 2.2f * density
+    }
+    canvas.drawRoundRect(rect, 13 * density, 13 * density, borderPaint)
+
+    // Pointer needle
+    val path = android.graphics.Path().apply {
+        moveTo(width / 2f - 6 * density, 40 * density)
+        lineTo(width / 2f, 48 * density)
+        lineTo(width / 2f + 6 * density, 40 * density)
+        close()
+    }
+    val needlePaint = Paint().apply {
+        isAntiAlias = true
+        color = AndroidColor.argb(255, 56, 189, 248)
+        style = Paint.Style.FILL
+    }
+    canvas.drawPath(path, needlePaint)
+
+    // Text: 🧑 Name • 28°C
+    val textPaint = Paint().apply {
+        isAntiAlias = true
+        color = AndroidColor.WHITE
+        textSize = 11.5f * density
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+    val cleanName = if (name.length > 7) name.take(6) + "…" else name
+    val displayText = "🧑 $cleanName • ${"%.0f".format(temp)}°C"
+    canvas.drawText(displayText, width / 2f, 25 * density, textPaint)
+
+    return BitmapDrawable(context.resources, bitmap)
+}
+
+@Composable
+private fun ShareWeatherDialog(
+    currentLocationName: String,
+    latitude: Double,
+    longitude: Double,
+    weather: AnyLocationWeather?,
+    onDismiss: () -> Unit,
+    onShare: (name: String) -> Unit
+) {
+    val context = LocalContext.current
+    var nameInput by remember { mutableStateOf(SharedFriendStore.getSavedUserName(context)) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = SurfaceDark,
+            border = BorderStroke(1.dp, BorderGlass),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📍 Share My Weather & Pin",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Your friend will see a custom pointer on their map with your name, location, and live weather telemetry.",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text("Your Name", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    placeholder = { Text("Enter your name (e.g. Sai)", color = TextMuted, fontSize = 13.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = BorderGlass,
+                        focusedContainerColor = Color(0x10FFFFFF),
+                        unfocusedContainerColor = Color(0x08FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0x1245677D),
+                    border = BorderStroke(1.dp, BorderGlass),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "PREVIEW OF SHARED TELEMETRY",
+                            color = TextMuted,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "📍 $currentLocationName",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "🌡️ ${weather?.temperature?.let { "%.1f°C".format(it) } ?: "--"} • ${weather?.conditionText ?: "Live Weather"}",
+                            color = PrimaryBlue,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "💧 Humidity: ${weather?.humidity?.let { "%.0f%%".format(it) } ?: "--"} • 💨 Wind: ${weather?.windSpeed?.let { "%.1f m/s".format(it) } ?: "--"}",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = {
+                        val validName = nameInput.trim().ifBlank { "Friend" }
+                        SharedFriendStore.saveUserName(context, validName)
+                        onShare(validName)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Share via WhatsApp / SMS", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PasteFriendLinkDialog(
+    onDismiss: () -> Unit,
+    onFriendLoaded: (SharedFriendWeather) -> Unit
+) {
+    val context = LocalContext.current
+    var input by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = SurfaceDark,
+            border = BorderStroke(1.dp, BorderGlass),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🧑 Locate Friend's Weather Pin",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Paste the link or message you received from your friend to view their live pointer on your map.",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = {
+                        input = it
+                        errorMessage = null
+                    },
+                    placeholder = { Text("Paste link or message here...", color = TextMuted, fontSize = 13.sp) },
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = PrimaryBlue,
+                        unfocusedBorderColor = BorderGlass,
+                        focusedContainerColor = Color(0x10FFFFFF),
+                        unfocusedContainerColor = Color(0x08FFFFFF)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = errorMessage!!,
+                        color = Color(0xFFEF4444),
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = {
+                        val parsed = SharedFriendWeather.parseFromUri(input)
+                        if (parsed != null) {
+                            onFriendLoaded(parsed)
+                            onDismiss()
+                            Toast.makeText(context, "📍 Found ${parsed.name}'s location in ${parsed.cityName}!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            errorMessage = "Could not find a valid WeatherGPT share link in the input. Please check and try again."
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Drop Pin on Map", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
