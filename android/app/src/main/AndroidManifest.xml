@@ -56,11 +56,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link: https://weathergpt.app/share?... -->
+            <!-- Deep link: https://weather-gpt-ymze.onrender.com/share?... & https://weathergpt.app/share?... -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="weather-gpt-ymze.onrender.com"
+                    android:pathPrefix="/share" />
                 <data
                     android:scheme="https"
                     android:host="weathergpt.app"

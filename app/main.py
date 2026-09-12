@@ -15,6 +15,8 @@ from app.database import get_db
 from sqlalchemy.orm import Session
 from app.services.geocoding import search_location
 from fastapi import FastAPI, Query, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse
+import html
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -374,4 +376,92 @@ async def speech_transcribe(
             "status": "error",
             "message": f"Speech transcription failed: {exc}",
         }
+
+
+@app.get("/share", response_class=HTMLResponse)
+async def share_weather_landing(
+    n: str = Query(default="Friend"),
+    lat: float = Query(default=0.0),
+    lon: float = Query(default=0.0),
+    c: str = Query(default="Current Location"),
+    t: float = Query(default=0.0),
+    cond: str = Query(default="Clear"),
+    h: int = Query(default=0),
+    w: float = Query(default=0.0),
+    ts: int = Query(default=0),
+):
+    safe_name = html.escape(n)
+    safe_city = html.escape(c)
+    safe_cond = html.escape(cond)
+    intent_url = f"intent://share?n={n}&lat={lat}&lon={lon}&c={c}&t={t}&cond={cond}&h={h}&w={w}&ts={ts}#Intent;scheme=weathergpt;package=com.example.weathergpt;end"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{safe_name}'s Weather & Location • WeatherGPT</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
+        body {{ background: #0A1626; color: #FFFFFF; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }}
+        .card {{ background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 24px; padding: 28px; max-width: 420px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); backdrop-filter: blur(12px); text-align: center; }}
+        .avatar {{ width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, #0284C7, #38BDF8); display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px; border: 2px solid #38BDF8; }}
+        h1 {{ font-size: 22px; font-weight: 700; margin-bottom: 4px; }}
+        .city {{ color: #94A3B8; font-size: 14px; margin-bottom: 20px; }}
+        .weather-box {{ background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 16px; padding: 18px; margin-bottom: 22px; }}
+        .temp {{ font-size: 38px; font-weight: 800; color: #38BDF8; }}
+        .condition {{ font-size: 15px; font-weight: 600; color: #F8FAFC; margin-top: 4px; }}
+        .metrics {{ display: flex; justify-content: space-around; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }}
+        .metric-item span {{ display: block; }}
+        .metric-label {{ font-size: 11px; color: #94A3B8; }}
+        .metric-val {{ font-size: 14px; font-weight: 600; color: #F1F5F9; }}
+        .btn {{ display: block; width: 100%; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s ease; margin-bottom: 10px; }}
+        .btn-primary {{ background: #0284C7; color: #FFFFFF; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4); }}
+        .btn-primary:hover {{ background: #0369A1; }}
+        .btn-secondary {{ background: rgba(255, 255, 255, 0.08); color: #94A3B8; border: 1px solid rgba(255, 255, 255, 0.12); }}
+        .footer-tip {{ font-size: 11px; color: #64748B; margin-top: 16px; line-height: 1.4; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="avatar">🧑</div>
+        <h1>{safe_name}'s Location</h1>
+        <p class="city">📍 {safe_city} ({lat:.4f}, {lon:.4f})</p>
+
+        <div class="weather-box">
+            <div class="temp">{t:.1f}°C</div>
+            <div class="condition">🌤️ {safe_cond}</div>
+            <div class="metrics">
+                <div class="metric-item">
+                    <span class="metric-label">Humidity</span>
+                    <span class="metric-val">💧 {h}%</span>
+                </div>
+                <div class="metric-item">
+                    <span class="metric-label">Wind</span>
+                    <span class="metric-val">💨 {w:.1f} m/s</span>
+                </div>
+            </div>
+        </div>
+
+        <a id="openAppBtn" href="{intent_url}" class="btn btn-primary">📱 Open in WeatherGPT App</a>
+        <a href="https://github.com/Ismit-06/Weather_GPT" class="btn btn-secondary">⬇️ Get WeatherGPT App</a>
+
+        <p class="footer-tip">
+            Opening WeatherGPT will automatically drop a custom pointer with {safe_name}'s live weather telemetry and distance from you.
+        </p>
+    </div>
+
+    <script>
+        // Automatic app launch redirect on Android
+        const intentUrl = "{intent_url}";
+        if (/android/i.test(navigator.userAgent)) {{
+            setTimeout(() => {{
+                window.location.href = intentUrl;
+            }}, 300);
+        }}
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
 

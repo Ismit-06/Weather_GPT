@@ -29,7 +29,7 @@ data class SharedFriendWeather(
     companion object {
         const val SCHEME_CUSTOM = "weathergpt"
         const val HOST_SHARE = "share"
-        const val WEB_BASE_URL = "https://weathergpt.app/share"
+        const val WEB_BASE_URL = "https://weather-gpt-ymze.onrender.com/share"
 
         /**
          * Encodes a SharedFriendWeather object into both custom scheme and universal web URLs.
@@ -64,7 +64,7 @@ data class SharedFriendWeather(
             return try {
                 val clean = rawInput.trim()
                 // If user pasted a full message containing a URL, extract the URL
-                val urlRegex = Regex("""(https?://weathergpt\.app/share\?[^\s]+|weathergpt://share\?[^\s]+)""")
+                val urlRegex = Regex("""(https?://[^\s]+/share\?[^\s]+|weathergpt://share\?[^\s]+)""")
                 val matchedUrl = urlRegex.find(clean)?.value ?: clean
 
                 val uri = Uri.parse(matchedUrl)
