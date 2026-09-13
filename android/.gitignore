@@ -1,0 +1,38 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+ui-backups/
+*.before-*.kt
+.venv/
+build/
+
+# Local Android/IDE configuration
+local.properties
+.idea/
+.gradle/
+build/
+*/build/
+
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Local UI backups
+ui-backups/
+
+# Generated/pasted temporary files
+*.before-*.kt

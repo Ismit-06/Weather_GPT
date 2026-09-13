@@ -1,0 +1,8 @@
+{
+  "image_path": "dataset/test/non_sky/sample_ceiling_001.jpg",
+  "filename": "sample_ceiling_001.jpg",
+  "timestamp": "2026-09-10T17:05:06.834795",
+  "analysis": {
+    "error": "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+  }
+}

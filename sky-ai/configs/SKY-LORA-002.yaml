@@ -1,0 +1,80 @@
+﻿# Multimodal LoRA Fine-Tuning Configuration — Iteration 2
+# Experiment ID: SKY-LORA-002
+# Base Model: google/gemma-4-26B-A4B-it (Multimodal Vision-Language)
+# Objective: Failure-driven hard-negative suppression with balanced sky recall
+
+experiment_id: "SKY-LORA-002"
+iteration_notes: >
+  Changes from SKY-LORA-001:
+  1. Expanded hard-negative training representation (+250 fabric/bedsheet, +150 ceiling, +100 reflection).
+  2. Increased LoRA rank from 16 to 32 and alpha from 32 to 64 to expand capacity for fine textile/weave discrimination.
+  3. Added photometric jitter and slight perspective augmentation to break texture-to-cloud mapping.
+  4. Lowered learning rate slightly (1.2e-4 vs 1.5e-4) with extended warmup to prevent catastrophic forgetting of real sky.
+
+model:
+  base_model_name_or_path: "google/gemma-4-26B-A4B-it"
+  torch_dtype: "bfloat16"
+  use_4bit: true                                  # QLoRA (NF4)
+  quantization_type: "nf4"
+  double_quant: true
+  compute_dtype: "bfloat16"
+  trust_remote_code: true
+
+dataset:
+  train_file: "dataset/train_v2.jsonl"
+  validation_file: "dataset/validation_v2.jsonl"
+  test_file: "dataset/test/labels.jsonl"          # Strictly LOCKED evaluation set
+  nightmare_file: "dataset/nightmare/labels.jsonl" # Strictly LOCKED evaluation set
+  max_seq_length: 2048
+  image_resolution: [448, 448]
+
+image_token_budget:
+  visual_token_budget: 384                        # Increased from 256 to capture subtle textile weave & ceiling borders
+  rationale: "Higher budget enables the vision encoder to detect micro-texture weave and surface creases"
+
+augmentation:
+  enabled: true
+  brightness_jitter: 0.15
+  contrast_jitter: 0.15
+  saturation_jitter: 0.10
+  jpeg_compression_quality: [55, 95]
+  perspective_distortion_scale: 0.08              # Breaks planar fabric illusion
+  horizontal_flip_prob: 0.5
+  vertical_flip_prob: 0.0                         # Disabled: maintains natural gravitational orientation
+
+peft_lora:
+  r: 32                                           # Increased from 16 (SKY-LORA-001)
+  lora_alpha: 64                                  # Increased from 32 (SKY-LORA-001)
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+    - "mm_projector"                              # Vision-language projection bridge
+
+training_args:
+  output_dir: "checkpoints/SKY-LORA-002"
+  num_train_epochs: 6                             # Increased from 5
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 1.2e-4                           # Slightly lower than 1.5e-4
+  warmup_ratio: 0.08                              # Slightly longer warmup
+  weight_decay: 0.015
+  lr_scheduler_type: "cosine"
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  logging_steps: 5
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  seed: 42

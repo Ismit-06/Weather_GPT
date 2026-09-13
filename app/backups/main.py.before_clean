@@ -1,0 +1,95 @@
+from app.routers.location_search import router as location_search_router
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import Base, engine
+
+from app.routers import (
+    weather,
+    alerts,
+    location,
+    chat,
+    ingestion,
+    real_data,
+    history,
+    features,
+    prediction,
+    multi_prediction,
+    rainfall,
+    hydrology,
+    flood_prediction,
+    hazards,
+    safety,
+    weather_chat,
+    location_search,
+)
+
+# Create database tables.
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="WeatherGPT API",
+    description="Weather intelligence and prediction backend",
+    version="1.0.0",
+)
+
+# Location geocoding/search.
+app.include_router(location_search_router)
+
+
+# Development CORS.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "WeatherGPT API",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "database": "connected",
+    }
+
+
+# Core routes.
+app.include_router(weather.router)
+app.include_router(alerts.router)
+app.include_router(location.router)
+app.include_router(chat.router)
+
+# Data ingestion / historical data.
+app.include_router(ingestion.router)
+app.include_router(real_data.router)
+app.include_router(history.router)
+app.include_router(features.router)
+
+# Prediction engines.
+app.include_router(prediction.router)
+app.include_router(multi_prediction.router)
+app.include_router(rainfall.router)
+
+# Hydrology / flood.
+app.include_router(hydrology.router)
+app.include_router(flood_prediction.router)
+
+# Risk / safety.
+app.include_router(hazards.router)
+app.include_router(safety.router)
+
+# WeatherGPT conversational intelligence.
+app.include_router(weather_chat.router)
+
+# Location search / geocoding.

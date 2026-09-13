@@ -1,0 +1,50 @@
+{
+  "release_version": "1.0.0",
+  "created_at": "2026-09-10T20:25:00Z",
+  "environment": "production",
+  "model": {
+    "base_model": "google/gemma-4-26B-A4B-it",
+    "active_adapter": "SKY-LORA-002",
+    "adapter_path": "checkpoints/SKY-LORA-002",
+    "rollback_adapter": "SKY-LORA-001",
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "quantization": "nf4",
+    "sky_confidence_threshold": 0.80,
+    "image_token_budget": 384
+  },
+  "service": {
+    "name": "sky-ai-service",
+    "version": "sky-ai-1.0.0",
+    "contract_version": "sky-observation-v1",
+    "fusion_contract_version": "fusion-v1",
+    "max_image_size_mb": 15,
+    "max_dimensions": [4096, 4096],
+    "rate_limit_per_minute": 60,
+    "max_concurrency": 10,
+    "timeout_seconds": 30,
+    "no_raw_image_persistence": true
+  },
+  "android": {
+    "namespace": "com.example.weathergpt",
+    "version_name": "1.0.0",
+    "version_code": 1,
+    "min_sdk": 26,
+    "target_sdk": 35,
+    "compile_sdk": 35,
+    "feature_flag_sky_ai": true,
+    "frame_interval_ms": 1500,
+    "compression_format": "JPEG",
+    "compression_quality": 85
+  },
+  "backend": {
+    "service_name": "WeatherGPT Backend",
+    "version": "1.0.0",
+    "framework": "FastAPI",
+    "production_host": "https://weather-gpt-ymze.onrender.com"
+  },
+  "immutable_checksums": {
+    "adapter_config_sha256": "4b971e411b058a917056637b8fb9dffbfda0583b2762b9fec549ec2a27ff8fa6",
+    "production_lock_sha256": "5c90b8f060741270274296ca8efd60060933758368ba609f9ea191ba3d97f26d"
+  }
+}

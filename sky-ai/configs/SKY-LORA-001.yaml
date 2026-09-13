@@ -1,0 +1,65 @@
+﻿# Full Multimodal LoRA Fine-Tuning Configuration for WeatherGPT Sky AI
+# Experiment ID: SKY-LORA-001
+# Base Model: google/gemma-4-26B-A4B-it (Multimodal Vision-Language)
+# Objective: Hard-negative discrimination (bedsheet/ceiling/fabric vs genuine outdoor sky)
+
+experiment_id: "SKY-LORA-001"
+
+model:
+  base_model_name_or_path: "google/gemma-4-26B-A4B-it"
+  torch_dtype: "bfloat16"
+  use_4bit: true                                  # QLoRA (NF4) for 24GB-48GB VRAM compatibility
+  quantization_type: "nf4"
+  double_quant: true
+  compute_dtype: "bfloat16"
+  trust_remote_code: true
+
+dataset:
+  train_file: "dataset/train.jsonl"
+  validation_file: "dataset/validation.jsonl"
+  test_file: "dataset/test/labels.jsonl"         # Evaluation only - strictly LOCKED
+  nightmare_file: "dataset/nightmare/labels.jsonl" # Evaluation only - strictly LOCKED
+  max_seq_length: 2048
+  image_resolution: [448, 448]
+
+image_token_budget:
+  # Gemma 4 visual-token budget: classification-oriented (low visual token budget)
+  visual_token_budget: 256                       # Low budget chosen for sky classification vs OCR
+  rationale: "Primary task is optical scene discrimination (bedsheet vs sky), not reading fine micro-text"
+
+peft_lora:
+  r: 16                                          # LoRA rank
+  lora_alpha: 32                                 # LoRA scaling factor
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+    - "mm_projector"                             # Vision-language projection bridge
+
+training_args:
+  output_dir: "checkpoints/SKY-LORA-001"
+  num_train_epochs: 5
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 1.5e-4
+  warmup_ratio: 0.06
+  weight_decay: 0.01
+  lr_scheduler_type: "cosine"
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  logging_steps: 5
+  eval_strategy: "epoch"
+  save_strategy: "epoch"
+  save_total_limit: 2
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  seed: 42

@@ -1,0 +1,1156 @@
+package com.weathergpt.app.ui.screens
+
+import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.weathergpt.app.audio.VoiceAssistantManager
+import com.weathergpt.app.data.LocationReverseClient
+import com.weathergpt.app.location.DeviceLocationProvider
+import com.weathergpt.app.location.LanguageStore
+import com.weathergpt.app.location.LocationStore
+import com.weathergpt.app.location.SelectedLocation
+import com.weathergpt.app.ui.components.GlassCard
+import com.weathergpt.app.ui.theme.BackgroundDark
+import com.weathergpt.app.ui.theme.BorderGlass
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
+import com.weathergpt.app.viewmodel.ChatViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+@Composable
+fun ChatScreen(
+    chatViewModel: ChatViewModel = viewModel()
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val uiState by chatViewModel.uiState.collectAsState()
+    val message = remember { mutableStateOf("") }
+
+    val storedLocation by LocationStore.location.collectAsState()
+    val isManualFlow by LocationStore.isManualFlow.collectAsState()
+    val activeLocation = storedLocation ?: remember { LocationStore.getLocation(context) }
+    val isManual = isManualFlow || LocationStore.isManual(context)
+
+    var showLocationDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var isDetectingLocation by remember { mutableStateOf(false) }
+
+    val selectedLanguage by LanguageStore.languageFlow.collectAsState()
+
+    suspend fun detectGpsLocation() {
+        isDetectingLocation = true
+        try {
+            val provider = DeviceLocationProvider(context)
+            val devLoc = provider.getCurrentLocation()
+            if (devLoc != null) {
+                var cityName = "Current location"
+                var stateName: String? = null
+                var countryName: String? = null
+                try {
+                    val rev = LocationReverseClient.api.reverse(devLoc.latitude, devLoc.longitude)
+                    if (!rev.name.isNullOrBlank()) cityName = rev.name
+                    stateName = rev.state
+                    countryName = rev.country
+                } catch (e: Exception) {
+                    Log.w("ChatScreen", "Reverse geocode error: ${e.message}")
+                    try {
+                        @Suppress("DEPRECATION")
+                        val geocoder = android.location.Geocoder(context, Locale.getDefault())
+                        val addrs = geocoder.getFromLocation(devLoc.latitude, devLoc.longitude, 1)
+                        val a = addrs?.firstOrNull()
+                        if (a != null) {
+                            val n = a.locality ?: a.subAdminArea ?: a.adminArea
+                            if (!n.isNullOrBlank()) cityName = n
+                            stateName = a.adminArea
+                            countryName = a.countryName
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                val newLoc = SelectedLocation(
+                    name = cityName,
+                    latitude = devLoc.latitude,
+                    longitude = devLoc.longitude,
+                    country = countryName,
+                    admin1 = stateName,
+                    timezone = "Asia/Kolkata"
+                )
+                LocationStore.useGps(context, newLoc)
+                Toast.makeText(context, "Location: $cityName", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Could not acquire GPS location.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            if (e is kotlin.coroutines.cancellation.CancellationException) throw e
+            Log.e("ChatScreen", "Location detection error", e)
+        } finally {
+            isDetectingLocation = false
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fine || coarse) {
+            coroutineScope.launch {
+                detectGpsLocation()
+            }
+        } else {
+            Toast.makeText(context, "Location permission denied. Using saved location.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val skyPhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                try {
+                    val stream = context.contentResolver.openInputStream(it)
+                    val bitmap = android.graphics.BitmapFactory.decodeStream(stream)
+                    stream?.close()
+                    if (bitmap != null) {
+                        chatViewModel.analyzeSkyImage(
+                            bitmap = bitmap,
+                            latitude = activeLocation.latitude,
+                            longitude = activeLocation.longitude,
+                            locationName = activeLocation.name,
+                            language = selectedLanguage ?: "auto"
+                        )
+                    } else {
+                        Toast.makeText(context, "Could not decode sky image.", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error loading image: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        LocationStore.initialize(context)
+        LanguageStore.initialize(context)
+        if (!LocationStore.isManual(context)) {
+            val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            if (fine || coarse) {
+                detectGpsLocation()
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        }
+    }
+
+    val voiceAssistant = remember { VoiceAssistantManager(context) }
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceAssistant.destroy()
+        }
+    }
+
+    val isListening by voiceAssistant.isListening.collectAsState()
+    val isSpeaking by voiceAssistant.isSpeaking.collectAsState()
+    val isProcessingVoice by voiceAssistant.isProcessing.collectAsState()
+    val voiceRms by voiceAssistant.rmsLevel.collectAsState()
+    var autoSpeakEnabled by remember { mutableStateOf(true) }
+
+    LaunchedEffect(voiceAssistant) {
+        voiceAssistant.onUserTranscriptFinal = { transcript, langCode ->
+            chatViewModel.setVoiceProcessing(transcript)
+        }
+        voiceAssistant.onAssistantAnswerReceived = { displayText, speechText, lang, langCode ->
+            val userQ = voiceAssistant.currentTranscript.value.ifBlank { "Voice Query" }
+            chatViewModel.updateVoiceInteraction(
+                userQuery = userQ,
+                answerText = displayText,
+                speechText = speechText,
+                language = lang,
+                languageCode = langCode
+            )
+        }
+        voiceAssistant.onErrorOccurred = { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun sendText(textToSend: String) {
+        val value = textToSend.trim()
+        if (value.isBlank() || uiState.isLoading) return
+
+        val langToSend = if (selectedLanguage.equals("Auto", ignoreCase = true)) "auto" else selectedLanguage
+
+        chatViewModel.sendMessage(
+            question = value,
+            latitude = activeLocation.latitude,
+            longitude = activeLocation.longitude,
+            locationName = activeLocation.name,
+            language = langToSend
+        )
+        message.value = ""
+    }
+
+    fun sendMessage() {
+        sendText(message.value)
+    }
+
+    val onVoiceResult: (String) -> Unit = { spokenText ->
+        val trimmed = spokenText.trim()
+        if (trimmed.isNotBlank()) {
+            sendText(trimmed)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            voiceAssistant.startListening(
+                languageCode = selectedLanguage,
+                onResult = onVoiceResult,
+                onError = { err ->
+                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            Toast.makeText(context, "Microphone permission is required for voice assistant", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun toggleVoiceListening() {
+        if (isSpeaking) {
+            voiceAssistant.stopSpeaking()
+            return
+        }
+        if (isListening) {
+            voiceAssistant.stopListening()
+        } else {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasPermission) {
+                voiceAssistant.startListening(
+                    languageCode = selectedLanguage,
+                    onResult = onVoiceResult,
+                    onError = { err ->
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            } else {
+                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    // Auto-speak responses in parallel with instant UI rendering
+    LaunchedEffect(uiState.messages.size) {
+        val lastMessage = uiState.messages.lastOrNull()
+        if (autoSpeakEnabled && lastMessage != null && lastMessage.role.lowercase() != "user" && !uiState.isLoading) {
+            val speechLang = if (!selectedLanguage.equals("Auto", ignoreCase = true)) {
+                selectedLanguage
+            } else {
+                uiState.detectedLanguageCode ?: "en-IN"
+            }
+            val textToSpeak = uiState.latestSpeechText ?: lastMessage.content
+            voiceAssistant.speak(textToSpeak, speechLang)
+        }
+    }
+
+    val currentAppLang = remember(selectedLanguage) {
+        LanguageStore.SUPPORTED_LANGUAGES.find {
+            it.code.equals(selectedLanguage, ignoreCase = true)
+        } ?: LanguageStore.SUPPORTED_LANGUAGES.first()
+    }
+
+    // Determine current Orb state for the Living Orb
+    val isBusy = uiState.isLoading || isProcessingVoice
+    val orbState = when {
+        uiState.error != null -> OrbState.ERROR
+        isBusy -> OrbState.PROCESSING
+        isSpeaking -> OrbState.AI_SPEAKING
+        isListening -> OrbState.LISTENING
+        else -> OrbState.IDLE
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundDark)
+            .padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // ──────────────────────────────────────────────────────────────────
+        // 1. HEADER + AI ORB
+        // ──────────────────────────────────────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Show large header only when idle (no messages)
+            if (uiState.messages.isEmpty() && !uiState.isLoading && uiState.error == null) {
+                Text(
+                    text = "AI ASSISTANT",
+                    color = SecondaryCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Ask WeatherGPT.",
+                    color = TextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Real-time weather answers. Smarter decisions.",
+                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            WeatherAIOrb(
+                orbState = orbState,
+                audioAmplitude = if (isListening || isSpeaking) voiceRms.coerceIn(0.15f, 1.0f) else 0.05f,
+                size = if (uiState.messages.isEmpty() && !uiState.isLoading) 180.dp else 160.dp,
+                onTap = { toggleVoiceListening() }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = when {
+                    isListening -> "Listening..."
+                    isSpeaking  -> "Responding..."
+                    isBusy      -> "Thinking..."
+                    else        -> "Tap to speak"
+                },
+                color = TextPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.2.sp
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = when {
+                    isListening -> "Speak naturally"
+                    isSpeaking  -> "Tap orb to interrupt"
+                    isBusy      -> "Analyzing atmospheric telemetry"
+                    else        -> "Ask anything about the weather"
+                },
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ──────────────────────────────────────────────────────────────────
+        // 2. LOCATION & LANGUAGE PILL CARDS  (with subtitle text)
+        // ──────────────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Location pill
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                    .clickable { showLocationDialog = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "Location",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                text = activeLocation.name.take(14)
+                                    .let { if (activeLocation.name.length > 14) "$it…" else it },
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val sub = listOfNotNull(activeLocation.admin1, activeLocation.country)
+                                .filter { it.isNotBlank() }.joinToString(", ")
+                            if (sub.isNotBlank()) {
+                                Text(
+                                    text = sub.take(22).let { if (sub.length > 22) "$it…" else it },
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            // Language pill
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+                    .clickable { showLanguageDialog = true }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Language,
+                            contentDescription = "Language",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                text = currentAppLang.englishName.take(12),
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Chat & Voice",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ──────────────────────────────────────────────────────────────────
+        // 3. DYNAMIC CONTENT AREA
+        // ──────────────────────────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            if (uiState.isLoading) {
+                GlassThinkingBubble()
+            } else if (uiState.error != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x15B85D5D))
+                        .border(1.dp, Color(0x30B85D5D), RoundedCornerShape(16.dp))
+                        .padding(14.dp)
+                ) {
+                    Text(
+                        text = uiState.error ?: "An unexpected error occurred.",
+                        color = Color(0xFFB85D5D),
+                        fontSize = 13.sp
+                    )
+                }
+            } else if (uiState.messages.isNotEmpty()) {
+                val latestAssistant = uiState.messages.findLast { !it.role.equals("user", ignoreCase = true) }
+                if (latestAssistant != null) {
+                    GlassAssistantBubble(
+                        text = latestAssistant.content,
+                        onSpeak = {
+                            if (isSpeaking) {
+                                voiceAssistant.stopSpeaking()
+                            } else {
+                                val textToSpeak = uiState.latestSpeechText ?: latestAssistant.content
+                                voiceAssistant.speak(
+                                    textToSpeak,
+                                    uiState.detectedLanguageCode
+                                )
+                            }
+                        },
+                        isSpeaking = isSpeaking,
+                        onCopy = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("WeatherGPT Response", latestAssistant.content)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+            } else {
+                // Quick suggestions — 2-col grid matching reference design
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "⭐", title = "Best time to travel?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "When is the best time to travel from ${activeLocation.name} this week?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "☂️", title = "Will it rain today?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Will it rain today in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "🏃", title = "Can I go for a run?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Can I go for a run right now in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "🧳", title = "What to pack?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "What should I pack for a trip today from ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SuggestionGlassCard(
+                            icon = "📷", title = "Photography tips?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Give me outdoor photography tips for today's weather in ${activeLocation.name}."
+                                sendMessage()
+                            }
+                        )
+                        SuggestionGlassCard(
+                            icon = "💡", title = "Why feels like this?",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                message.value = "Why does it feel hotter or colder than actual temperature in ${activeLocation.name}?"
+                                sendMessage()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // ──────────────────────────────────────────────────────────────────
+        // 4. GLASS INPUT BAR  — mic · text · mic-button · send circle
+        // ──────────────────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(26.dp))
+                .background(Color.White)
+                .border(1.dp, BorderGlass, RoundedCornerShape(26.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BasicTextField(
+                value = message.value,
+                onValueChange = { message.value = it },
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 6.dp),
+                enabled = !uiState.isLoading,
+                textStyle = TextStyle(color = TextPrimary, fontSize = 14.sp),
+                cursorBrush = SolidColor(PrimaryBlue),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                decorationBox = { innerTextField ->
+                    if (message.value.isEmpty()) {
+                        Text(
+                            text = when {
+                                isListening -> "Listening… speak now"
+                                isSpeaking  -> "WeatherGPT is speaking…"
+                                else        -> "Ask anything about weather..."
+                            },
+                            color = when {
+                                isListening -> PrimaryBlue
+                                isSpeaking  -> PrimaryBlue
+                                else        -> TextMuted
+                            },
+                            fontSize = 14.sp
+                        )
+                    }
+                    innerTextField()
+                }
+            )
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Sky Photo Analysis Button
+            Icon(
+                imageVector = Icons.Default.PhotoCamera,
+                contentDescription = "Analyze Sky Photo",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable(enabled = !uiState.isLoading) { skyPhotoLauncher.launch("image/*") }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Mic icon
+            val micPulse = rememberInfiniteTransition(label = "pulse")
+            val micScale by micPulse.animateFloat(
+                initialValue = 1.0f,
+                targetValue = 1.2f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(500, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            Icon(
+                imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                contentDescription = "Mic",
+                tint = if (isListening) Color(0xFFB85D5D) else TextSecondary,
+                modifier = Modifier
+                    .size(22.dp)
+                    .scale(if (isListening) micScale else 1f)
+                    .clickable { toggleVoiceListening() }
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Send button circle
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryBlue)
+                    .clickable(enabled = message.value.isNotBlank() && !uiState.isLoading) {
+                        sendMessage()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Send",
+                    tint = if (message.value.isNotBlank() && !uiState.isLoading) Color.White else Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+        }
+    }
+
+    if (showLocationDialog) {
+        LocationSearchDialog(
+            currentLocation = activeLocation.name,
+            onDismiss = { showLocationDialog = false },
+            isManualMode = isManual,
+            onUseCurrentLocation = {
+                val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                if (fine || coarse) {
+                    CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
+                        detectGpsLocation()
+                    }
+                } else {
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
+                }
+            },
+            onLocationSelected = { locationResult ->
+                val lat = locationResult.latitude
+                val lon = locationResult.longitude
+                if (lat != null && lon != null) {
+                    val sel = SelectedLocation(
+                        name = locationResult.name ?: "Selected Location",
+                        latitude = lat,
+                        longitude = lon,
+                        country = locationResult.country,
+                        admin1 = locationResult.admin1,
+                        timezone = "Asia/Kolkata"
+                    )
+                    LocationStore.saveLocation(context, sel, manual = true)
+                    Toast.makeText(context, "Location set to ${sel.name}", Toast.LENGTH_SHORT).show()
+                }
+                showLocationDialog = false
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguageCode = selectedLanguage,
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = { appLang ->
+                LanguageStore.saveLanguage(context, appLang.code)
+                Toast.makeText(
+                    context,
+                    "Language set to ${appLang.nativeLabel} (${appLang.englishName})",
+                    Toast.LENGTH_SHORT
+                ).show()
+                showLanguageDialog = false
+            }
+        )
+    }
+}
+
+/**
+ * 16dp Corner Radius Glass Suggestion Card
+ */
+@Composable
+private fun SuggestionGlassCard(
+    icon: String,
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(text = icon, fontSize = 16.sp)
+            Text(
+                text = title,
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextMuted,
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+@Composable
+private fun GlassUserBubble(text: String) {
+    val timeString = remember { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date()) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFE8ECEF))
+            .border(1.dp, BorderGlass, RoundedCornerShape(18.dp))
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryBlue),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "User",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = text,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            }
+
+            Text(
+                text = timeString,
+                color = TextMuted,
+                fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.Bottom)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassAssistantBubble(
+    text: String,
+    onSpeak: () -> Unit,
+    isSpeaking: Boolean,
+    onCopy: () -> Unit
+) {
+    val cleanDisplayText = remember(text) {
+        var t = text
+        if (t.contains("<think>")) {
+            t = t.replace(Regex("<think>[\\s\\S]*?</think>"), "").trim()
+        }
+
+        // Remove all emojis and unicode pictographs
+        t = t.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\uFE00-\uFE0F\u200D\u2300-\u23FF\u2B50\u2B55\u3030]"), "")
+
+        // Fix known transliteration / machine translation glitches
+        t = t.replace(Regex("(?i)\\bblowing\\s*रही\\s*है"), "चल रही है")
+        t = t.replace(Regex("(?i)\\bblowing\\s*रहा\\s*है"), "चल रहा है")
+        t = t.replace(Regex("(?i)\\bblowing\\b"), "चल रही है")
+        t = t.replace(Regex("\\b100%\\s*बादल\\s*आश्रित\\b"), "आसमान में बादल छाए हुए हैं")
+        t = t.replace(Regex("\\bगर्मी\\s+का\\s+तना(\\.\\.\\.)?|\\bगर्मी\\s+का\\s+तनाव\\b"), "गर्मी का असर कम रहेगा")
+
+        // Remove parenthetical metric dumps like (वर्षा: 0.0 mm), (2.9 m/s), (humidity: 60%), (0.0 mm)
+        t = t.replace(Regex("(?i)\\s*\\((?:वर्षा|बारिश|rain|rainfall|wind|हवा|humidity|आर्द्रता|temp|तापमान)?:?\\s*[\\d.]+\\s*(?:mm|m/s|km/h|°C|%|hPa)?\\)"), "")
+        t = t.replace(Regex("(?i)\\s*\\([\\d.]+\\s*(?:mm|m/s|km/h|°C|%|hPa)\\)"), "")
+
+        // Remove markdown formatting symbols
+        t = t.replace(Regex("[*#_`~>\\[\\]]"), "")
+
+        val lines = t.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val filtered = lines.filterNot { line ->
+            val l = line.lowercase()
+            l.startsWith("the user is asking") ||
+            l.startsWith("let me look at") ||
+            l.startsWith("looking at the data") ||
+            l.startsWith("wait, let me reconsider") ||
+            l.startsWith("hmm") ||
+            l.startsWith("i think i'm") ||
+            l.startsWith("let me just respond") ||
+            l.startsWith("i'll respond in") ||
+            l.startsWith("the user has been communicating") ||
+            l.contains("overthinking") ||
+            l.contains("respond naturally") ||
+            l.contains("weather advisory or committee") ||
+            (l.contains("could it be") && l.endsWith("?")) ||
+            l.startsWith("the weather data provided is") ||
+            l.endsWith("मौसम की स्थिति:") ||
+            l.endsWith("मौसम की कुछ बातें:") ||
+            l.endsWith("key details:")
+        }
+
+        val processedLines = filtered.mapNotNull { line ->
+            var cl = line.replace(Regex("^[-•–—\\d.)]+\\s*"), "").trim()
+            if (cl.matches(Regex("(?i).*(?:मौसम की स्थिति|मौसम की कुछ बातें|मुख्य बातें|key details)[:\\s]*$"))) {
+                null
+            } else {
+                cl = cl.replace(Regex("(?i)(?:मौसम की कुछ बातें देखें|यहाँ कुछ बातें देखें|Here are a few points)[:\\s]*"), "")
+                cl = cl.replace(Regex("\\s*[—–]\\s*"), "। ")
+                cl.trim().ifEmpty { null }
+            }
+        }
+
+        var result = if (processedLines.isNotEmpty()) processedLines.joinToString(" ") else t
+        result = result.replace(Regex("\\s+"), " ")
+        result = result.replace(Regex("([।!?.,])\\s*([।!?.,])+"), "$1")
+        result = result.replace(Regex("\\s+([।!?.,])"), "$1")
+        result.trim()
+    }
+
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(20.dp))
+            .padding(16.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(PrimaryBlue),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Cloud,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+
+                Text(
+                    text = "WeatherGPT",
+                    color = PrimaryBlue,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = cleanDisplayText,
+                color = TextPrimary,
+                fontSize = 14.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Normal
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy",
+                        tint = TextMuted,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onSpeak,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSpeaking) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = "Speak",
+                        tint = if (isSpeaking) PrimaryBlue else TextMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
+                Box {
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Copy full response", color = TextPrimary) },
+                            onClick = {
+                                onCopy()
+                                showMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlassThinkingBubble() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.85f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(1.dp, BorderGlass, RoundedCornerShape(16.dp))
+            .padding(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = PrimaryBlue,
+                strokeWidth = 2.dp
+            )
+            Text(
+                text = "WeatherGPT is analyzing telemetry...",
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
+        }
+    }
+}

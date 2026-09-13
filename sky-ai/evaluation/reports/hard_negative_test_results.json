@@ -1,0 +1,162 @@
+{
+  "INDOOR": [
+    {
+      "label": "white_ceiling",
+      "sky_detected": false,
+      "confidence": 0.01,
+      "scene_type": "ceiling",
+      "correct_rejection": true
+    },
+    {
+      "label": "blue_ceiling",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "textured_ceiling",
+      "sky_detected": false,
+      "confidence": 0.01,
+      "scene_type": "ceiling",
+      "correct_rejection": true
+    },
+    {
+      "label": "painted_wall",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "blue_wall",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "white_wall",
+      "sky_detected": false,
+      "confidence": 0.01,
+      "scene_type": "ceiling",
+      "correct_rejection": true
+    },
+    {
+      "label": "grey_wall",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "curtain",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "blanket",
+      "sky_detected": false,
+      "confidence": 0.0,
+      "scene_type": "indoor_surface",
+      "correct_rejection": true
+    },
+    {
+      "label": "carpet",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "floor_wood",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    }
+  ],
+  "WINDOW_AND_SCREEN": [
+    {
+      "label": "window_reflection",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "screen_displaying_sky",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "tv_showing_clouds",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "laptop_screen",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    }
+  ],
+  "OUTDOOR_NON_SKY": [
+    {
+      "label": "ocean_water",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "lake_water",
+      "sky_detected": true,
+      "confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "correct_rejection": false
+    },
+    {
+      "label": "snow_ground",
+      "sky_detected": false,
+      "confidence": 0.01,
+      "scene_type": "ceiling",
+      "correct_rejection": true
+    },
+    {
+      "label": "concrete_road",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "building_facade",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "roof_tiles",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    },
+    {
+      "label": "vegetation_trees",
+      "sky_detected": false,
+      "confidence": 0.02,
+      "scene_type": "bedsheet",
+      "correct_rejection": true
+    }
+  ]
+}

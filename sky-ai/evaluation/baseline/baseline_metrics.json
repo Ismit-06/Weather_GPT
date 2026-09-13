@@ -1,0 +1,27 @@
+{
+  "model": "google/gemma-4-26b-a4b-it:free",
+  "total_test_images": 0,
+  "correct": 0,
+  "incorrect": 0,
+  "accuracy": 0.0,
+  "sky_detection_metrics": {
+    "true_positive": 0,
+    "true_negative": 0,
+    "false_positive": 0,
+    "false_negative": 0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0
+  },
+  "rates": {
+    "false_sky_rate": 0.0,
+    "nightmare_false_sky_rate": 0.0,
+    "category_breakdown": {}
+  },
+  "confidence_distribution": {
+    "genuine_sky": {},
+    "non_sky": {}
+  },
+  "high_confidence_false_sky_count": 0,
+  "total_failures": 0
+}

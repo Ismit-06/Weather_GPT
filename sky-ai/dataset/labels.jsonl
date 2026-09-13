@@ -1,0 +1,4 @@
+{"image": "nightmare/bedsheet/known_bedsheet_failure_001.png", "ground_truth": {"sky_detected": false, "scene_type": "bedsheet", "cloud_condition": "not_applicable"}}
+{"image": "test/non_sky/sample_ceiling_001.jpg", "ground_truth": {"sky_detected": false, "scene_type": "ceiling", "cloud_condition": "not_applicable"}}
+{"image": "test/non_sky/sample_fabric_001.jpg", "ground_truth": {"sky_detected": false, "scene_type": "fabric", "cloud_condition": "not_applicable"}}
+{"image": "test/sky/sample_sky_001.jpg", "ground_truth": {"sky_detected": true, "scene_type": "outdoor_sky", "cloud_condition": "partly_cloudy"}}

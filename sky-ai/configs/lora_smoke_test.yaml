@@ -1,0 +1,56 @@
+﻿# Gemma 4 26B A4B Multimodal LoRA Smoke Test Configuration
+# Experiment ID: SKY-LORA-001-SMOKE
+# Objective: Minimal verification of model loading, multimodal batches, forward/backward pass & checkpoint saving
+
+experiment_id: "SKY-LORA-001-SMOKE"
+
+model:
+  base_model_name_or_path: "google/gemma-4-26B-A4B-it"
+  torch_dtype: "bfloat16"
+  use_4bit: true                                  # QLoRA for memory containment
+  quantization_type: "nf4"
+  double_quant: true
+  compute_dtype: "bfloat16"
+
+dataset:
+  train_file: "dataset/train.jsonl"
+  validation_file: "dataset/validation.jsonl"
+  max_train_samples: 25                          # Smoke test slice
+  max_val_samples: 10                            # Smoke test slice
+  max_seq_length: 1024
+  image_resolution: [448, 448]
+
+peft_lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+    - "mm_projector"
+
+training_args:
+  output_dir: "checkpoints/SKY-LORA-001"
+  num_train_epochs: 1
+  max_steps: 10                                  # Smoke test step cap
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  warmup_steps: 2
+  logging_steps: 1
+  save_steps: 10
+  eval_steps: 5
+  eval_strategy: "steps"
+  save_strategy: "steps"
+  fp16: false
+  bf16: true
+  gradient_checkpointing: true
+  seed: 42

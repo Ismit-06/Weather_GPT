@@ -1,0 +1,65 @@
+[
+  {
+    "label": "clear_blue_sky",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  },
+  {
+    "label": "partly_cloudy",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  },
+  {
+    "label": "overcast_sky",
+    "sky_detected": false,
+    "confidence": 0.02,
+    "cloud_condition": null,
+    "cloud_coverage": null
+  },
+  {
+    "label": "dark_storm_sky",
+    "sky_detected": false,
+    "confidence": 0.02,
+    "cloud_condition": null,
+    "cloud_coverage": null
+  },
+  {
+    "label": "sunrise_sunset",
+    "sky_detected": false,
+    "confidence": 0.02,
+    "cloud_condition": null,
+    "cloud_coverage": null
+  },
+  {
+    "label": "sky_with_trees",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  },
+  {
+    "label": "sky_with_buildings",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  },
+  {
+    "label": "sky_with_wires",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  },
+  {
+    "label": "partially_obstructed_sky",
+    "sky_detected": true,
+    "confidence": 0.95,
+    "cloud_condition": "clear",
+    "cloud_coverage": 0.05
+  }
+]

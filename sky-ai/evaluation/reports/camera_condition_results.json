@@ -1,0 +1,82 @@
+[
+  {
+    "test": "underexposed_low_light",
+    "res": {
+      "request_id": "6a8f99c6-6ace-46fe-8063-98d7c89e6924",
+      "sky_detected": false,
+      "sky_confidence": 0.02,
+      "scene_type": "bedsheet",
+      "cloud_condition": null,
+      "cloud_coverage": null,
+      "visible_precipitation": false,
+      "horizon_visible": false,
+      "obstruction": "none",
+      "image_quality": "good",
+      "model_version": "SKY-LORA-002"
+    }
+  },
+  {
+    "test": "overexposed_flare",
+    "res": {
+      "request_id": "d1b9bb4f-db11-467b-9ffd-83ce40fe7e4b",
+      "sky_detected": false,
+      "sky_confidence": 0.01,
+      "scene_type": "ceiling",
+      "cloud_condition": null,
+      "cloud_coverage": null,
+      "visible_precipitation": false,
+      "horizon_visible": false,
+      "obstruction": "none",
+      "image_quality": "good",
+      "model_version": "SKY-LORA-002"
+    }
+  },
+  {
+    "test": "severe_motion_blur",
+    "res": {
+      "request_id": "72eb67b5-3143-4a51-b3bf-5b5ae0d4a692",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "cloud_coverage": 0.05,
+      "visible_precipitation": false,
+      "horizon_visible": true,
+      "obstruction": "none",
+      "image_quality": "good",
+      "model_version": "SKY-LORA-002"
+    }
+  },
+  {
+    "test": "heavy_jpeg_artifacts",
+    "res": {
+      "request_id": "1d805973-758c-4cf1-b055-9fc84b8ac213",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "cloud_coverage": 0.05,
+      "visible_precipitation": false,
+      "horizon_visible": true,
+      "obstruction": "none",
+      "image_quality": "good",
+      "model_version": "SKY-LORA-002"
+    }
+  },
+  {
+    "test": "night_sky",
+    "res": {
+      "request_id": "0277010e-0d47-4b0c-82a1-a9b0dc080221",
+      "sky_detected": false,
+      "sky_confidence": 0.02,
+      "scene_type": "bedsheet",
+      "cloud_condition": null,
+      "cloud_coverage": null,
+      "visible_precipitation": false,
+      "horizon_visible": false,
+      "obstruction": "none",
+      "image_quality": "good",
+      "model_version": "SKY-LORA-002"
+    }
+  }
+]

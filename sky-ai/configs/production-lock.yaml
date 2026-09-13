@@ -1,0 +1,43 @@
+# Production Configuration Lock
+# WeatherGPT Sky AI - Phase 8 Production Release Lock
+
+model:
+  base_model_id: "google/gemma-4-26B-A4B-it"
+  adapter_path: "checkpoints/SKY-LORA-002"
+  model_version: "SKY-LORA-002"
+  lora_rank: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  quantization: "nf4"
+
+vision:
+  image_token_budget: 384
+  max_input_dimension: 4096
+  min_input_dimension: 64
+  preprocessing_target_size: [512, 512]
+  preserve_aspect_ratio: true
+
+gate:
+  sky_confidence_threshold: 0.80
+  strict_validation: true
+  rejection_classes:
+    - "bedsheet"
+    - "fabric"
+    - "ceiling"
+    - "indoor_surface"
+    - "wall"
+    - "floor"
+
+service:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  request_timeout_seconds: 30
+  max_image_size_mb: 15
+  save_debug_images: false
+
+client_android:
+  analysis_throttle_ms: 1500
+  compression_format: "JPEG"
+  compression_quality: 85
+  timeout_seconds: 15

@@ -1,0 +1,26 @@
+model:
+  base_model_name: google/gemma-4-26B-A4B-it
+  adapter_path: checkpoints/SKY-LORA-002
+  selected_model_version: SKY-LORA-002
+  dtype: bfloat16
+  load_in_4bit: true
+  max_sequence_length: 4096
+  visual_token_budget: 384
+service:
+  host: 0.0.0.0
+  port: 8000
+  workers: 2
+  timeout_seconds: 30
+  cors_origins:
+  - '*'
+inference:
+  sky_confidence_threshold: 0.8
+  min_image_dimension: 64
+  max_image_dimension: 4096
+  max_payload_bytes: 10485760
+  temperature: 0.0
+  max_new_tokens: 256
+logging:
+  level: INFO
+  format: json
+  enable_request_tracing: true

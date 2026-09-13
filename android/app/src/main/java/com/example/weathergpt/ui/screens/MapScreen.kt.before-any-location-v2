@@ -1,0 +1,3296 @@
+package com.example.weathergpt.ui.screens
+
+import android.graphics.Color as AndroidColor
+import org.osmdroid.views.overlay.Overlay
+import org.osmdroid.views.overlay.Polygon
+import android.view.View
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.weathergpt.data.WeatherApiClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import org.osmdroid.config.Configuration
+import org.osmdroid.views.overlay.TilesOverlay
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.MapTileProviderBasic
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import java.net.HttpURLConnection
+import java.net.URL
+
+private const val BACKEND_URL =
+    "https://weather-gpt-jfpk.onrender.com"
+
+private data class DamMarkerData(
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val state: String?,
+    val storagePercent: Double?,
+    val level: Double?
+)
+
+private data class EarthquakeMarkerData(
+    val latitude: Double,
+    val longitude: Double,
+    val magnitude: Double?,
+    val place: String?,
+    val depthKm: Double?
+)
+
+private data class FloodMapData(
+    val latitude: Double,
+    val longitude: Double,
+    val risk: String,
+    val currentWaterLevel: Double?,
+    val warningLevel: Double?,
+    val dangerLevel: Double?
+)
+
+private data class AlertMarkerData(
+    val latitude: Double,
+    val longitude: Double,
+    val title: String,
+    val severity: String,
+    val description: String?
+)
+
+private data class AreaAnalysis(
+    val latitude: Double,
+    val longitude: Double,
+    val temperature: Double?,
+    val rainfallProbability: Double?,
+    val floodRisk: String?,
+    val overallRisk: String?,
+    val recommendation: String?
+)
+
+private data class AreaWeatherData(
+    val temperature: Double?,
+    val rainfallProbability: Double?
+)
+
+@Composable
+fun MapScreen() {
+
+    val defaultLocation =
+        GeoPoint(
+            16.5062,
+            80.6480
+        )
+
+    var selectedLayer by remember {
+        mutableStateOf("Weather")
+    }
+
+    var mapView by remember {
+        mutableStateOf<MapView?>(null)
+    }
+
+    var dams by remember {
+        mutableStateOf(
+            emptyList<DamMarkerData>()
+        )
+    }
+
+    var earthquakes by remember {
+        mutableStateOf(
+            emptyList<EarthquakeMarkerData>()
+        )
+    }
+
+    var floodData by remember {
+        mutableStateOf<FloodMapData?>(null)
+    }
+
+    var alerts by remember {
+        mutableStateOf(
+            emptyList<AlertMarkerData>()
+        )
+    }
+
+    var mapReady by remember {
+        mutableStateOf(false)
+    }
+
+    var loadingLayer by remember {
+        mutableStateOf(false)
+    }
+
+    var analyzingArea by remember {
+        mutableStateOf(false)
+    }
+
+    var areaAnalysis by remember {
+        mutableStateOf<AreaAnalysis?>(null)
+    }
+
+    var rainTilesOverlay by remember {
+        mutableStateOf<TilesOverlay?>(null)
+    }
+
+    Configuration
+        .getInstance()
+        .userAgentValue =
+        "WeatherGPT/1.0"
+
+    /*
+     * Load live dam data when Dams is selected.
+     */
+    LaunchedEffect(
+        selectedLayer
+    ) {
+
+        if (selectedLayer != "Dams") {
+            return@LaunchedEffect
+        }
+
+        loadingLayer = true
+
+        if (selectedLayer == "Dams") {
+
+            dams =
+                try {
+
+                    fetchDams()
+
+                } catch (_: Exception) {
+
+                    emptyList()
+                }
+        }
+
+        if (selectedLayer == "Quakes") {
+
+            earthquakes =
+                try {
+
+                    fetchEarthquakes()
+
+                } catch (_: Exception) {
+
+                    emptyList()
+                }
+        }
+
+        if (selectedLayer == "Rain") {
+
+            try {
+
+                loadingLayer = true
+
+                val overlay =
+                    buildRainOverlay()
+
+                rainTilesOverlay =
+                    overlay
+
+                mapView?.overlays?.add(
+                    overlay
+                )
+
+                mapView?.invalidate()
+
+            } catch (_: Exception) {
+
+                rainTilesOverlay = null
+
+            }
+        }
+
+        if (selectedLayer == "Flood") {
+
+            floodData =
+                try {
+                    fetchFloodData(
+                        latitude =
+                            defaultLocation.latitude,
+
+                        longitude =
+                            defaultLocation.longitude
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+
+            mapView?.let { view ->
+
+                val data =
+                    floodData
+
+                if (data != null) {
+
+                    addFloodOverlay(
+                        view,
+                        data
+                    )
+                }
+            }
+        }
+
+        if (selectedLayer == "Alerts") {
+
+            alerts =
+                try {
+
+                    fetchAlerts()
+
+                } catch (_: Exception) {
+
+                    emptyList()
+                }
+
+            mapView?.let { view ->
+
+                addAlertMarkers(
+                    view,
+                    alerts
+                )
+            }
+        }
+
+        loadingLayer = false
+
+        if (mapReady) {
+            mapView?.let { addDamMarkers(it, dams) }
+        }
+    }
+
+    /*
+     * Update markers whenever the selected layer changes.
+     */
+    LaunchedEffect(
+        selectedLayer,
+        mapReady,
+        dams
+    ) {
+
+        val view = mapView ?: return@LaunchedEffect
+
+        clearDataMarkers(view)
+
+        val existingRain =
+            rainTilesOverlay
+
+        if (
+            selectedLayer != "Rain" &&
+            existingRain != null
+        ) {
+            view.overlays.remove(
+                existingRain
+            )
+
+            rainTilesOverlay = null
+        }
+
+        if (selectedLayer != "Flood") {
+
+            removeFloodOverlays(view)
+        }
+
+        when (selectedLayer) {
+
+            "Dams" -> {
+                addDamMarkers(
+                    view,
+                    dams
+                )
+            }
+
+            "Quakes" -> {
+                addEarthquakeMarkers(
+                    view,
+                    earthquakes
+                )
+            }
+
+            "Alerts" -> {
+                addAlertMarkers(
+                    view,
+                    alerts
+                )
+            }
+        }
+
+        view.invalidate()
+    }
+
+    Box(
+        modifier =
+            Modifier.fillMaxSize()
+    ) {
+
+        AndroidView(
+
+            modifier =
+                Modifier.fillMaxSize(),
+
+            factory = { context ->
+
+                MapView(context).apply {
+
+                    setTileSource(
+                        TileSourceFactory.MAPNIK
+                    )
+
+                    setMultiTouchControls(true)
+
+                    controller.setZoom(
+                        11.0
+                    )
+
+                    controller.setCenter(
+                        defaultLocation
+                    )
+
+                    val compass =
+                        CompassOverlay(
+                            context,
+                            this
+                        )
+
+                    compass.enableCompass()
+
+                    overlays.add(
+                        compass
+                    )
+
+                    val centerMarker =
+                        Marker(this)
+
+                    centerMarker.position =
+                        defaultLocation
+
+                    centerMarker.title =
+                        "WeatherGPT"
+
+                    centerMarker.snippet =
+                        "Smart weather intelligence"
+
+                    overlays.add(
+                        centerMarker
+                    )
+
+                    mapView = this
+                    mapReady = true
+
+                    invalidate()
+                }
+            },
+
+            update = { view ->
+
+                mapView = view
+                mapReady = true
+            }
+        )
+
+        // =========================================================
+        // HEADER
+        // =========================================================
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 14.dp,
+                        vertical = 12.dp
+                    ),
+
+            shape =
+                RoundedCornerShape(18.dp),
+
+            color =
+                Color.White.copy(
+                    alpha = 0.96f
+                )
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.padding(
+                        horizontal = 14.dp,
+                        vertical = 11.dp
+                    ),
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween,
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Column(
+                    modifier =
+                        Modifier.weight(1f)
+                ) {
+
+                    Text(
+                        text =
+                            "SMART MAP",
+
+                        color =
+                            Color(0xFF087F8C),
+
+                        fontSize = 10.sp
+                    )
+
+                    Text(
+                        text =
+                            "Weather intelligence",
+
+                        color =
+                            Color(0xFF17212B),
+
+                        fontSize = 18.sp
+                    )
+
+                    Text(
+                        text =
+                            if (loadingLayer) {
+                                "Loading live layer..."
+                            } else {
+                                "OpenStreetMap • Live data"
+                            },
+
+                        color =
+                            Color(0xFF71808F),
+
+                        fontSize = 11.sp
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+
+                        mapView?.controller?.animateTo(
+                            defaultLocation
+                        )
+                    }
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Default.Cloud,
+
+                        contentDescription =
+                            "Center map",
+
+                        tint =
+                            Color(0xFF137CBD)
+                    )
+                }
+            }
+        }
+
+        // =========================================================
+        // LAYERS
+        // =========================================================
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopCenter
+                    )
+                    .padding(
+                        top = 108.dp,
+                        start = 12.dp,
+                        end = 12.dp
+                    ),
+
+            shape =
+                RoundedCornerShape(16.dp),
+
+            color =
+                Color.White.copy(
+                    alpha = 0.94f
+                )
+        ) {
+
+            Row(
+
+                modifier =
+                    Modifier
+                        .horizontalScroll(
+                            rememberScrollState()
+                        )
+                        .padding(
+                            horizontal = 8.dp,
+                            vertical = 7.dp
+                        ),
+
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+
+                LayerChip(
+                    "Weather",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Weather"
+                    }
+                )
+
+                LayerChip(
+                    "Rain",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Rain"
+                    }
+                )
+
+                LayerChip(
+                    "Flood",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Flood"
+                    }
+                )
+
+                LayerChip(
+                    "Alerts",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Alerts"
+                    }
+                )
+
+                LayerChip(
+                    "Dams",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Dams"
+                    }
+                )
+
+                LayerChip(
+                    "Quakes",
+                    selectedLayer,
+                    onClick = {
+                        selectedLayer = "Quakes"
+                    }
+                )
+            }
+        }
+
+        // =========================================================
+        // AREA ANALYSIS CARD
+        // =========================================================
+
+        if (areaAnalysis != null) {
+
+            Surface(
+
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.BottomCenter
+                        )
+                        .padding(
+                            start = 14.dp,
+                            end = 14.dp,
+                            bottom = 72.dp
+                        )
+                        .fillMaxWidth(),
+
+                shape =
+                    RoundedCornerShape(22.dp),
+
+                color =
+                    Color(0xF8FFFFFF)
+            ) {
+
+                Column(
+                    modifier =
+                        Modifier.padding(
+                            16.dp
+                        )
+                ) {
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween,
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+
+                        Column {
+
+                            Text(
+                                text =
+                                    "AREA INTELLIGENCE",
+
+                                color =
+                                    Color(0xFF087F8C),
+
+                                fontSize =
+                                    9.sp
+                            )
+
+                            Text(
+                                text =
+                                    "Selected area",
+
+                                color =
+                                    Color(0xFF17212B),
+
+                                fontSize =
+                                    18.sp
+                            )
+
+                            Text(
+                                text =
+                                    "Live weather intelligence • Vijayawada data",
+
+                                color =
+                                    Color(0xFF71808F),
+
+                                fontSize =
+                                    9.sp
+                            )
+
+                            Text(
+                                text =
+                                    "%.4f, %.4f"
+                                        .format(
+                                            areaAnalysis!!.latitude,
+                                            areaAnalysis!!.longitude
+                                        ),
+
+                                color =
+                                    Color(0xFF71808F),
+
+                                fontSize =
+                                    9.sp
+                            )
+                        }
+
+                        Text(
+                            text =
+                                areaAnalysis!!.overallRisk
+                                    ?: "UNKNOWN",
+
+                            color =
+                                when (
+                                    areaAnalysis!!.overallRisk
+                                        ?.uppercase()
+                                ) {
+
+                                    "HIGH",
+                                    "SEVERE" ->
+                                        Color(0xFFD63B3B)
+
+                                    "MODERATE",
+                                    "MEDIUM" ->
+                                        Color(0xFFE58A13)
+
+                                    else ->
+                                        Color(0xFF1A9B70)
+                                },
+
+                            fontSize =
+                                11.sp
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(12.dp)
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+
+                        AreaMetric(
+                            label = "TEMP",
+
+                            value =
+                                areaAnalysis!!
+                                    .temperature
+                                    ?.let {
+                                        "${"%.1f".format(it)}°C"
+                                    }
+                                    ?: "--",
+
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+                        AreaMetric(
+                            label = "RAIN",
+
+                            value =
+                                areaAnalysis!!
+                                    .rainfallProbability
+                                    ?.let {
+                                        "${"%.0f".format(it)}%"
+                                    }
+                                    ?: "--",
+
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+                        AreaMetric(
+                            label = "FLOOD",
+
+                            value =
+                                areaAnalysis!!
+                                    .floodRisk
+                                    ?.uppercase()
+                                    ?: "--",
+
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(12.dp)
+                    )
+
+                    Text(
+                        text =
+                            "RECOMMENDATION",
+
+                        color =
+                            Color(0xFF087F8C),
+
+                        fontSize =
+                            9.sp
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text =
+                            areaAnalysis!!
+                                .recommendation
+                                ?: "Continue monitoring local weather conditions.",
+
+                        color =
+                            Color(0xFF465563),
+
+                        fontSize =
+                            12.sp,
+
+                        lineHeight =
+                            18.sp
+                    )
+                }
+            }
+        }
+
+        // =========================================================
+        // SELECTED LAYER
+        // =========================================================
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomStart
+                    )
+                    .padding(
+                        start = 14.dp,
+                        bottom = 16.dp
+                    ),
+
+            shape =
+                RoundedCornerShape(18.dp),
+
+            color =
+                Color.White.copy(
+                    alpha = 0.96f
+                )
+        ) {
+
+            Row(
+                modifier =
+                    Modifier.padding(
+                        horizontal = 14.dp,
+                        vertical = 11.dp
+                    ),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                LayerIcon(
+                    selectedLayer
+                )
+
+                Column(
+                    modifier =
+                        Modifier.padding(
+                            start = 9.dp
+                        )
+                ) {
+
+                    Text(
+                        text =
+                            selectedLayer.uppercase(),
+
+                        color =
+                            Color(0xFF087F8C),
+
+                        fontSize = 9.sp
+                    )
+
+                    Text(
+                        text =
+                            when (selectedLayer) {
+
+                                "Dams" ->
+                                    if (dams.isEmpty()) {
+                                        "No dam data loaded"
+                                    } else {
+                                        "${dams.size} reservoirs"
+                                    }
+
+                                "Quakes" ->
+                                    if (earthquakes.isEmpty()) {
+                                        "No earthquake data loaded"
+                                    } else {
+                                        "${earthquakes.size} earthquakes"
+                                    }
+
+                                "Alerts" ->
+                                    if (alerts.isEmpty()) {
+                                        "No mapped alerts"
+                                    } else {
+                                        "${alerts.size} active warnings"
+                                    }
+
+                                "Flood" ->
+                                    floodData?.risk
+                                        ?: "Flood-risk zones"
+
+                                "Rain" ->
+                                    "Live radar precipitation"
+
+                                else ->
+                                    "Current weather"
+                            },
+
+                        color =
+                            Color(0xFF17212B),
+
+                        fontSize =
+                            12.sp
+                    )
+                }
+            }
+        }
+
+        // =========================================================
+        // ANALYZE THIS AREA
+        // =========================================================
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomCenter
+                    )
+                    .padding(
+                        bottom = 18.dp
+                    ),
+
+            shape =
+                RoundedCornerShape(24.dp),
+
+            color =
+                Color(0xFF137CBD)
+        ) {
+
+            androidx.compose.material3.Button(
+                onClick = {
+
+                    val center =
+                        mapView?.mapCenter?.let {
+                            GeoPoint(
+                                it.latitude,
+                                it.longitude
+                            )
+                        }
+                            ?: defaultLocation
+
+                    analyzingArea = true
+                    areaAnalysis = null
+
+                    kotlinx.coroutines.CoroutineScope(
+                        Dispatchers.Main
+                    ).launch {
+
+                        areaAnalysis =
+                            try {
+
+                                analyzeArea(
+                                    latitude =
+                                        center.latitude,
+
+                                    longitude =
+                                        center.longitude
+                                )
+
+                            } catch (_: Exception) {
+
+                                AreaAnalysis(
+                                    latitude =
+                                        center.latitude,
+
+                                    longitude =
+                                        center.longitude,
+
+                                    temperature =
+                                        null,
+
+                                    rainfallProbability =
+                                        null,
+
+                                    floodRisk =
+                                        null,
+
+                                    overallRisk =
+                                        "UNAVAILABLE",
+
+                                    recommendation =
+                                        "Unable to load live weather intelligence. " +
+                                        "Check your internet connection and try again."
+                                )
+                            }
+
+                        analyzingArea = false
+                    }
+                },
+
+                colors =
+                    androidx.compose.material3.ButtonDefaults
+                        .buttonColors(
+                            containerColor =
+                                Color.Transparent
+                        ),
+
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(
+                            horizontal = 20.dp,
+                            vertical = 10.dp
+                        )
+            ) {
+
+                Text(
+                    text =
+                        if (analyzingArea) {
+                            "Analyzing..."
+                        } else {
+                            "✦  Analyze This Area"
+                        },
+
+                    color =
+                        Color.White,
+
+                    fontSize = 13.sp
+                )
+            }
+        }
+
+        // =========================================================
+        // REFRESH
+        // =========================================================
+
+        Surface(
+
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomEnd
+                    )
+                    .padding(
+                        end = 14.dp,
+                        bottom = 16.dp
+                    ),
+
+            shape =
+                CircleShape,
+
+            color =
+                Color.White.copy(
+                    alpha = 0.96f
+                )
+        ) {
+
+            IconButton(
+                onClick = {
+
+                    if (
+                        selectedLayer == "Dams" ||
+                        selectedLayer == "Quakes" ||
+                        selectedLayer == "Alerts"
+                    ) {
+
+                        loadingLayer =
+                            true
+
+                        mapView?.let {
+                            clearDataMarkers(it)
+                        }
+
+                    }
+                }
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Default.Refresh,
+
+                    contentDescription =
+                        "Refresh map",
+
+                    tint =
+                        Color(0xFF137CBD)
+                )
+            }
+        }
+    }
+}
+
+
+// =================================================================
+// ANALYSIS METRIC
+// =================================================================
+
+@Composable
+private fun AnalysisMetric(
+    label: String,
+    value: String
+) {
+
+    Surface(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
+
+        shape =
+            RoundedCornerShape(12.dp),
+
+        color =
+            Color(0xFFF1F6FA)
+    ) {
+
+        Column(
+            modifier =
+                Modifier.padding(
+                    9.dp
+                )
+        ) {
+
+            Text(
+                text =
+                    label.uppercase(),
+
+                color =
+                    Color(0xFF71808F),
+
+                fontSize = 8.sp
+            )
+
+            Text(
+                text =
+                    value,
+
+                color =
+                    Color(0xFF17212B),
+
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+
+// =================================================================
+// AREA METRIC
+// =================================================================
+
+@Composable
+private fun AreaMetric(
+    label: String,
+    value: String,
+    modifier: Modifier
+) {
+
+    Surface(
+
+        modifier =
+            modifier,
+
+        shape =
+            RoundedCornerShape(13.dp),
+
+        color =
+            Color(0xFFF1F6FA)
+    ) {
+
+        Column(
+            modifier =
+                Modifier.padding(
+                    10.dp
+                )
+        ) {
+
+            Text(
+                text =
+                    label,
+
+                color =
+                    Color(0xFF71808F),
+
+                fontSize =
+                    8.sp
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(2.dp)
+            )
+
+            Text(
+                text =
+                    value,
+
+                color =
+                    Color(0xFF17212B),
+
+                fontSize =
+                    13.sp
+            )
+        }
+    }
+}
+
+
+// =================================================================
+// LAYER CHIP
+// =================================================================
+
+@Composable
+private fun LayerChip(
+    text: String,
+    selectedLayer: String,
+    onClick: () -> Unit
+) {
+
+    FilterChip(
+        selected =
+            selectedLayer == text,
+
+        onClick =
+            onClick,
+
+        label = {
+
+            Text(
+                text = text,
+                fontSize = 11.sp
+            )
+        }
+    )
+}
+
+
+// =================================================================
+// LAYER ICON
+// =================================================================
+
+@Composable
+private fun LayerIcon(
+    layer: String
+) {
+
+    val icon =
+        when (layer) {
+
+            "Rain" ->
+                Icons.Default.WaterDrop
+
+            "Flood" ->
+                Icons.Default.Warning
+
+            "Alerts" ->
+                Icons.Default.Warning
+
+            "Dams" ->
+                Icons.Default.WaterDrop
+
+            "Quakes" ->
+                Icons.Default.Warning
+
+            else ->
+                Icons.Default.Cloud
+        }
+
+    Icon(
+        imageVector =
+            icon,
+
+        contentDescription =
+            layer,
+
+        tint =
+            Color(0xFF137CBD),
+
+        modifier =
+            Modifier.size(21.dp)
+    )
+}
+
+
+// =================================================================
+// NETWORK
+// =================================================================
+
+private suspend fun fetchDams():
+    List<DamMarkerData> =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val url =
+            URL(
+                "$BACKEND_URL/dams?limit=200"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in
+                    200..299
+            ) {
+                throw RuntimeException(
+                    "Dams request failed: HTTP $code"
+                )
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            parseDams(
+                JSONObject(body)
+            )
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// =================================================================
+// RAINVIEWER RADAR
+// =================================================================
+
+private suspend fun fetchRainViewerFrame():
+    Pair<String, String>? =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val url =
+            URL(
+                "https://api.rainviewer.com/public/weather-maps.json"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in 200..299
+            ) {
+                return@withContext null
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            val root =
+                JSONObject(body)
+
+            val host =
+                root.optString(
+                    "host",
+                    ""
+                )
+
+            val radar =
+                root.optJSONObject(
+                    "radar"
+                )
+                    ?: return@withContext null
+
+            val past =
+                radar.optJSONArray(
+                    "past"
+                )
+                    ?: return@withContext null
+
+            if (past.length() == 0) {
+                return@withContext null
+            }
+
+            val latest =
+                past.getJSONObject(
+                    past.length() - 1
+                )
+
+            val path =
+                latest.optString(
+                    "path",
+                    ""
+                )
+
+            if (
+                host.isBlank() ||
+                path.isBlank()
+            ) {
+                return@withContext null
+            }
+
+            Pair(
+                host,
+                path
+            )
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// =================================================================
+// RAIN TILE OVERLAY
+// =================================================================
+
+private suspend fun buildRainOverlay():
+    TilesOverlay =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val frame =
+            fetchRainViewerFrame()
+
+        if (frame == null) {
+
+            throw RuntimeException(
+                "Rain radar unavailable"
+            )
+        }
+
+        val host =
+            frame.first
+
+        val path =
+            frame.second
+
+        val source =
+            object :
+                OnlineTileSourceBase(
+                    "RainViewer",
+                    1,
+                    7,
+                    256,
+                    ".png",
+                    arrayOf(
+                        host
+                    )
+                ) {
+
+                    override fun getTileURLString(
+                        pMapTileIndex: Long
+                    ): String {
+
+                        val z =
+                            org.osmdroid.util.MapTileIndex
+                                .getZoom(
+                                    pMapTileIndex
+                                )
+
+                        val x =
+                            org.osmdroid.util.MapTileIndex
+                                .getX(
+                                    pMapTileIndex
+                                )
+
+                        val y =
+                            org.osmdroid.util.MapTileIndex
+                                .getY(
+                                    pMapTileIndex
+                                )
+
+                        return "$host$path/256/$z/$x/$y/2/1_1.png"
+                    }
+                }
+
+        val provider =
+            MapTileProviderBasic(
+                android.app.Application()
+            )
+
+        val overlay =
+            TilesOverlay(
+                provider,
+                null
+            )
+
+        overlay.setLoadingBackgroundColor(
+            AndroidColor.TRANSPARENT
+        )
+
+        overlay.setLoadingLineColor(
+            AndroidColor.TRANSPARENT
+        )
+
+        provider.tileSource =
+            source
+
+        overlay
+    }
+
+
+// =================================================================
+// AREA ANALYSIS
+// =================================================================
+
+private suspend fun analyzeArea(
+    latitude: Double,
+    longitude: Double
+): AreaAnalysis {
+
+    /*
+     * The current weather database is location-name based.
+     * Your current Smart Map is centered around Vijayawada,
+     * so use the supported backend location for the analysis
+     * while retaining the exact map coordinates in the UI.
+     *
+     * Later we can add reverse-geocoding + nearest-station
+     * matching for true hyperlocal analysis.
+     */
+    val location =
+        "Vijayawada"
+
+    val temperatureResponse =
+        WeatherApiClient.api
+            .getTemperatureForecast(
+                location
+            )
+
+    val rainfallResponse =
+        WeatherApiClient.api
+            .getRainfallForecast(
+                location
+            )
+
+    val floodResponse =
+        WeatherApiClient.api
+            .getFloodForecast(
+                location
+            )
+
+    /*
+     * Use the first forecast rainfall probability.
+     */
+    val rainfallProbability =
+        rainfallResponse
+            .forecast
+            .firstOrNull()
+            ?.rain_probability_pct
+
+    /*
+     * The backend flood endpoint already returns
+     * flood-risk information directly.
+     */
+    val floodRisk =
+        floodResponse
+            .forecast
+            ?.firstOrNull()
+            ?.flood_risk
+            ?: "UNKNOWN"
+
+    /*
+     * The backend's safety engine is the real combined
+     * hazard engine. We use it instead of duplicating
+     * risk logic in the Android client.
+     */
+    val safetyResponse =
+        if (
+            rainfallProbability != null
+        ) {
+
+            WeatherApiClient.api
+                .getSafety(
+                    location =
+                        location,
+
+                    rainfallProbability =
+                        rainfallProbability
+                )
+
+        } else {
+            null
+        }
+
+    val overallRisk =
+        safetyResponse
+            ?.safety
+            ?.overall_risk_level
+            ?: calculateOverallRisk(
+                temperature =
+                    temperatureResponse
+                        .current_temperature_c,
+
+                rainfallProbability =
+                    rainfallProbability,
+
+                floodRisk =
+                    floodRisk
+            )
+
+    val recommendation =
+        safetyResponse
+            ?.safety
+            ?.recommendations
+            ?.firstOrNull()
+            ?.actions
+            ?.firstOrNull()
+            ?: calculateAreaRecommendation(
+                temperature =
+                    temperatureResponse
+                        .current_temperature_c,
+
+                rainfallProbability =
+                    rainfallProbability,
+
+                floodRisk =
+                    floodRisk
+            )
+
+    return AreaAnalysis(
+
+        latitude =
+            latitude,
+
+        longitude =
+            longitude,
+
+        temperature =
+            temperatureResponse
+                .current_temperature_c,
+
+        rainfallProbability =
+            rainfallProbability,
+
+        floodRisk =
+            floodRisk,
+
+        overallRisk =
+            overallRisk,
+
+        recommendation =
+            recommendation
+    )
+}
+
+
+// ============================================================
+// WEATHER
+// ============================================================
+
+private suspend fun fetchAreaWeather(
+    location: String
+): AreaWeatherData {
+
+    val temperature =
+        fetchDoubleField(
+            endpoint =
+                "/prediction/temperature/direct",
+
+            queryKey =
+                "location",
+
+            queryValue =
+                location,
+
+            possibleKeys =
+                listOf(
+                    "temperature_c",
+                    "temperature",
+                    "value"
+                )
+        )
+
+    val rainfall =
+        fetchDoubleField(
+            endpoint =
+                "/prediction/rainfall",
+
+            queryKey =
+                "location",
+
+            queryValue =
+                location,
+
+            possibleKeys =
+                listOf(
+                    "rainfall_probability",
+                    "precipitation_probability",
+                    "probability",
+                    "value"
+                )
+        )
+
+    return AreaWeatherData(
+        temperature =
+            temperature,
+
+        rainfallProbability =
+            rainfall
+    )
+}
+
+
+// ============================================================
+// FLOOD
+// ============================================================
+
+private suspend fun fetchAreaFlood(
+    location: String
+): String? {
+
+    return try {
+
+        val root =
+            getJson(
+                endpoint =
+                    "/prediction/flood",
+
+                queryKey =
+                    "location",
+
+                queryValue =
+                    location
+            )
+
+        when {
+
+            root.has("flood_risk") ->
+                root.optString(
+                    "flood_risk"
+                )
+
+            root.has("risk") ->
+                root.optString(
+                    "risk"
+                )
+
+            else ->
+                null
+        }
+
+    } catch (_: Exception) {
+
+        null
+    }
+}
+
+
+// ============================================================
+// GENERIC JSON REQUEST
+// ============================================================
+
+private suspend fun getJson(
+    endpoint: String,
+    queryKey: String,
+    queryValue: String
+): JSONObject =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val encoded =
+            java.net.URLEncoder
+                .encode(
+                    queryValue,
+                    "UTF-8"
+                )
+
+        val url =
+            URL(
+                "$BACKEND_URL$endpoint?$queryKey=$encoded"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in 200..299
+            ) {
+
+                throw RuntimeException(
+                    "HTTP $code"
+                )
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            JSONObject(body)
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// ============================================================
+// DOUBLE EXTRACTION
+// ============================================================
+
+private suspend fun fetchDoubleField(
+    endpoint: String,
+    queryKey: String,
+    queryValue: String,
+    possibleKeys: List<String>
+): Double? {
+
+    return try {
+
+        val root =
+            getJson(
+                endpoint =
+                    endpoint,
+
+                queryKey =
+                    queryKey,
+
+                queryValue =
+                    queryValue
+            )
+
+        for (
+            key in possibleKeys
+        ) {
+
+            if (
+                root.has(key) &&
+                !root.isNull(key)
+            ) {
+
+                val value =
+                    root.optDouble(
+                        key,
+                        Double.NaN
+                    )
+
+                if (
+                    !value.isNaN()
+                ) {
+                    return value
+                }
+            }
+        }
+
+        /*
+         * Some forecast APIs wrap their result.
+         */
+        val data =
+            root.optJSONObject(
+                "data"
+            )
+
+        if (data != null) {
+
+            for (
+                key in possibleKeys
+            ) {
+
+                if (
+                    data.has(key) &&
+                    !data.isNull(key)
+                ) {
+
+                    val value =
+                        data.optDouble(
+                            key,
+                            Double.NaN
+                        )
+
+                    if (
+                        !value.isNaN()
+                    ) {
+                        return value
+                    }
+                }
+            }
+        }
+
+        null
+
+    } catch (_: Exception) {
+
+        null
+    }
+}
+
+
+// ============================================================
+// OVERALL RISK
+// ============================================================
+
+private fun calculateOverallRisk(
+    temperature: Double?,
+    rainfallProbability: Double?,
+    floodRisk: String?
+): String {
+
+    val flood =
+        floodRisk
+            ?.uppercase()
+            .orEmpty()
+
+    if (
+        flood.contains("SEVERE") ||
+        flood.contains("HIGH")
+    ) {
+        return "HIGH"
+    }
+
+    if (
+        rainfallProbability != null &&
+        rainfallProbability >= 70.0
+    ) {
+        return "HIGH"
+    }
+
+    if (
+        temperature != null &&
+        temperature >= 40.0
+    ) {
+        return "HIGH"
+    }
+
+    if (
+        flood.contains("MODERATE") ||
+        flood.contains("MEDIUM")
+    ) {
+        return "MODERATE"
+    }
+
+    if (
+        rainfallProbability != null &&
+        rainfallProbability >= 40.0
+    ) {
+        return "MODERATE"
+    }
+
+    if (
+        temperature != null &&
+        temperature >= 35.0
+    ) {
+        return "MODERATE"
+    }
+
+    return "LOW"
+}
+
+
+// ============================================================
+// RECOMMENDATION
+// ============================================================
+
+private fun calculateAreaRecommendation(
+    temperature: Double?,
+    rainfallProbability: Double?,
+    floodRisk: String?
+): String {
+
+    val flood =
+        floodRisk
+            ?.uppercase()
+            .orEmpty()
+
+    if (
+        flood.contains("HIGH") ||
+        flood.contains("SEVERE")
+    ) {
+
+        return "Flood-related risk is elevated. " +
+            "Avoid low-lying areas and check official warnings."
+    }
+
+    if (
+        rainfallProbability != null &&
+        rainfallProbability >= 70.0
+    ) {
+
+        return "Heavy rainfall is likely. " +
+            "Plan outdoor travel carefully and keep rain protection ready."
+    }
+
+    if (
+        temperature != null &&
+        temperature >= 38.0
+    ) {
+
+        return "High heat is expected. " +
+            "Stay hydrated and reduce prolonged exposure."
+    }
+
+    if (
+        rainfallProbability != null &&
+        rainfallProbability >= 40.0
+    ) {
+
+        return "There is a meaningful chance of rain. " +
+            "Keep rain protection nearby."
+    }
+
+    return "Conditions currently appear relatively stable. " +
+        "Continue monitoring the live forecast."
+}
+
+
+
+
+
+
+// =================================================================
+// ALERT NETWORK
+// =================================================================
+
+private suspend fun fetchAlerts():
+    List<AlertMarkerData> =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val url =
+            URL(
+                "$BACKEND_URL/alerts"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in 200..299
+            ) {
+                throw RuntimeException(
+                    "Alerts request failed: HTTP $code"
+                )
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            parseAlerts(
+                JSONObject(body)
+            )
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// =================================================================
+// ALERT JSON
+// =================================================================
+
+private fun parseAlerts(
+    root: JSONObject
+): List<AlertMarkerData> {
+
+    val result =
+        ArrayList<AlertMarkerData>()
+
+    val array =
+        root.optJSONArray("alerts")
+            ?: root.optJSONArray("results")
+            ?: root.optJSONArray("data")
+            ?: JSONArray()
+
+    for (
+        index in 0 until array.length()
+    ) {
+
+        val item =
+            array.optJSONObject(index)
+                ?: continue
+
+        val latitude =
+            item.optDouble(
+                "latitude",
+                Double.NaN
+            )
+
+        val longitude =
+            item.optDouble(
+                "longitude",
+                Double.NaN
+            )
+
+        if (
+            latitude.isNaN() ||
+            longitude.isNaN()
+        ) {
+            continue
+        }
+
+        val title =
+            when {
+
+                item.has("title") ->
+                    item.optString(
+                        "title"
+                    )
+
+                item.has("event") ->
+                    item.optString(
+                        "event"
+                    )
+
+                item.has("headline") ->
+                    item.optString(
+                        "headline"
+                    )
+
+                else ->
+                    "Weather Alert"
+            }
+
+        val severity =
+            when {
+
+                item.has("severity") ->
+                    item.optString(
+                        "severity"
+                    )
+
+                item.has("level") ->
+                    item.optString(
+                        "level"
+                    )
+
+                item.has("warning_level") ->
+                    item.optString(
+                        "warning_level"
+                    )
+
+                else ->
+                    "UNKNOWN"
+            }
+
+        val description =
+            when {
+
+                item.has("description") ->
+                    item.optString(
+                        "description"
+                    )
+
+                item.has("message") ->
+                    item.optString(
+                        "message"
+                    )
+
+                item.has("instruction") ->
+                    item.optString(
+                        "instruction"
+                    )
+
+                else ->
+                    null
+            }
+
+        result.add(
+            AlertMarkerData(
+
+                latitude =
+                    latitude,
+
+                longitude =
+                    longitude,
+
+                title =
+                    title,
+
+                severity =
+                    severity,
+
+                description =
+                    description
+            )
+        )
+    }
+
+    return result
+}
+
+
+// =================================================================
+// FLOOD DATA
+// =================================================================
+
+private suspend fun fetchFloodData(
+    latitude: Double,
+    longitude: Double
+): FloodMapData? =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val encodedLocation =
+            "$latitude,$longitude"
+
+        val url =
+            URL(
+                "$BACKEND_URL/flood?location=$encodedLocation"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in 200..299
+            ) {
+                throw RuntimeException(
+                    "Flood request failed: HTTP $code"
+                )
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            val root =
+                JSONObject(body)
+
+            val resultLatitude =
+                if (
+                    root.has("latitude") &&
+                    !root.isNull("latitude")
+                ) {
+                    root.optDouble(
+                        "latitude"
+                    )
+                } else {
+                    latitude
+                }
+
+            val resultLongitude =
+                if (
+                    root.has("longitude") &&
+                    !root.isNull("longitude")
+                ) {
+                    root.optDouble(
+                        "longitude"
+                    )
+                } else {
+                    longitude
+                }
+
+            FloodMapData(
+
+                latitude =
+                    resultLatitude,
+
+                longitude =
+                    resultLongitude,
+
+                risk =
+                    root.optString(
+                        "flood_risk",
+                        "UNKNOWN"
+                    ),
+
+                currentWaterLevel =
+                    root.optDoubleNullable(
+                        "current_water_level_m"
+                    ),
+
+                warningLevel =
+                    root.optDoubleNullable(
+                        "warning_level_m"
+                    ),
+
+                dangerLevel =
+                    root.optDoubleNullable(
+                        "danger_level_m"
+                    )
+            )
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// =================================================================
+// FLOOD OVERLAY
+// =================================================================
+
+private fun addFloodOverlay(
+    map: MapView,
+    data: FloodMapData
+): Polygon {
+val center =
+        GeoPoint(
+            data.latitude,
+            data.longitude
+        )
+
+    /*
+     * Approximate visualization zone around the
+     * returned location.
+     *
+     * Later this will be replaced with real
+     * basin/flood polygons from GIS data.
+     */
+    val points =
+        Polygon.pointsAsRect(
+            center,
+            12000.0,
+            9000.0
+        )
+            .map {
+                GeoPoint(
+                    it.latitude,
+                    it.longitude
+                )
+            }
+
+    val polygon =
+        Polygon(map)
+
+    polygon.points =
+        points
+
+    val normalizedRisk =
+        data.risk
+            .uppercase()
+
+    val fillColor =
+        when {
+
+            normalizedRisk.contains(
+                "HIGH"
+            ) ||
+            normalizedRisk.contains(
+                "SEVERE"
+            ) ->
+                AndroidColor.argb(
+                    90,
+                    220,
+                    55,
+                    55
+                )
+
+            normalizedRisk.contains(
+                "MODERATE"
+            ) ||
+            normalizedRisk.contains(
+                "MEDIUM"
+            ) ->
+                AndroidColor.argb(
+                    80,
+                    255,
+                    166,
+                    50
+                )
+
+            normalizedRisk.contains(
+                "LOW"
+            ) ->
+                AndroidColor.argb(
+                    65,
+                    60,
+                    180,
+                    255
+                )
+
+            else ->
+                AndroidColor.argb(
+                    45,
+                    120,
+                    150,
+                    190
+                )
+        }
+
+    polygon.fillColor =
+        fillColor
+
+    polygon.strokeColor =
+        AndroidColor.argb(
+            180,
+            255,
+            255,
+            255
+        )
+
+    polygon.strokeWidth =
+        4f
+
+    polygon.title =
+        "Flood risk: ${data.risk}"
+
+    polygon.snippet =
+        buildString {
+
+            append(
+                "Current water: "
+            )
+
+            append(
+                data.currentWaterLevel
+                    ?.let {
+                        "${"%.2f".format(it)} m"
+                    }
+                    ?: "Unavailable"
+            )
+
+            append(" • Warning: ")
+
+            append(
+                data.warningLevel
+                    ?.let {
+                        "${"%.2f".format(it)} m"
+                    }
+                    ?: "Unavailable"
+            )
+
+            append(" • Danger: ")
+
+            append(
+                data.dangerLevel
+                    ?.let {
+                        "${"%.2f".format(it)} m"
+                    }
+                    ?: "Unavailable"
+            )
+        }
+
+    map.overlays.add(
+        polygon
+    )
+
+    map.invalidate()
+
+    return polygon
+}
+
+
+// =================================================================
+// JSON NULLABLE DOUBLE
+// =================================================================
+
+private fun JSONObject.optDoubleNullable(
+    key: String
+): Double? {
+
+    if (
+        !has(key) ||
+        isNull(key)
+    ) {
+        return null
+    }
+
+    val value =
+        optDouble(
+            key,
+            Double.NaN
+        )
+
+    return if (
+        value.isNaN()
+    ) {
+        null
+    } else {
+        value
+    }
+}
+
+
+// =================================================================
+// EARTHQUAKE NETWORK
+// =================================================================
+
+private suspend fun fetchEarthquakes():
+    List<EarthquakeMarkerData> =
+    withContext(
+        Dispatchers.IO
+    ) {
+
+        val url =
+            URL(
+                "$BACKEND_URL/earthquakes"
+            )
+
+        val connection =
+            url.openConnection()
+                as HttpURLConnection
+
+        try {
+
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                15000
+
+            connection.readTimeout =
+                15000
+
+            connection.setRequestProperty(
+                "Accept",
+                "application/json"
+            )
+
+            val code =
+                connection.responseCode
+
+            if (
+                code !in 200..299
+            ) {
+                throw RuntimeException(
+                    "Earthquake request failed: HTTP $code"
+                )
+            }
+
+            val body =
+                connection
+                    .inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            parseEarthquakes(
+                JSONObject(body)
+            )
+
+        } finally {
+
+            connection.disconnect()
+        }
+    }
+
+
+// =================================================================
+// EARTHQUAKE JSON
+// =================================================================
+
+private fun parseEarthquakes(
+    root: JSONObject
+): List<EarthquakeMarkerData> {
+
+    val result =
+        ArrayList<EarthquakeMarkerData>()
+
+    val array =
+        root.optJSONArray("earthquakes")
+            ?: root.optJSONArray("results")
+            ?: root.optJSONArray("data")
+            ?: JSONArray()
+
+    for (
+        index in 0 until array.length()
+    ) {
+
+        val item =
+            array.optJSONObject(index)
+                ?: continue
+
+        val latitude =
+            item.optDouble(
+                "latitude",
+                Double.NaN
+            )
+
+        val longitude =
+            item.optDouble(
+                "longitude",
+                Double.NaN
+            )
+
+        if (
+            latitude.isNaN() ||
+            longitude.isNaN()
+        ) {
+            continue
+        }
+
+        val magnitude =
+            if (
+                item.has("magnitude") &&
+                !item.isNull("magnitude")
+            ) {
+                item.optDouble(
+                    "magnitude",
+                    Double.NaN
+                ).takeUnless {
+                    it.isNaN()
+                }
+            } else {
+                null
+            }
+
+        val place =
+            when {
+
+                item.has("place") &&
+                !item.isNull("place") ->
+                    item.optString("place")
+
+                item.has("location") &&
+                !item.isNull("location") ->
+                    item.optString("location")
+
+                else ->
+                    "Earthquake"
+            }
+
+        val depth =
+            if (
+                item.has("depth_km") &&
+                !item.isNull("depth_km")
+            ) {
+                item.optDouble(
+                    "depth_km",
+                    Double.NaN
+                ).takeUnless {
+                    it.isNaN()
+                }
+            } else {
+                null
+            }
+
+        result.add(
+            EarthquakeMarkerData(
+                latitude =
+                    latitude,
+
+                longitude =
+                    longitude,
+
+                magnitude =
+                    magnitude,
+
+                place =
+                    place,
+
+                depthKm =
+                    depth
+            )
+        )
+    }
+
+    return result
+}
+
+
+// =================================================================
+// JSON
+// =================================================================
+
+private fun parseDams(
+    root: JSONObject
+): List<DamMarkerData> {
+
+    val result =
+        ArrayList<DamMarkerData>()
+
+    val array =
+        root.optJSONArray(
+            "reservoirs"
+        )
+            ?: JSONArray()
+
+    for (
+        index in 0 until array.length()
+    ) {
+
+        val item =
+            array.optJSONObject(
+                index
+            )
+                ?: continue
+
+        val latitude =
+            item.optDouble(
+                "latitude",
+                Double.NaN
+            )
+
+        val longitude =
+            item.optDouble(
+                "longitude",
+                Double.NaN
+            )
+
+        if (
+            latitude.isNaN() ||
+            longitude.isNaN()
+        ) {
+            continue
+        }
+
+        val name =
+            item.optString(
+                "name",
+                "Reservoir"
+            )
+
+        val state =
+            if (
+                item.has("state") &&
+                !item.isNull("state")
+            ) {
+                item.optString("state")
+            } else {
+                null
+            }
+
+        val storage =
+            if (
+                item.has(
+                    "storage_percent"
+                ) &&
+                !item.isNull(
+                    "storage_percent"
+                )
+            ) {
+                item.optDouble(
+                    "storage_percent",
+                    Double.NaN
+                ).takeUnless {
+                    it.isNaN()
+                }
+            } else {
+                null
+            }
+
+        val level =
+            if (
+                item.has(
+                    "current_level_m"
+                ) &&
+                !item.isNull(
+                    "current_level_m"
+                )
+            ) {
+                item.optDouble(
+                    "current_level_m",
+                    Double.NaN
+                ).takeUnless {
+                    it.isNaN()
+                }
+            } else {
+                null
+            }
+
+        result.add(
+            DamMarkerData(
+                name =
+                    name,
+
+                latitude =
+                    latitude,
+
+                longitude =
+                    longitude,
+
+                state =
+                    state,
+
+                storagePercent =
+                    storage,
+
+                level =
+                    level
+            )
+        )
+    }
+
+    return result
+}
+
+
+// =================================================================
+// MAP MARKERS
+// =================================================================
+
+private fun addDamMarkers(
+    map: MapView,
+    dams: List<DamMarkerData>
+) {
+
+    clearDataMarkers(map)
+
+    for (dam in dams) {
+
+        val marker =
+            Marker(map)
+
+        marker.position =
+            GeoPoint(
+                dam.latitude,
+                dam.longitude
+            )
+
+        marker.title =
+            dam.name
+
+        val storageText =
+            dam.storagePercent
+                ?.let {
+                    "Storage: ${"%.1f".format(it)}%"
+                }
+                ?: "Storage: unavailable"
+
+        val stateText =
+            dam.state
+                ?: "State unavailable"
+
+        val levelText =
+            dam.level
+                ?.let {
+                    "Level: ${"%.2f".format(it)} m"
+                }
+                ?: "Level: unavailable"
+
+        marker.snippet =
+            "$stateText • $storageText • $levelText"
+
+        map.overlays.add(
+            marker
+        )
+    }
+
+    map.invalidate()
+}
+
+
+// =================================================================
+// EARTHQUAKE MARKERS
+// =================================================================
+
+private fun addEarthquakeMarkers(
+    map: MapView,
+    earthquakes: List<EarthquakeMarkerData>
+) {
+
+    clearDataMarkers(map)
+
+    for (quake in earthquakes) {
+
+        val marker =
+            Marker(map)
+
+        marker.position =
+            GeoPoint(
+                quake.latitude,
+                quake.longitude
+            )
+
+        val magnitude =
+            quake.magnitude
+                ?.let {
+                    "M${"%.1f".format(it)}"
+                }
+                ?: "Earthquake"
+
+        marker.title =
+            magnitude
+
+        val place =
+            quake.place
+                ?: "Unknown location"
+
+        val depth =
+            quake.depthKm
+                ?.let {
+                    "Depth: ${"%.1f".format(it)} km"
+                }
+
+        marker.snippet =
+            if (depth != null) {
+                "$place • $depth"
+            } else {
+                place
+            }
+
+        map.overlays.add(
+            marker
+        )
+    }
+map.invalidate()
+}
+
+
+// =================================================================
+// ALERT MARKERS
+// =================================================================
+
+private fun addAlertMarkers(
+    map: MapView,
+    alerts: List<AlertMarkerData>
+) {
+
+    clearDataMarkers(map)
+
+    for (alert in alerts) {
+
+        val marker =
+            Marker(map)
+
+        marker.position =
+            GeoPoint(
+                alert.latitude,
+                alert.longitude
+            )
+
+        marker.title =
+            "⚠ ${alert.title}"
+
+        marker.snippet =
+            if (
+                alert.description
+                    .isNullOrBlank()
+            ) {
+
+                "Severity: ${alert.severity}"
+
+            } else {
+
+                "Severity: ${alert.severity} • " +
+                    alert.description
+            }
+
+        map.overlays.add(
+            marker
+        )
+    }
+
+    map.invalidate()
+}
+
+
+// ============================================================
+// DEMO FLOOD ZONE
+// ============================================================
+
+private fun addDemoFloodZone(
+    map: MapView
+) {
+
+    val center =
+        GeoPoint(
+            16.5062,
+            80.6480
+        )
+
+    val polygon =
+        Polygon(map)
+
+    polygon.points =
+        Polygon.pointsAsRect(
+            center,
+            12000.0,
+            9000.0
+        )
+            .map {
+                GeoPoint(
+                    it.latitude,
+                    it.longitude
+                )
+            }
+
+    polygon.fillColor =
+        AndroidColor.argb(
+            85,
+            30,
+            120,
+            255
+        )
+
+    polygon.strokeColor =
+        AndroidColor.argb(
+            210,
+            20,
+            90,
+            200
+        )
+
+    polygon.strokeWidth =
+        5f
+
+    polygon.title =
+        "Flood Risk Area"
+
+    polygon.snippet =
+        "Flood-risk visualization"
+
+    map.overlays.add(
+        polygon
+    )
+
+    map.invalidate()
+}
+
+
+// ============================================================
+// DEMO WEATHER MARKERS
+// ============================================================
+
+private fun addWeatherDemoMarkers(
+    map: MapView
+) {
+
+    val locations =
+        listOf(
+
+            Triple(
+                16.5062,
+                80.6480,
+                "Current weather"
+            ),
+
+            Triple(
+                16.5300,
+                80.6200,
+                "Weather observation"
+            ),
+
+            Triple(
+                16.4800,
+                80.6800,
+                "Weather observation"
+            )
+        )
+
+    for (item in locations) {
+
+        val marker =
+            Marker(map)
+
+        marker.position =
+            GeoPoint(
+                item.first,
+                item.second
+            )
+
+        marker.title =
+            "☁ ${item.third}"
+
+        marker.snippet =
+            "WeatherGPT weather layer"
+
+        map.overlays.add(
+            marker
+        )
+    }
+
+    map.invalidate()
+}
+
+
+// ============================================================
+// FLOOD OVERLAY CLEANUP
+// ============================================================
+
+private fun removeFloodOverlays(
+    map: MapView
+) {
+
+    val iterator =
+        map.overlays.iterator()
+
+    while (
+        iterator.hasNext()
+    ) {
+
+        val overlay =
+            iterator.next()
+
+        if (
+            overlay is Polygon
+        ) {
+
+            iterator.remove()
+        }
+    }
+
+    map.invalidate()
+}
+
+
+// =================================================================
+// DATA MARKER CLEANUP
+// =================================================================
+
+private fun clearDataMarkers(
+    map: MapView
+) {
+
+    val iterator =
+        map.overlays.iterator()
+
+    while (
+        iterator.hasNext()
+    ) {
+
+        val overlay =
+            iterator.next()
+
+        if (
+            overlay is Marker &&
+            overlay.title != "WeatherGPT"
+        ) {
+
+            iterator.remove()
+        }
+    }
+}
+
+
+// ============================================================
+// CLEAR ALL SMART-MAP DATA OVERLAYS
+// ============================================================
+
+private fun clearSmartMapOverlays(
+    map: MapView
+) {
+
+    val iterator =
+        map.overlays.iterator()
+
+    while (
+        iterator.hasNext()
+    ) {
+
+        val overlay =
+            iterator.next()
+
+        if (
+            overlay is Marker &&
+            overlay.title != "WeatherGPT"
+        ) {
+            iterator.remove()
+            continue
+        }
+
+        if (
+            overlay is Polygon
+        ) {
+            iterator.remove()
+            continue
+        }
+    }
+
+    map.invalidate()
+}
