@@ -1,0 +1,38 @@
+{
+  "experiment_id": "SKY-LORA-001",
+  "base_model": "google/gemma-4-26B-A4B-it",
+  "status": "HARDWARE_LIMITED",
+  "hardware_audit": {
+    "os": "Windows 11",
+    "detected_gpu": "NVIDIA GeForce RTX 2050 Laptop GPU",
+    "detected_vram_gb": 4.0,
+    "required_vram_gb": 24.0,
+    "system_ram_gb": 7.65,
+    "framework_status": "PyTorch / Transformers / PEFT not installed on local host"
+  },
+  "configuration": {
+    "config_file": "configs/SKY-LORA-001.yaml",
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj",
+      "mm_projector"
+    ],
+    "visual_token_budget": 256,
+    "precision": "bfloat16 (NF4 QLoRA)"
+  },
+  "datasets": {
+    "training_samples": 63,
+    "validation_samples": 18,
+    "locked_test_samples": 4,
+    "leakage_violations": 0
+  },
+  "verdict": "STOPPED_BEFORE_TRAINING (Hardware Audit Incompatibility)"
+}

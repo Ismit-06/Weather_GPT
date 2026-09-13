@@ -1,0 +1,39 @@
+{
+  "status": "PASS",
+  "locked_test_images_count": 4,
+  "train_stats": {
+    "total_records": 63,
+    "unique_filenames": 63,
+    "sky_count": 27,
+    "non_sky_count": 36,
+    "scenes": {
+      "ceiling": 8,
+      "outdoor_sky": 27,
+      "blanket": 4,
+      "screen_or_photo": 4,
+      "window_reflection": 4,
+      "fabric": 4,
+      "bedsheet": 4,
+      "curtain": 4,
+      "wall": 4
+    }
+  },
+  "val_stats": {
+    "total_records": 18,
+    "unique_filenames": 18,
+    "sky_count": 9,
+    "non_sky_count": 9,
+    "scenes": {
+      "ceiling": 2,
+      "outdoor_sky": 9,
+      "bedsheet": 1,
+      "blanket": 1,
+      "screen_or_photo": 1,
+      "fabric": 1,
+      "wall": 1,
+      "curtain": 1,
+      "window_reflection": 1
+    }
+  },
+  "errors": []
+}

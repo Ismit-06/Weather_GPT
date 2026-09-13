@@ -1,0 +1,121 @@
+[
+  {
+    "test_id": 1,
+    "label": "1_clear_sky",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows clear skies (5% cover), and weather ..."
+  },
+  {
+    "test_id": 2,
+    "label": "2_cloudy_sky",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows partly cloudy skies (50% cover), and..."
+  },
+  {
+    "test_id": 3,
+    "label": "3_overcast",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows overcast skies (92% cover), and weat..."
+  },
+  {
+    "test_id": 4,
+    "label": "4_bedsheet",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports cloudy ..."
+  },
+  {
+    "test_id": 5,
+    "label": "5_ceiling",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 6,
+    "label": "6_fabric",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 7,
+    "label": "7_wall",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 8,
+    "label": "8_window_reflection",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 9,
+    "label": "9_screen_showing_sky",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 10,
+    "label": "10_partial_sky",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows partly cloudy skies (40% cover), and..."
+  },
+  {
+    "test_id": 11,
+    "label": "11_rain",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows storm clouds skies (0% cover), and w..."
+  },
+  {
+    "test_id": 12,
+    "label": "12_radar_only_rain",
+    "confidence_level": "High",
+    "has_disagreement": true,
+    "answer_excerpt": "The camera observes mostly cloudy conditions (0% cover), while station telemetry..."
+  },
+  {
+    "test_id": 13,
+    "label": "13_weather_api_unavailable",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera observes clear conditions with 10% cloud cover. Numerical weather tel..."
+  },
+  {
+    "test_id": 14,
+    "label": "14_sky_ai_unavailable",
+    "confidence_level": "Moderate",
+    "has_disagreement": false,
+    "answer_excerpt": "The camera cannot see genuine sky, but current weather telemetry reports clear c..."
+  },
+  {
+    "test_id": 15,
+    "label": "15_slow_network_simulated",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows clear skies (0% cover), and weather ..."
+  },
+  {
+    "test_id": 16,
+    "label": "16_backend_restart_ready",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows clear skies (0% cover), and weather ..."
+  },
+  {
+    "test_id": 17,
+    "label": "17_model_rollback_verified",
+    "confidence_level": "High",
+    "has_disagreement": false,
+    "answer_excerpt": "Conditions are consistent: the camera shows clear skies (0% cover), and weather ..."
+  }
+]

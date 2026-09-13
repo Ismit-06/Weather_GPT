@@ -1,0 +1,43 @@
+{
+  "model_name": "google/gemma-4-26B-A4B-it",
+  "adapter_name": "SKY-LORA-002",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj"
+  ],
+  "image_token_budget": 384,
+  "confidence_gate_threshold": 0.8,
+  "created_at": "2026-09-10T19:40:00Z",
+  "architecture": "Gemma 4 Multimodal Vision-Language Model",
+  "file_manifest": {
+    "checkpoints/SKY-LORA-002/adapter_config.json": {
+      "exists": false,
+      "size_bytes": 0,
+      "sha256": null
+    },
+    "checkpoints/SKY-LORA-002/training_metadata.json": {
+      "exists": false,
+      "size_bytes": 0,
+      "sha256": null
+    },
+    "checkpoints/SKY-LORA-002/training_history.json": {
+      "exists": false,
+      "size_bytes": 0,
+      "sha256": null
+    },
+    "configs/training_config.yaml": {
+      "exists": false,
+      "size_bytes": 0,
+      "sha256": null
+    },
+    "configs/hyperparameters.yaml": {
+      "exists": false,
+      "size_bytes": 0,
+      "sha256": null
+    }
+  }
+}

@@ -1,0 +1,56 @@
+﻿[
+  {
+    "rank": 1,
+    "failure_type": "FALSE_SKY",
+    "image": "nightmare/bedsheet/known_bedsheet_failure_001.png",
+    "ground_truth": {
+      "sky_detected": false,
+      "scene_type": "bedsheet",
+      "cloud_condition": "not_applicable"
+    },
+    "predicted": {
+      "sky_detected": true,
+      "sky_confidence": 0.94,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "overcast"
+    },
+    "severity": "CRITICAL",
+    "visual_root_cause": "Diffuse light blue/grey wrinkled fabric fills entire FOV without ground reference; model interprets micro-creases as stratocumulus cloud deck."
+  },
+  {
+    "rank": 2,
+    "failure_type": "FALSE_SKY",
+    "image": "dataset/test/non_sky/sample_ceiling_001.jpg",
+    "ground_truth": {
+      "sky_detected": false,
+      "scene_type": "ceiling",
+      "cloud_condition": "not_applicable"
+    },
+    "predicted": {
+      "sky_detected": true,
+      "sky_confidence": 0.88,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "overcast"
+    },
+    "severity": "CRITICAL",
+    "visual_root_cause": "Flat off-white plaster with circular recessed lamp fixture misinterpreted as sun diffusing through dense cirrostratus cloud layer."
+  },
+  {
+    "rank": 3,
+    "failure_type": "FALSE_SKY",
+    "image": "dataset/test/non_sky/sample_fabric_001.jpg",
+    "ground_truth": {
+      "sky_detected": false,
+      "scene_type": "fabric",
+      "cloud_condition": "not_applicable"
+    },
+    "predicted": {
+      "sky_detected": true,
+      "sky_confidence": 0.82,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "partly_cloudy"
+    },
+    "severity": "CRITICAL",
+    "visual_root_cause": "Linear weave ripples and desaturated blue-grey hues misinterpreted as wave clouds (altocumulus undulatus)."
+  }
+]

@@ -1,0 +1,28 @@
+﻿[
+  {
+    "failure_id": "CRIT-001",
+    "image": "nightmare/bedsheet/known_bedsheet_failure_001.png",
+    "actual_scene_type": "bedsheet",
+    "actual_sky_detected": false,
+    "predicted_scene_type": "outdoor_sky",
+    "predicted_sky_detected": true,
+    "confidence": 0.94,
+    "cloud_condition": "overcast",
+    "severity": 1,
+    "failure_type": "HIGH_CONFIDENCE_FALSE_SKY",
+    "reason": "Wrinkled diffuse fabric falsely identified as overcast stratocumulus cloud deck."
+  },
+  {
+    "failure_id": "CRIT-002",
+    "image": "dataset/test/non_sky/sample_ceiling_001.jpg",
+    "actual_scene_type": "ceiling",
+    "actual_sky_detected": false,
+    "predicted_scene_type": "outdoor_sky",
+    "predicted_sky_detected": true,
+    "confidence": 0.88,
+    "cloud_condition": "overcast",
+    "severity": 1,
+    "failure_type": "HIGH_CONFIDENCE_FALSE_SKY",
+    "reason": "Flat off-white plaster ceiling with circular recessed light misinterpreted as diffused sun behind cirrostratus."
+  }
+]

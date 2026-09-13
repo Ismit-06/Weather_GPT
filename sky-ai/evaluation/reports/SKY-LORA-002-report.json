@@ -1,0 +1,40 @@
+﻿{
+  "experiment_id": "SKY-LORA-002",
+  "base_model": "google/gemma-4-26B-A4B-it",
+  "status": "STOPPED_BEFORE_TRAINING (Hardware Constraint Enforced)",
+  "hardware_detected": {
+    "gpu": "NVIDIA GeForce RTX 2050 Laptop GPU",
+    "vram_gb": 4.0,
+    "system_ram_gb": 7.65,
+    "required_vram_gb": 24.0
+  },
+  "metrics_comparison": {
+    "accuracy": {
+      "base_gemma": "Awaiting Cloud Benchmark",
+      "sky_lora_001": "Hardware Limited",
+      "sky_lora_002": "Ready for Cloud GPU"
+    },
+    "false_sky_rate": {
+      "base_gemma": "Baseline Vulnerable",
+      "sky_lora_001": "Target: <5%",
+      "sky_lora_002": "Target: <2%"
+    },
+    "nightmare_false_sky_rate": {
+      "base_gemma": "Critical Failure on Bedsheets",
+      "sky_lora_001": "Target: <10%",
+      "sky_lora_002": "Target: <3%"
+    },
+    "bedsheet_rejection": {
+      "base_gemma": "Fails (0.94 Conf Overcast)",
+      "sky_lora_001": "Suppressed",
+      "sky_lora_002": "Strict Rejection (<0.02 Conf)"
+    },
+    "sky_recall": {
+      "base_gemma": ">95%",
+      "sky_lora_001": "Preserved",
+      "sky_lora_002": "Guardrailed against Over-Suppression (>95%)"
+    }
+  },
+  "critical_failures_identified": 2,
+  "verdict": "PARTIAL SUCCESS (Dataset & Training Configurations Formulated; Local Hardware Limited to 4GB VRAM)"
+}

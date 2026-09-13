@@ -1,0 +1,30 @@
+{
+  "concurrency_1": {
+    "workers": 1,
+    "requests": 3,
+    "success_rate": 1.0,
+    "avg_latency_ms": 1002.91,
+    "max_latency_ms": 1196.29
+  },
+  "concurrency_2": {
+    "workers": 2,
+    "requests": 6,
+    "success_rate": 1.0,
+    "avg_latency_ms": 2484.65,
+    "max_latency_ms": 6429.83
+  },
+  "concurrency_4": {
+    "workers": 4,
+    "requests": 12,
+    "success_rate": 1.0,
+    "avg_latency_ms": 1325.18,
+    "max_latency_ms": 2005.58
+  },
+  "concurrency_8": {
+    "workers": 8,
+    "requests": 24,
+    "success_rate": 1.0,
+    "avg_latency_ms": 1395.03,
+    "max_latency_ms": 2334.9
+  }
+}

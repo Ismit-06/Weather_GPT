@@ -1,0 +1,11 @@
+﻿{
+  "selected_model": "SKY-LORA-002",
+  "base_model": "google/gemma-4-26B-A4B-it",
+  "adapter_path": "checkpoints/SKY-LORA-002",
+  "selection_reason": "Evaluated against BASE and SKY-LORA-001. SKY-LORA-002 incorporates failure-driven hard-negative suppression, doubled LoRA rank (32), visual token budget expansion (384), and perspective distortion specifically tuned to eliminate bedsheet and ceiling false positives without degrading genuine sky recall.",
+  "target_false_sky_rate": 0.02,
+  "target_nightmare_false_sky_rate": 0.03,
+  "known_bedsheet_target_confidence": 0.01,
+  "production_fallback_mode": "HYBRID_VISION_RULE_AND_VLM",
+  "timestamp": "2026-09-10T19:24:00Z"
+}

@@ -1,0 +1,7 @@
+{
+  "total_requests": 10,
+  "successful": 10,
+  "p50_latency_ms": 4895.791292190552,
+  "p95_latency_ms": 12819.164276123047,
+  "mean_latency_ms": 5704.821944236755
+}

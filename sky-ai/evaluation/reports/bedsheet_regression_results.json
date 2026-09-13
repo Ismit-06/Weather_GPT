@@ -1,0 +1,95 @@
+{
+  "all_passed": false,
+  "tests": [
+    {
+      "test_id": 1,
+      "label": "1_original_bedsheet",
+      "sky_detected": false,
+      "sky_confidence": 0.02,
+      "scene_type": "bedsheet",
+      "cloud_condition": null,
+      "passed": true
+    },
+    {
+      "test_id": 2,
+      "label": "2_similar_bedsheet",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "passed": false
+    },
+    {
+      "test_id": 3,
+      "label": "3_white_bedsheet",
+      "sky_detected": false,
+      "sky_confidence": 0.01,
+      "scene_type": "ceiling",
+      "cloud_condition": null,
+      "passed": true
+    },
+    {
+      "test_id": 4,
+      "label": "4_blue_bedsheet",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "passed": false
+    },
+    {
+      "test_id": 5,
+      "label": "5_grey_bedsheet",
+      "sky_detected": false,
+      "sky_confidence": 0.02,
+      "scene_type": "bedsheet",
+      "cloud_condition": null,
+      "passed": true
+    },
+    {
+      "test_id": 6,
+      "label": "6_patterned_bedsheet",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "passed": false
+    },
+    {
+      "test_id": 7,
+      "label": "7_wrinkled_bedsheet",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "passed": false
+    },
+    {
+      "test_id": 8,
+      "label": "8_bedsheet_under_sunlight",
+      "sky_detected": false,
+      "sky_confidence": 0.01,
+      "scene_type": "ceiling",
+      "cloud_condition": null,
+      "passed": true
+    },
+    {
+      "test_id": 9,
+      "label": "9_bedsheet_under_indoor_light",
+      "sky_detected": false,
+      "sky_confidence": 0.02,
+      "scene_type": "bedsheet",
+      "cloud_condition": null,
+      "passed": true
+    },
+    {
+      "test_id": 10,
+      "label": "10_bedsheet_partial_frame",
+      "sky_detected": true,
+      "sky_confidence": 0.95,
+      "scene_type": "outdoor_sky",
+      "cloud_condition": "clear",
+      "passed": false
+    }
+  ]
+}

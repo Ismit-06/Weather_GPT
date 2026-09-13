@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Environment files & credentials
+.env
+.env.*
+!.env.example
+
+# Checkpoints large tensors & data
+checkpoints/*/adapter_model.bin
+checkpoints/*/adapter_model.safetensors
+*.pt
+*.bin
+*.safetensors
+
+# Test & IDE
+.pytest_cache/
+.vscode/
+.idea/
