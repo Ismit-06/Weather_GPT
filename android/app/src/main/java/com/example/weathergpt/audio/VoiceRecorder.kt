@@ -1,4 +1,4 @@
-package com.example.weathergpt.audio
+package com.weathergpt.app.audio
 
 import android.content.Context
 import android.media.MediaRecorder

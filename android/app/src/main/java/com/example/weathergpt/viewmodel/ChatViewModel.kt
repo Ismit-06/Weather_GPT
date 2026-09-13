@@ -1,13 +1,13 @@
-package com.example.weathergpt.viewmodel
+package com.weathergpt.app.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weathergpt.data.AgentState
-import com.example.weathergpt.data.ChatClient
-import com.example.weathergpt.data.ChatMessage
-import com.example.weathergpt.data.ChatStore
-import com.example.weathergpt.data.ChatWeatherRequest
+import com.weathergpt.app.data.AgentState
+import com.weathergpt.app.data.ChatClient
+import com.weathergpt.app.data.ChatMessage
+import com.weathergpt.app.data.ChatStore
+import com.weathergpt.app.data.ChatWeatherRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,7 +69,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         // Track and learn activity preferences (Opt-in)
         try {
-            com.example.weathergpt.data.UserPreferencesStore.recordActivityQuery(context, text)
+            com.weathergpt.app.data.UserPreferencesStore.recordActivityQuery(context, text)
         } catch (_: Exception) {}
 
         val currentState = _uiState.value
@@ -149,10 +149,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } catch (cloudErr: Exception) {
                 // If cloud is unavailable or timed out, gracefully fall back to local instant weather intelligence
                 try {
-                    val cachedWeather = com.example.weathergpt.data.MetWeatherClient.getCachedWeather(latitude, longitude, context)
-                        ?: com.example.weathergpt.data.MetWeatherClient.getFastWeather(latitude, longitude, context)
+                    val cachedWeather = com.weathergpt.app.data.MetWeatherClient.getCachedWeather(latitude, longitude, context)
+                        ?: com.weathergpt.app.data.MetWeatherClient.getFastWeather(latitude, longitude, context)
 
-                    val fallback = com.example.weathergpt.data.FastWeatherAssistant.generateInstantResponse(
+                    val fallback = com.weathergpt.app.data.FastWeatherAssistant.generateInstantResponse(
                         query = text,
                         weather = cachedWeather,
                         locationName = locationName,
@@ -267,13 +267,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, bos)
                 val bytes = bos.toByteArray()
 
-                val part = com.example.weathergpt.data.SkyAiClient.createMultipartImage(bytes, "chat_sky_upload.jpg")
+                val part = com.weathergpt.app.data.SkyAiClient.createMultipartImage(bytes, "chat_sky_upload.jpg")
                 val latBody = latitude.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                 val lonBody = longitude.toString().toRequestBody("text/plain".toMediaTypeOrNull())
                 val locBody = locationName?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val langBody = language.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val response = com.example.weathergpt.data.SkyAiClient.api.analyzeVisualCloud(
+                val response = com.weathergpt.app.data.SkyAiClient.api.analyzeVisualCloud(
                     image = part,
                     latitude = latBody,
                     longitude = lonBody,

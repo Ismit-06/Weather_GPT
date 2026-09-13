@@ -1,4 +1,4 @@
-package com.example.weathergpt.data
+package com.weathergpt.app.data
 
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient

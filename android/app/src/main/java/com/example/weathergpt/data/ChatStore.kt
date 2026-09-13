@@ -1,7 +1,7 @@
-﻿package com.example.weathergpt.data
+package com.weathergpt.app.data
 
 import android.content.Context
-import com.example.weathergpt.viewmodel.ChatUiMessage
+import com.weathergpt.app.viewmodel.ChatUiMessage
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 

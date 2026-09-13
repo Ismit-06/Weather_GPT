@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.screens
+package com.weathergpt.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -35,9 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.weathergpt.data.LocationResult
-import com.example.weathergpt.viewmodel.LocationSearchState
-import com.example.weathergpt.viewmodel.LocationViewModel
+import com.weathergpt.app.data.LocationResult
+import com.weathergpt.app.viewmodel.LocationSearchState
+import com.weathergpt.app.viewmodel.LocationViewModel
 import kotlinx.coroutines.delay
 
 @Composable

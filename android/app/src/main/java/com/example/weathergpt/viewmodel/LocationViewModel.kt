@@ -1,9 +1,9 @@
-package com.example.weathergpt.viewmodel
+package com.weathergpt.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weathergpt.data.LocationResult
-import com.example.weathergpt.data.WeatherApiClient
+import com.weathergpt.app.data.LocationResult
+import com.weathergpt.app.data.WeatherApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

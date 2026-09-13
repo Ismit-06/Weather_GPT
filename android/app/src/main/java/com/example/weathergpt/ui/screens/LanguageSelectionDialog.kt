@@ -1,4 +1,4 @@
-﻿package com.example.weathergpt.ui.screens
+package com.weathergpt.app.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -29,14 +29,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.weathergpt.location.AppLanguage
-import com.example.weathergpt.location.LanguageStore
-import com.example.weathergpt.ui.theme.NeonBlue
-import com.example.weathergpt.ui.theme.NeonCyan
-import com.example.weathergpt.ui.theme.SurfaceDark
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
+import com.weathergpt.app.location.AppLanguage
+import com.weathergpt.app.location.LanguageStore
+import com.weathergpt.app.ui.theme.NeonBlue
+import com.weathergpt.app.ui.theme.NeonCyan
+import com.weathergpt.app.ui.theme.SurfaceDark
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
 
 @Composable
 fun LanguageSelectionDialog(

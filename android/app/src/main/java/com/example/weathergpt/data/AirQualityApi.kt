@@ -1,4 +1,4 @@
-package com.example.weathergpt.data
+package com.weathergpt.app.data
 
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient

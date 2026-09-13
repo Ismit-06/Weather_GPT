@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.screens
+package com.weathergpt.app.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -36,13 +36,13 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.weathergpt.ui.theme.CloudBlue
-import com.example.weathergpt.ui.theme.DangerRed
-import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.SecondaryCyan
-import com.example.weathergpt.ui.theme.StormSlate
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.CloudBlue
+import com.weathergpt.app.ui.theme.DangerRed
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.StormSlate
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
 import kotlin.math.cos
 import kotlin.math.sin
 

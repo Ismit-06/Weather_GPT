@@ -1,4 +1,4 @@
-package com.example.weathergpt.navigation
+package com.weathergpt.app.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,22 +57,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.weathergpt.ui.screens.AlertsScreen
-import com.example.weathergpt.ui.screens.CameraScreen
-import com.example.weathergpt.ui.screens.ChatScreen
-import com.example.weathergpt.ui.screens.ForecastScreen
-import com.example.weathergpt.ui.screens.HomeScreen
-import com.example.weathergpt.ui.screens.MapScreen
-import com.example.weathergpt.R
-import com.example.weathergpt.ui.theme.BackgroundDark
-import com.example.weathergpt.ui.theme.BorderGlass
-import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.SecondaryCyan
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.SurfaceDark
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
+import com.weathergpt.app.ui.screens.AlertsScreen
+import com.weathergpt.app.ui.screens.CameraScreen
+import com.weathergpt.app.ui.screens.ChatScreen
+import com.weathergpt.app.ui.screens.ForecastScreen
+import com.weathergpt.app.ui.screens.HomeScreen
+import com.weathergpt.app.ui.screens.MapScreen
+import com.weathergpt.app.R
+import com.weathergpt.app.ui.theme.BackgroundDark
+import com.weathergpt.app.ui.theme.BorderGlass
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.SuccessGreen
+import com.weathergpt.app.ui.theme.SurfaceDark
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
 
 sealed class Screen(
     val route: String,
@@ -101,7 +101,7 @@ fun AppNavigation() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    val shouldNavigateToMap by com.example.weathergpt.data.SharedFriendStore.navigateToMapTrigger.collectAsState()
+    val shouldNavigateToMap by com.weathergpt.app.data.SharedFriendStore.navigateToMapTrigger.collectAsState()
     androidx.compose.runtime.LaunchedEffect(shouldNavigateToMap) {
         if (shouldNavigateToMap) {
             if (currentRoute != Screen.Map.route) {
@@ -113,7 +113,7 @@ fun AppNavigation() {
                     restoreState = true
                 }
             }
-            com.example.weathergpt.data.SharedFriendStore.resetNavigationTrigger()
+            com.weathergpt.app.data.SharedFriendStore.resetNavigationTrigger()
         }
     }
 

@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.screens
+package com.weathergpt.app.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
@@ -74,25 +74,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
-import com.example.weathergpt.data.LocationReverseClient
-import com.example.weathergpt.data.MetForecastItem
-import com.example.weathergpt.data.MetWeatherClient
-import com.example.weathergpt.data.UserPreferencesStore
-import com.example.weathergpt.data.extractDailyForecast
-import com.example.weathergpt.location.DeviceLocationProvider
-import com.example.weathergpt.location.LocationStore
-import com.example.weathergpt.location.SelectedLocation
-import com.example.weathergpt.ui.components.GlassCard
-import com.example.weathergpt.ui.components.RealisticWeatherIllustration
-import com.example.weathergpt.ui.theme.BackgroundDark
-import com.example.weathergpt.ui.theme.BorderGlass
-import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.SecondaryCyan
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
-import com.example.weathergpt.ui.theme.WarningAmber
+import com.weathergpt.app.data.LocationReverseClient
+import com.weathergpt.app.data.MetForecastItem
+import com.weathergpt.app.data.MetWeatherClient
+import com.weathergpt.app.data.UserPreferencesStore
+import com.weathergpt.app.data.extractDailyForecast
+import com.weathergpt.app.location.DeviceLocationProvider
+import com.weathergpt.app.location.LocationStore
+import com.weathergpt.app.location.SelectedLocation
+import com.weathergpt.app.ui.components.GlassCard
+import com.weathergpt.app.ui.components.RealisticWeatherIllustration
+import com.weathergpt.app.ui.theme.BackgroundDark
+import com.weathergpt.app.ui.theme.BorderGlass
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.SuccessGreen
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
+import com.weathergpt.app.ui.theme.WarningAmber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -138,7 +138,7 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(initialCache == null) }
     var hasError by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
-    var airQualityState by remember { mutableStateOf<com.example.weathergpt.data.AirQualityCurrent?>(null) }
+    var airQualityState by remember { mutableStateOf<com.weathergpt.app.data.AirQualityCurrent?>(null) }
     var showLocationDialog by remember { mutableStateOf(false) }
 
     // ── Weather loading effect (UNCHANGED) ───────────────────────────────────
@@ -203,7 +203,7 @@ fun HomeScreen(
 
                 // Fetch real live Air Quality concurrently
                 try {
-                    val aqiData = com.example.weathergpt.data.AirQualityClient.getLiveAirQuality(latitude, longitude)
+                    val aqiData = com.weathergpt.app.data.AirQualityClient.getLiveAirQuality(latitude, longitude)
                     if (aqiData != null) {
                         airQualityState = aqiData
                     }
@@ -1752,7 +1752,7 @@ private fun computeSunriseSunset(lat: Double, lon: Double, timezoneId: String = 
 // ════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun PersonalizationPreferencesDialog(
-    userPreferences: com.example.weathergpt.data.UserPreferences,
+    userPreferences: com.weathergpt.app.data.UserPreferences,
     onDismiss: () -> Unit,
     onToggleOptIn: (Boolean) -> Unit,
     onSelectPrimaryActivity: (String) -> Unit,

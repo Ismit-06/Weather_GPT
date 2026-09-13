@@ -1,4 +1,4 @@
-package com.example.weathergpt.data
+package com.weathergpt.app.data
 
 import android.content.Context
 import android.net.Uri

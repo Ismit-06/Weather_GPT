@@ -1,4 +1,4 @@
-package com.example.weathergpt.data
+package com.weathergpt.app.data
 
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody

@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.components
+package com.weathergpt.app.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import com.example.weathergpt.R
+import com.weathergpt.app.R
 import java.time.LocalTime
 
 enum class WeatherVisual {

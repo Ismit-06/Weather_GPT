@@ -1,4 +1,4 @@
-package com.example.weathergpt.audio
+package com.weathergpt.app.audio
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -11,7 +11,7 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
-import com.example.weathergpt.data.BackendConfig
+import com.weathergpt.app.data.BackendConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

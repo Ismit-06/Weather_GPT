@@ -1,10 +1,10 @@
-package com.example.weathergpt.sky
+package com.weathergpt.app.sky
 
-import com.example.weathergpt.data.MetForecastItem
-import com.example.weathergpt.data.MetLocation
-import com.example.weathergpt.data.MetWeatherResponse
-import com.example.weathergpt.data.radar.RadarMetadata
-import com.example.weathergpt.location.SelectedLocation
+import com.weathergpt.app.data.MetForecastItem
+import com.weathergpt.app.data.MetLocation
+import com.weathergpt.app.data.MetWeatherResponse
+import com.weathergpt.app.data.radar.RadarMetadata
+import com.weathergpt.app.location.SelectedLocation
 import org.junit.Assert.*
 import org.junit.Test
 

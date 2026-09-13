@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.components
+package com.weathergpt.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,23 +25,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.weathergpt.ui.theme.BorderGlass
-import com.example.weathergpt.ui.theme.BorderGlassSubtle
-import com.example.weathergpt.ui.theme.CloudBlue
-import com.example.weathergpt.ui.theme.CloudyGray
-import com.example.weathergpt.ui.theme.DangerRed
-import com.example.weathergpt.ui.theme.FogMuted
-import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.RainBlue
-import com.example.weathergpt.ui.theme.SecondaryCyan
-import com.example.weathergpt.ui.theme.SnowIce
-import com.example.weathergpt.ui.theme.StormSlate
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.SunnyGold
-import com.example.weathergpt.ui.theme.SurfaceDark
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
+import com.weathergpt.app.ui.theme.BorderGlass
+import com.weathergpt.app.ui.theme.BorderGlassSubtle
+import com.weathergpt.app.ui.theme.CloudBlue
+import com.weathergpt.app.ui.theme.CloudyGray
+import com.weathergpt.app.ui.theme.DangerRed
+import com.weathergpt.app.ui.theme.FogMuted
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.RainBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.SnowIce
+import com.weathergpt.app.ui.theme.StormSlate
+import com.weathergpt.app.ui.theme.SuccessGreen
+import com.weathergpt.app.ui.theme.SunnyGold
+import com.weathergpt.app.ui.theme.SurfaceDark
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
 
 /**
  * Minimal & Classy Surface Card.

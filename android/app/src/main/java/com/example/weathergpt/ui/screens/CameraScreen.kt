@@ -1,4 +1,4 @@
-package com.example.weathergpt.ui.screens
+package com.weathergpt.app.ui.screens
 
 import android.Manifest
 import android.content.Context
@@ -90,21 +90,21 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.weathergpt.sky.SkyDecisionState
-import com.example.weathergpt.sky.SkyWeatherFusionReport
-import com.example.weathergpt.ui.components.GlassCard
-import com.example.weathergpt.ui.theme.AccentPurple
-import com.example.weathergpt.ui.theme.BackgroundDark
-import com.example.weathergpt.ui.theme.BorderGlass
-import com.example.weathergpt.ui.theme.DangerRed
-import com.example.weathergpt.ui.theme.PrimaryBlue
-import com.example.weathergpt.ui.theme.SecondaryCyan
-import com.example.weathergpt.ui.theme.SuccessGreen
-import com.example.weathergpt.ui.theme.TextMuted
-import com.example.weathergpt.ui.theme.TextPrimary
-import com.example.weathergpt.ui.theme.TextSecondary
-import com.example.weathergpt.ui.theme.WarningAmber
-import com.example.weathergpt.viewmodel.SkyAiViewModel
+import com.weathergpt.app.sky.SkyDecisionState
+import com.weathergpt.app.sky.SkyWeatherFusionReport
+import com.weathergpt.app.ui.components.GlassCard
+import com.weathergpt.app.ui.theme.AccentPurple
+import com.weathergpt.app.ui.theme.BackgroundDark
+import com.weathergpt.app.ui.theme.BorderGlass
+import com.weathergpt.app.ui.theme.DangerRed
+import com.weathergpt.app.ui.theme.PrimaryBlue
+import com.weathergpt.app.ui.theme.SecondaryCyan
+import com.weathergpt.app.ui.theme.SuccessGreen
+import com.weathergpt.app.ui.theme.TextMuted
+import com.weathergpt.app.ui.theme.TextPrimary
+import com.weathergpt.app.ui.theme.TextSecondary
+import com.weathergpt.app.ui.theme.WarningAmber
+import com.weathergpt.app.viewmodel.SkyAiViewModel
 import kotlinx.coroutines.launch
 import java.io.InputStream
 

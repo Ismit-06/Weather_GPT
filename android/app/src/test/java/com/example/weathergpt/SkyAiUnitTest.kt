@@ -1,8 +1,8 @@
-package com.example.weathergpt
+package com.weathergpt.app
 
-import com.example.weathergpt.data.SkyAiClient
-import com.example.weathergpt.data.SkyAnalysisResponse
-import com.example.weathergpt.data.SkyAcceptanceGateStatus
+import com.weathergpt.app.data.SkyAiClient
+import com.weathergpt.app.data.SkyAnalysisResponse
+import com.weathergpt.app.data.SkyAcceptanceGateStatus
 import org.junit.Assert.*
 import org.junit.Test
 

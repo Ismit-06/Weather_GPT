@@ -1,11 +1,11 @@
-package com.example.weathergpt.sky
+package com.weathergpt.app.sky
 
-import com.example.weathergpt.data.MetForecastItem
-import com.example.weathergpt.data.MetWeatherResponse
-import com.example.weathergpt.data.SkyAnalysisResponse
-import com.example.weathergpt.data.radar.RadarMetadata
-import com.example.weathergpt.data.radar.RadarRepository
-import com.example.weathergpt.location.SelectedLocation
+import com.weathergpt.app.data.MetForecastItem
+import com.weathergpt.app.data.MetWeatherResponse
+import com.weathergpt.app.data.SkyAnalysisResponse
+import com.weathergpt.app.data.radar.RadarMetadata
+import com.weathergpt.app.data.radar.RadarRepository
+import com.weathergpt.app.location.SelectedLocation
 import java.util.Calendar
 
 data class SkyWeatherFusionReport(
@@ -42,7 +42,7 @@ object SkyWeatherFusionEngine {
         radarMetadata: RadarMetadata?,
         location: SelectedLocation?,
         skyServerResponse: SkyAnalysisResponse? = null,
-        visualCloudResponse: com.example.weathergpt.data.VisualCloudIntelligenceResponse? = null
+        visualCloudResponse: com.weathergpt.app.data.VisualCloudIntelligenceResponse? = null
     ): SkyWeatherFusionReport {
         val current = weatherResponse?.forecast?.firstOrNull()
         val nextHours = weatherResponse?.forecast?.drop(1)?.take(4) ?: emptyList()

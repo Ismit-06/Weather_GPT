@@ -1,4 +1,4 @@
-package com.example.weathergpt.location
+package com.weathergpt.app.location
 
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow

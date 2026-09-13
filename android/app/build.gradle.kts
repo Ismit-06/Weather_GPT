@@ -21,14 +21,14 @@ val localProperties =
 android {
 
     namespace =
-        "com.example.weathergpt"
+        "com.weathergpt.app"
 
     compileSdk = 35
 
     defaultConfig {
 
         applicationId =
-            "com.example.weathergpt"
+            "com.weathergpt.app"
 
         minSdk =
             26

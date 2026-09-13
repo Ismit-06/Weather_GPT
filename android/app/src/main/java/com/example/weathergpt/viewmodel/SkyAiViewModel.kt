@@ -1,4 +1,4 @@
-package com.example.weathergpt.viewmodel
+package com.weathergpt.app.viewmodel
 
 import android.app.Application
 import android.content.Context
@@ -8,21 +8,21 @@ import android.util.Log
 import androidx.camera.core.ImageProxy
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weathergpt.data.MetWeatherClient
-import com.example.weathergpt.data.MetWeatherResponse
-import com.example.weathergpt.data.SkyAiClient
-import com.example.weathergpt.data.SkyAnalysisResponse
-import com.example.weathergpt.data.radar.RadarMetadata
-import com.example.weathergpt.data.radar.RadarRepository
-import com.example.weathergpt.location.LocationStore
-import com.example.weathergpt.location.SelectedLocation
-import com.example.weathergpt.sky.SensorOrientationData
-import com.example.weathergpt.sky.SkyDecisionState
-import com.example.weathergpt.sky.SkyEvaluationResult
-import com.example.weathergpt.sky.SkySensorsManager
-import com.example.weathergpt.sky.SkyVisionAnalyzer
-import com.example.weathergpt.sky.SkyWeatherFusionEngine
-import com.example.weathergpt.sky.SkyWeatherFusionReport
+import com.weathergpt.app.data.MetWeatherClient
+import com.weathergpt.app.data.MetWeatherResponse
+import com.weathergpt.app.data.SkyAiClient
+import com.weathergpt.app.data.SkyAnalysisResponse
+import com.weathergpt.app.data.radar.RadarMetadata
+import com.weathergpt.app.data.radar.RadarRepository
+import com.weathergpt.app.location.LocationStore
+import com.weathergpt.app.location.SelectedLocation
+import com.weathergpt.app.sky.SensorOrientationData
+import com.weathergpt.app.sky.SkyDecisionState
+import com.weathergpt.app.sky.SkyEvaluationResult
+import com.weathergpt.app.sky.SkySensorsManager
+import com.weathergpt.app.sky.SkyVisionAnalyzer
+import com.weathergpt.app.sky.SkyWeatherFusionEngine
+import com.weathergpt.app.sky.SkyWeatherFusionReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
-import com.example.weathergpt.data.VisualCloudIntelligenceResponse
+import com.weathergpt.app.data.VisualCloudIntelligenceResponse
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicLong
 

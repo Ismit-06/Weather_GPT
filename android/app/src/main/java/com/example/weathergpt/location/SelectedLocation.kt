@@ -1,4 +1,4 @@
-package com.example.weathergpt.location
+package com.weathergpt.app.location
 
 data class SelectedLocation(
     val name: String,

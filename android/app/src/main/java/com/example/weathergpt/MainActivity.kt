@@ -1,12 +1,12 @@
-package com.example.weathergpt
+package com.weathergpt.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.weathergpt.navigation.AppNavigation
-import com.example.weathergpt.ui.theme.WeatherGPTTheme
+import com.weathergpt.app.navigation.AppNavigation
+import com.weathergpt.app.ui.theme.WeatherGPTTheme
 import androidx.lifecycle.lifecycleScope
-import com.example.weathergpt.data.BackendConfig
+import com.weathergpt.app.data.BackendConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -74,9 +74,9 @@ class MainActivity : ComponentActivity() {
     private fun handleIncomingShareIntent(intent: android.content.Intent?) {
         val uri = intent?.data ?: return
         try {
-            val friendData = com.example.weathergpt.data.SharedFriendWeather.parseFromUri(uri.toString())
+            val friendData = com.weathergpt.app.data.SharedFriendWeather.parseFromUri(uri.toString())
             if (friendData != null) {
-                com.example.weathergpt.data.SharedFriendStore.setSharedFriend(friendData, triggerNavigation = true)
+                com.weathergpt.app.data.SharedFriendStore.setSharedFriend(friendData, triggerNavigation = true)
             }
         } catch (e: Throwable) {
             android.util.Log.e("MainActivity", "Error parsing friend share deep link", e)

@@ -1,8 +1,8 @@
-package com.example.weathergpt.audio
+package com.weathergpt.app.audio
 
 import android.content.Context
 import android.util.Log
-import com.example.weathergpt.data.SpeechClient
+import com.weathergpt.app.data.SpeechClient
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody

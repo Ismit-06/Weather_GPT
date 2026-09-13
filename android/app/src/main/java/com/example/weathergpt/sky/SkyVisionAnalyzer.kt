@@ -1,4 +1,4 @@
-package com.example.weathergpt.sky
+package com.weathergpt.app.sky
 
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor

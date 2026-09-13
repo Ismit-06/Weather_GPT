@@ -1,9 +1,9 @@
-package com.example.weathergpt.viewmodel
+package com.weathergpt.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.weathergpt.data.MetWeatherClient
-import com.example.weathergpt.data.MetWeatherResponse
+import com.weathergpt.app.data.MetWeatherClient
+import com.weathergpt.app.data.MetWeatherResponse
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

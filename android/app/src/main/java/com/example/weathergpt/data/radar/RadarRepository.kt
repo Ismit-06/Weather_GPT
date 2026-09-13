@@ -1,4 +1,4 @@
-package com.example.weathergpt.data.radar
+package com.weathergpt.app.data.radar
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers

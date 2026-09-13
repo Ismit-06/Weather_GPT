@@ -1,4 +1,4 @@
-package com.example.weathergpt.data.radar
+package com.weathergpt.app.data.radar
 
 import com.google.gson.annotations.SerializedName
 

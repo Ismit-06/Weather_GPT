@@ -1,4 +1,4 @@
-package com.example.weathergpt
+package com.weathergpt.app
 
 import org.junit.Test
 

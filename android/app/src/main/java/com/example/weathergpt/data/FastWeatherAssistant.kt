@@ -1,7 +1,7 @@
-package com.example.weathergpt.data
+package com.weathergpt.app.data
 
-import com.example.weathergpt.data.MetForecastItem
-import com.example.weathergpt.data.MetWeatherResponse
+import com.weathergpt.app.data.MetForecastItem
+import com.weathergpt.app.data.MetWeatherResponse
 import java.util.Calendar
 import java.util.Locale
 

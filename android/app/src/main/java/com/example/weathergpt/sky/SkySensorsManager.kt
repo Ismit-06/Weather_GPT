@@ -1,4 +1,4 @@
-package com.example.weathergpt.sky
+package com.weathergpt.app.sky
 
 import android.content.Context
 import android.hardware.Sensor
