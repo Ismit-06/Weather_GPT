@@ -82,9 +82,24 @@ fun AlertsScreen() {
     var selectedFilter by remember { mutableStateOf("All") }
     var showAllDams by remember { mutableStateOf(false) }
 
+    var liveAlerts by remember { mutableStateOf<List<com.weathergpt.app.data.AlertItem>>(emptyList()) }
+    var activeCycloneAlert by remember { mutableStateOf<com.weathergpt.app.data.AlertItem?>(null) }
+
     // Periodic time-to-time automatic updating (every 5 minutes) + immediate manual refresh
     LaunchedEffect(refreshKey) {
         while (isActive) {
+            try {
+                val alertsRes = withContext(Dispatchers.IO) {
+                    com.weathergpt.app.data.AlertsClient.service.getAlerts()
+                }
+                if (alertsRes.alerts != null) {
+                    liveAlerts = alertsRes.alerts
+                    activeCycloneAlert = alertsRes.alerts.firstOrNull { 
+                        it.type == "CYCLONE_WARNING" || it.type == "CYCLONE_ALERT" || it.severity == "CRITICAL"
+                    }
+                }
+            } catch (_: Exception) { }
+
             try {
                 val response = withContext(Dispatchers.IO) {
                     DamClient.service.getDams(limit = 200)

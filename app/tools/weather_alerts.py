@@ -59,6 +59,49 @@ def classify_alert(
         "time"
     )
 
+    pressure_hpa = _to_float(item.get("pressure_hpa"), 1013.25)
+
+    # ---------------------------------------------------------
+    # Cyclone / Deep Depression (IMD Bay of Bengal Criteria)
+    # ---------------------------------------------------------
+    wind_kmh = wind_ms * 3.6
+    if wind_kmh >= 89 or (pressure_hpa < 985 and wind_kmh >= 75):
+        alerts.append({
+            "type": "CYCLONE_WARNING",
+            "severity": "CRITICAL",
+            "source_type": "IMD_HAZARD_ENGINE",
+            "time": time,
+            "value": round(wind_kmh, 1),
+            "unit": "km/h",
+            "pressure_hpa": pressure_hpa,
+            "message": "SEVERE CYCLONIC STORM WARNING: High wind gusts & storm surge threat detected.",
+            "advisory": "IMMEDIATE EVACUATION / STAY INDOORS: Move to designated cyclone shelters away from coastal zones."
+        })
+    elif wind_kmh >= 62 or (pressure_hpa < 995 and wind_kmh >= 50):
+        alerts.append({
+            "type": "CYCLONE_ALERT",
+            "severity": "HIGH",
+            "source_type": "IMD_HAZARD_ENGINE",
+            "time": time,
+            "value": round(wind_kmh, 1),
+            "unit": "km/h",
+            "pressure_hpa": pressure_hpa,
+            "message": "CYCLONIC STORM SIGNAL DETECTED: Deep depression intensifying over coastal waters.",
+            "advisory": "COASTAL ALERT: Fishermen advised not to venture into sea. Secure loose property and stay tuned."
+        })
+    elif wind_kmh >= 45 or (pressure_hpa < 1002 and wind_kmh >= 35):
+        alerts.append({
+            "type": "DEEP_DEPRESSION",
+            "severity": "MEDIUM",
+            "source_type": "IMD_HAZARD_ENGINE",
+            "time": time,
+            "value": round(wind_kmh, 1),
+            "unit": "km/h",
+            "pressure_hpa": pressure_hpa,
+            "message": "DEEP DEPRESSION WATCH: Atmospheric pressure drop and gusty winds observed.",
+            "advisory": "PRECAUTIONARY WATCH: Heavy localized squalls expected in coastal & adjacent districts."
+        })
+
     # ---------------------------------------------------------
     # Rain
     # ---------------------------------------------------------
@@ -256,6 +299,7 @@ def _severity_rank(
 ) -> int:
 
     return {
+        "CRITICAL": 4,
         "HIGH": 3,
         "MEDIUM": 2,
         "LOW": 1,
