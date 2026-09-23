@@ -90,7 +90,7 @@ fun AlertsScreen() {
         while (isActive) {
             try {
                 val alertsRes = withContext(Dispatchers.IO) {
-                    com.weathergpt.app.data.AlertsClient.service.getAlerts()
+                    com.weathergpt.app.data.FeatureClient.api.getAlerts(latitude = 17.6868, longitude = 83.2185)
                 }
                 if (alertsRes.alerts != null) {
                     liveAlerts = alertsRes.alerts

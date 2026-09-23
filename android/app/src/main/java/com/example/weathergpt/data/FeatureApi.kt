@@ -11,15 +11,19 @@ data class AlertItem(
     val severity: String?,
     val source_type: String?,
     val time: String?,
-    val value: Double?,
-    val message: String?
+    val value: Any?,
+    val unit: String?,
+    val message: String?,
+    val advisory: String?,
+    val pressure_hpa: Double?
 )
 
 
 data class AlertSummary(
     val total: Int?,
     val high: Int?,
-    val medium: Int?
+    val medium: Int?,
+    val low: Int?
 )
 
 
