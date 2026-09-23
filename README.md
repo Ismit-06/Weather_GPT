@@ -247,6 +247,20 @@ WeatherGPT/
 
 ---
 
+## 📚 References & Academic Credits
+
+WeatherGPT builds upon foundational principles established in academic literature across conversational agents, human-AI interaction, and sensor-grounded precision environmental telemetry.
+
+| Research Paper | Authors & Affiliation | Publication Venue / Link | Relevance to WeatherGPT |
+| :--- | :--- | :--- | :--- |
+| **[A contemporary review on chatbots, AI-powered virtual conversational agents, ChatGPT](references/papers/A_Contemporary_Review_on_Chatbots_AI_Powered_Conversational_Agents_ChatGPT.pdf)** | Avyay Casheekar, Archit Lahiri, Kanishk Rath, Kaushik S. Prabhakar, Kathiravan Srinivasan (*Vellore Institute of Technology*) | *Computer Science Review* (Elsevier), Vol. 52, 2024.<br/>[DOI: 10.1016/j.cosrev.2024.100632](https://doi.org/10.1016/j.cosrev.2024.100632) | Informs conversational agent state management, domain safety guardrails, and UI/UX design heuristics for the WeatherAI Orb. |
+| **[Kissan-Dost: Bridging the Last Mile in Smallholder Precision Agriculture with Conversational IoT](references/papers/Kissan_Dost_Conversational_IoT_Precision_Agriculture.pdf)** | Muhammad Saad Ali, Daanish U. Khan, Laiba I. Ahmad, Umer Irfan, Maryam Mustafa, Naveed A. Bhatti, Muhammad H. Alizai (*LUMS*) | arXiv:2602.08593 [cs.HC], 2026.<br/>[arXiv:2602.08593](https://arxiv.org/abs/2602.08593) | Informs real-time sensor & weather telemetry grounding, localized multilingual voice interfaces, and actionable climate advisories. |
+
+> [!NOTE]
+> For complete bibliographies, BibTeX citations, and fair-use copyright declarations, please refer to [**REFERENCES.md**](REFERENCES.md). All intellectual property rights belong exclusively to the original authors and their publishers.
+
+---
+
 ## 🤝 Contributing
 
 Contributions, feedback, and pull requests are welcomed!
