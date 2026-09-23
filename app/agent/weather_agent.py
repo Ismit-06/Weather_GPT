@@ -278,6 +278,9 @@ class WeatherAgent:
                 language=
                     agent_state.get("language"),
 
+                llm_engine=
+                    agent_state.get("llm_engine"),
+
                 location_name=
                     agent_state.get(
                         "location_name"
@@ -1172,7 +1175,24 @@ class WeatherAgent:
         import os
         answer = None
 
-        if os.getenv("OPENROUTER_API_KEY"):
+        # Check explicit client request or environment toggle
+        requested_engine = (self.context.llm_engine or "").lower()
+        use_local = (
+            requested_engine == "local"
+            or (not requested_engine and os.getenv("USE_LOCAL_LLM", "false").lower() in ("true", "1", "yes"))
+        )
+
+        if use_local:
+            try:
+                from app.services.local_ai_chat import generate_local_chat
+                answer = await generate_local_chat(
+                    question=question,
+                    weather_context=weather_context,
+                )
+            except Exception:
+                answer = None
+
+        if not answer and os.getenv("OPENROUTER_API_KEY"):
             try:
                 from app.services.openrouter_chat import chat as openrouter_chat
                 answer = await openrouter_chat(

@@ -21,6 +21,7 @@ data class AgentState(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val language: String? = null,
+    val llm_engine: String? = null,
 
     val location_name: String? = null,
     val location_latitude: Double? = null,

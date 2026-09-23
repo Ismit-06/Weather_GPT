@@ -20,7 +20,6 @@ data class DeviceLocation(
     val latitude: Double,
     val longitude: Double
 )
-
 class DeviceLocationProvider(
     private val context: Context
 ) {

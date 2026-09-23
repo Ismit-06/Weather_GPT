@@ -43,10 +43,11 @@
         android:label="WeatherGPT"
         android:roundIcon="@drawable/app_logo"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.WeatherGPT">
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.weathergpt.app.MainActivity"
             android:exported="true"
             android:launchMode="singleTask">
 

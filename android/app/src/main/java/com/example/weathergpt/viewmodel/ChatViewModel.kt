@@ -88,14 +88,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             error = null
         )
 
+        val selectedEngine = com.weathergpt.app.location.LlmEngineStore.getEngine(context)
         val requestAgentState = if (!locationName.isNullOrBlank()) {
             agentState.copy(
                 location_name = locationName,
                 location_latitude = latitude,
-                location_longitude = longitude
+                location_longitude = longitude,
+                llm_engine = selectedEngine
             )
         } else {
-            agentState
+            agentState.copy(
+                llm_engine = selectedEngine
+            )
         }
 
         viewModelScope.launch {

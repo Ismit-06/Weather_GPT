@@ -20,6 +20,8 @@ class ConversationContext:
 
     language: str | None = None
 
+    llm_engine: str | None = None
+
     # Persistent destination/location selected by the user.
     location_name: str | None = None
 
@@ -53,6 +55,8 @@ def update_context(
     longitude: float | None = None,
 
     language: str | None = None,
+
+    llm_engine: str | None = None,
 
     location_name: str | None = None,
 
@@ -119,6 +123,12 @@ def update_context(
             language
             if language
             else previous.language
+        ),
+
+        llm_engine=(
+            llm_engine
+            if llm_engine
+            else previous.llm_engine
         ),
 
         location_name=(

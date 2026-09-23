@@ -108,7 +108,9 @@ graph TD
     end
 
     subgraph Intelligence ["🧠 Atmospheric AI & Scientific Fusion"]
+        WeatherAI["⚡ WeatherAI Local GPT (PyTorch v7.5 & BPE Engine)"]
         Gemma["👁️ Google Gemma 4 Vision (LoRA-002)"]
+        OpenRouter["☁️ OpenRouter / Qwen 2.5 72B Cloud Fallback"]
         Sarvam["🗣️ Sarvam Indic Multilingual ASR & TTS"]
         Fusion["🔮 Sky-Weather Optical & Sensor Fusion"]
         CWC["🌊 CWC Telemetry (124 All-India Reservoirs)"]
@@ -118,6 +120,8 @@ graph TD
     UI -->|HTTPS / REST| FastAPI
     Cam -->|Multipart Image| FastAPI
     Audio -->|Audio Stream| WS
+    FastAPI -->|Custom PyTorch BPE| WeatherAI
+    FastAPI -->|Cloud Fallback| OpenRouter
     FastAPI --> Gemma
     FastAPI --> Sarvam
     FastAPI --> Fusion
@@ -129,12 +133,17 @@ graph TD
 
 ## ✨ Cutting-Edge Technical Capabilities
 
-### 👁️ 1. Sky-AI: Visual Cloud Perception & Confounder Rejection
+### 🤖 1. WeatherAI: Custom On-Premise / Local LLM Microservice
+- **Custom Transformer Architecture**: Autoregressive PyTorch Transformer model ([`weather_gpt_bpe_v7_5_best.pt`](file:///e:/WeatherAI/checkpoints/weather_gpt_bpe_v7_5_best.pt)) trained on specialized meteorological QA pairs.
+- **Fast BPE Tokenizer**: Zero-dependency Byte-Pair Encoding tokenizer with vocabulary optimization for fast weather sequence generation.
+- **Dynamic Engine Switcher**: User-selectable AI engine toggle (`Local WeatherAI` vs `OpenRouter Cloud`) in the Android app with instant cloud-fallback resilience.
+
+### 👁️ 2. Sky-AI: Visual Cloud Perception & Confounder Rejection
 - **Gemma 4 Fine-Tuned Model**: Utilizes **Google Gemma 4 26B A4B Instruct** specialized via LoRA (**`SKY-LORA-002`**) for atmospheric cloud dynamics.
 - **Confounder Rejection Engine**: Actively eliminates non-sky indoor false positives (e.g. blue bedsheets, curtains, tinted glass, ceiling textures, computer displays) via spectral frequency analysis and edge-density heuristics.
 - **Multimodal Atmospheric Fusion**: Fuses live CameraX RGB telemetry, ambient brightness, and orientation metadata with meteorological radar models to classify cloud altitude, density, and immediate rain risk.
 
-### 🌊 2. All-India Dam Intelligence & Flood Early Warning (CWC)
+### 🌊 3. All-India Dam Intelligence & Flood Early Warning (CWC)
 - **124 Monitored Dams Across 31 States & UTs**: Full telemetry synchronization from the Central Water Commission (CWC).
 - **Comprehensive River Basins**: Krishna, Godavari, Ganga, Indus, Narmada, Cauvery, Mahanadi, Brahmaputra, Tapi, Sabarmati, and more.
 - **Real-Time Hydrological Metrics**: Full Reservoir Level (FRL in meters), current water level, live storage vs total capacity in BCM (Billion Cubic Meters), and storage percentage.
@@ -145,12 +154,12 @@ graph TD
   - `NORMAL CAPACITY` ($< 70\%$)
 - **Interactive Exploration Suite**: Real-time multi-attribute search (dam name, district, river basin, state) with regional filter chips (`Southern`, `Northern`, `Western`, `Eastern`, `Central`).
 
-### 🎙️ 3. Multilingual Indic Voice Assistant (Sarvam AI)
+### 🎙️ 4. Multilingual Indic Voice Assistant (Sarvam AI)
 - **12+ Indian Languages Supported**: Native conversational capability in **Hindi, English, Hinglish, Odia, Telugu, Tamil, Kannada, Bengali, Marathi, Gujarati, Malayalam, and Punjabi**.
 - **Streaming WebSocket Speech**: Bidirectional voice pipeline for natural audio query transcription and low-latency neural speech synthesis.
 - **Sub-50ms FastPath Engine**: Offline-resilient rule-based meteorological engine answering high-frequency weather and outdoor activity queries instantly.
 
-### 🗺️ 4. Turbo Vector Map & Doppler Radar Layers
+### 🗺️ 5. Turbo Vector Map & Doppler Radar Layers
 - **OSMDroid Turbo Engine**: 12 parallel raster rendering threads, 250 in-memory tile cache with 60-day persistent disk cache.
 - **Dynamic Layering**: Switch effortlessly between live precipitation radar, thermal contour maps, wind vector particle fields, and satellite imagery.
 
@@ -162,7 +171,7 @@ graph TD
 | :--- | :--- |
 | **Mobile Client** | Kotlin 2.0, Jetpack Compose, Material 3, Coroutines, StateFlow, Navigation Compose, CameraX |
 | **Mapping & Radar** | OSMDroid, MapTiler Vector Tiles, OpenWeather Doppler Layers, Leaflet / TileStream |
-| **Vision & AI** | Google Gemma 4 (26B A4B LoRA), PyTorch, Hugging Face Transformers, OpenCV, Scikit-Learn |
+| **Vision & Local LLM** | WeatherAI PyTorch GPT (v7.5 BPE), Google Gemma 4 (26B A4B LoRA), Hugging Face, OpenCV, Scikit-Learn |
 | **Speech & Multilingual** | Sarvam AI Speech API, Android AudioRecord, Neural TTS, OkHttp WebSocket Streaming |
 | **Cloud & Backend** | Python 3.12, FastAPI, Uvicorn, SQLAlchemy, PostgreSQL, Render Cloud Platform |
 | **Data & Storage** | Retrofit 2, OkHttp 4, Gson, Room Database, EncryptedSharedPreferences |

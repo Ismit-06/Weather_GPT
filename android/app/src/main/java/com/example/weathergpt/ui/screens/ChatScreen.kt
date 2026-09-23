@@ -547,8 +547,9 @@ fun ChatScreen(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
+                            val currentEngineState by com.weathergpt.app.location.LlmEngineStore.engineFlow.collectAsState()
                             Text(
-                                text = "Chat & Voice",
+                                text = if (currentEngineState == "local") "Local AI Model" else "OpenRouter Cloud",
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
