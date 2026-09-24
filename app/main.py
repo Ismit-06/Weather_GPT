@@ -77,27 +77,21 @@ app.add_middleware(
 
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
+from app.web_ui import get_web_app_html
 
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
-def _get_web_html() -> str:
-    index_file = static_dir / "index.html"
-    if index_file.exists():
-        return index_file.read_text(encoding="utf-8")
-    return """<!DOCTYPE html><html><body><h1>WeatherGPT Web Application Loading...</h1></body></html>"""
-
-
 @app.get("/", response_class=HTMLResponse)
-def root_web():
-    return HTMLResponse(content=_get_web_html())
+async def root_web():
+    return HTMLResponse(content=get_web_app_html())
 
 
 @app.get("/app", response_class=HTMLResponse)
-def web_app():
-    return HTMLResponse(content=_get_web_html())
+async def web_app():
+    return HTMLResponse(content=get_web_app_html())
 
 
 @app.get("/api/v1")
