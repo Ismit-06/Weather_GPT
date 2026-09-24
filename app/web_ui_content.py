@@ -1,4 +1,6 @@
-<!DOCTYPE html>
+import html
+
+WEB_APP_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -267,7 +269,7 @@
         <!-- Top Quiet Sky Header -->
         <header class="quiet-header">
             <div class="brand-box" onclick="switchNav('home')">
-                <img src="assets/logo.png" alt="WeatherGPT Logo">
+                <img src="https://raw.githubusercontent.com/Ismit-06/Weather_GPT/main/assets/logo.png" alt="WeatherGPT Logo">
                 <h1>WeatherGPT</h1>
             </div>
             <div class="header-actions">
@@ -436,7 +438,6 @@
     </div>
 
     <script>
-        const API_BASE = "https://weather-gpt-ymze.onrender.com";
         let currentLat = 17.6868, currentLon = 83.2185, currentLocationStr = "Visakhapatnam, Andhra Pradesh", map = null;
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -460,7 +461,7 @@
             document.getElementById('currentCoords').innerText = `(${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
             document.getElementById('heroCity').innerText = name.split(',')[0];
             try {
-                const res = await fetch(`${API_BASE}/weather/current?latitude=${lat}&longitude=${lon}`);
+                const res = await fetch(`/weather/current?latitude=${lat}&longitude=${lon}`);
                 const data = await res.json();
                 if (data.status === "success" && data.current) {
                     const c = data.current;
@@ -488,7 +489,7 @@
 
         async function fetchAlerts(lat, lon) {
             try {
-                const res = await fetch(`${API_BASE}/alerts?latitude=${lat}&longitude=${lon}`);
+                const res = await fetch(`/alerts?latitude=${lat}&longitude=${lon}`);
                 const data = await res.json();
                 const container = document.getElementById('alertsFeed'); container.innerHTML = '';
                 if (data.alerts && data.alerts.length > 0) {
@@ -509,7 +510,7 @@
 
         async function fetchAgriData(lat, lon) {
             try {
-                const res = await fetch(`${API_BASE}/agriculture?latitude=${lat}&longitude=${lon}`);
+                const res = await fetch(`/agriculture?latitude=${lat}&longitude=${lon}`);
                 const data = await res.json();
                 const container = document.getElementById('agriContent');
                 if (data.status === 'success') {
@@ -520,7 +521,7 @@
 
         async function fetchDamsData() {
             try {
-                const res = await fetch(`${API_BASE}/dams?limit=10`);
+                const res = await fetch(`/dams?limit=10`);
                 const data = await res.json();
                 const tbody = document.getElementById('damsTableBody'); tbody.innerHTML = '';
                 if (data.reservoirs) {
@@ -542,7 +543,7 @@
             const uMsg = document.createElement('div'); uMsg.className = 'bubble user'; uMsg.innerText = q;
             messagesDiv.appendChild(uMsg); input.value = ''; messagesDiv.scrollTop = messagesDiv.scrollHeight;
             try {
-                const res = await fetch(`${API_BASE}/chat/weather`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, latitude: currentLat, longitude: currentLon }) });
+                const res = await fetch(`/chat/weather`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, latitude: currentLat, longitude: currentLon }) });
                 const data = await res.json();
                 const aiMsg = document.createElement('div'); aiMsg.className = 'bubble ai'; aiMsg.innerText = data.answer || data.response || "No response.";
                 messagesDiv.appendChild(aiMsg); messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -557,7 +558,7 @@
             const resDiv = document.getElementById('skyResult');
             resDiv.innerHTML = "<p style='color: var(--ocean-blue); font-weight:600; font-size:12px;'>Running Sky AI analysis...</p>";
             try {
-                const res = await fetch(`${API_BASE}/api/v1/weather/analyze-sky`, { method: 'POST', body: formData });
+                const res = await fetch(`/api/v1/weather/analyze-sky`, { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.status === 'success') {
                     resDiv.innerHTML = `<h4 style="color: var(--primary-navy); font-size:13px; margin-bottom: 4px;">Analysis Complete</h4><p style="font-size: 12px; margin-bottom: 4px;"><strong>Assessment:</strong> ${data.assessment}</p><p style="font-size: 11.5px; color: var(--slate-secondary);">${data.explanation}</p>`;
@@ -578,7 +579,7 @@
             const query = e.target.value.trim(); const dropdown = document.getElementById('searchDropdown');
             if (query.length < 2) { dropdown.innerHTML = ''; return; }
             try {
-                const res = await fetch(`${API_BASE}/location/search?query=${encodeURIComponent(query)}`);
+                const res = await fetch(`/location/search?query=${encodeURIComponent(query)}`);
                 const data = await res.json();
                 if (data.results && data.results.length > 0) {
                     dropdown.innerHTML = '';
@@ -605,3 +606,4 @@
     </script>
 </body>
 </html>
+"""
