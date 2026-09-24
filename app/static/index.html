@@ -382,12 +382,85 @@
             font-weight: 700;
         }
 
-        /* MAP */
+        /* MAP & RADAR */
         #map {
-            height: 550px;
+            height: 600px;
             width: 100%;
             border-radius: 20px;
             border: 1px solid var(--border-glass);
+            position: relative;
+        }
+
+        .radar-controls-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .radar-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radar-btn {
+            background: #F1F5F9;
+            border: 1px solid #CBD5E1;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary-navy);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .radar-btn:hover {
+            background: #E2E8F0;
+        }
+
+        .radar-btn.active {
+            background: #2563EB;
+            color: white;
+            border-color: #2563EB;
+        }
+
+        .radar-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .radar-slider-container input[type="range"] {
+            flex: 1;
+            accent-color: #2563EB;
+            cursor: pointer;
+        }
+
+        .radar-badge {
+            background: #EFF6FF;
+            color: #1D4ED8;
+            border: 1px solid #BFDBFE;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: monospace;
+            white-space: nowrap;
         }
 
         .pill-badge {
@@ -592,6 +665,26 @@
 
         <!-- TAB 6: HAZARDS MAP -->
         <div id="tab-map-view" class="tab-content">
+            <div class="radar-controls-card">
+                <div class="radar-btn-group">
+                    <button id="radarToggleBtn" class="radar-btn active" onclick="toggleRadarLayer()">🌧️ Live Rain Radar</button>
+                    <button id="radarPlayBtn" class="radar-btn" onclick="toggleRadarPlayback()">▶️ Play</button>
+                    <button class="radar-btn" onclick="stepRadar(-1)">⏮️</button>
+                    <button class="radar-btn" onclick="stepRadar(1)">⏭️</button>
+                </div>
+                
+                <div class="radar-slider-container">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--slate-secondary);">Frame:</span>
+                    <input type="range" id="radarTimelineSlider" min="0" max="0" value="0" oninput="onRadarSliderChange(this.value)">
+                    <span id="radarTimeDisplay" class="radar-badge">Connecting...</span>
+                </div>
+
+                <div class="radar-btn-group">
+                    <span style="font-size: 12px; font-weight: 600; color: var(--slate-secondary);">Opacity:</span>
+                    <input type="range" id="radarOpacitySlider" min="10" max="100" value="80" style="width: 80px;" oninput="changeRadarOpacity(this.value)">
+                </div>
+            </div>
+
             <div class="glass-card" style="padding: 12px;">
                 <div id="map"></div>
             </div>
@@ -651,6 +744,15 @@
 
                 if (data.forecast) {
                     renderHourlyForecast(data.forecast);
+                }
+
+                // If map is already initialized, pan to new location and update marker
+                if (map) {
+                    map.panTo([lat, lon]);
+                    if (targetMarker) {
+                        targetMarker.setLatLng([lat, lon]);
+                        targetMarker.setPopupContent(`<b>${name}</b><br>Active Meteorological Target`);
+                    }
                 }
             } catch (err) {
                 console.error("Error fetching weather:", err);
@@ -843,15 +945,176 @@
             }
         }
 
+        // RainViewer Live Radar State
+        let radarHost = "https://tilecache.rainviewer.com";
+        let radarFrames = [];
+        let radarCurrentFrameIndex = -1;
+        let radarLayer = null;
+        let radarPlaybackTimer = null;
+        let isRadarVisible = true;
+        let radarOpacity = 0.8;
+        let targetMarker = null;
+
         function initMap() {
+            if (map) return;
             map = L.map('map').setView([currentLat, currentLon], 7);
+            
+            // Base Map Layer (OpenStreetMap with high-contrast cartography)
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
+                attribution: '© OpenStreetMap contributors, Weather data © RainViewer'
             }).addTo(map);
 
-            L.marker([currentLat, currentLon]).addTo(map)
+            targetMarker = L.marker([currentLat, currentLon]).addTo(map)
                 .bindPopup(`<b>${currentLocationStr}</b><br>Active Meteorological Target`)
                 .openPopup();
+
+            // Fetch live radar metadata and initialize radar overlay
+            initRadarLayer();
+        }
+
+        async function initRadarLayer() {
+            const timeDisplay = document.getElementById('radarTimeDisplay');
+            const slider = document.getElementById('radarTimelineSlider');
+
+            try {
+                if (timeDisplay) timeDisplay.innerText = "Syncing radar...";
+                const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
+                if (!res.ok) throw new Error("Radar API HTTP " + res.status);
+
+                const data = await res.json();
+                radarHost = data.host || "https://tilecache.rainviewer.com";
+                
+                const past = (data.radar && data.radar.past) ? data.radar.past : [];
+                const nowcast = (data.radar && data.radar.nowcast) ? data.radar.nowcast : [];
+                
+                radarFrames = [...past, ...nowcast];
+                if (radarFrames.length === 0) {
+                    if (timeDisplay) timeDisplay.innerText = "Radar offline";
+                    return;
+                }
+
+                // Setup timeline slider
+                if (slider) {
+                    slider.min = 0;
+                    slider.max = radarFrames.length - 1;
+                    slider.value = past.length > 0 ? (past.length - 1) : (radarFrames.length - 1);
+                }
+
+                // Default to latest past frame
+                const defaultIdx = past.length > 0 ? (past.length - 1) : (radarFrames.length - 1);
+                showRadarFrame(defaultIdx);
+            } catch (err) {
+                console.error("RainViewer load error:", err);
+                if (timeDisplay) timeDisplay.innerText = "Radar load error";
+            }
+        }
+
+        function showRadarFrame(index) {
+            if (!radarFrames || radarFrames.length === 0) return;
+            if (index < 0 || index >= radarFrames.length) return;
+
+            radarCurrentFrameIndex = index;
+            const frame = radarFrames[index];
+            const cleanHost = radarHost.replace(/\/+$/, '');
+            const cleanPath = frame.path.startsWith('/') ? frame.path : ('/' + frame.path);
+            
+            // Build RainViewer URL: {host}{path}/256/{z}/{x}/{y}/2/1_1.png (Universal/TITAN color scheme, smooth+snow)
+            const tileUrl = `${cleanHost}${cleanPath}/256/{z}/{x}/{y}/2/1_1.png`;
+
+            if (radarLayer && map.hasLayer(radarLayer)) {
+                map.removeLayer(radarLayer);
+            }
+
+            if (isRadarVisible) {
+                radarLayer = L.tileLayer(tileUrl, {
+                    tileSize: 256,
+                    opacity: radarOpacity,
+                    zIndex: 100,
+                    maxNativeZoom: 7,
+                    maxZoom: 18
+                });
+                radarLayer.addTo(map);
+            }
+
+            // Update UI Slider & Badge
+            const slider = document.getElementById('radarTimelineSlider');
+            if (slider) slider.value = index;
+
+            const timeDisplay = document.getElementById('radarTimeDisplay');
+            if (timeDisplay) {
+                const date = new Date(frame.time * 1000);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const isNowcast = (index >= (radarFrames.length - 3));
+                timeDisplay.innerText = `${timeStr} ${isNowcast ? '(Forecast)' : '(Observed)'}`;
+            }
+        }
+
+        function onRadarSliderChange(val) {
+            pauseRadar();
+            showRadarFrame(parseInt(val, 10));
+        }
+
+        function stepRadar(delta) {
+            pauseRadar();
+            if (radarFrames.length === 0) return;
+            let next = radarCurrentFrameIndex + delta;
+            if (next < 0) next = 0;
+            if (next >= radarFrames.length) next = radarFrames.length - 1;
+            showRadarFrame(next);
+        }
+
+        function toggleRadarPlayback() {
+            if (radarPlaybackTimer) {
+                pauseRadar();
+            } else {
+                playRadar();
+            }
+        }
+
+        function playRadar() {
+            if (radarFrames.length === 0) return;
+            const btn = document.getElementById('radarPlayBtn');
+            if (btn) btn.innerHTML = "⏸️ Pause";
+
+            radarPlaybackTimer = setInterval(() => {
+                let next = radarCurrentFrameIndex + 1;
+                if (next >= radarFrames.length) {
+                    next = 0;
+                }
+                showRadarFrame(next);
+            }, 850);
+        }
+
+        function pauseRadar() {
+            if (radarPlaybackTimer) {
+                clearInterval(radarPlaybackTimer);
+                radarPlaybackTimer = null;
+            }
+            const btn = document.getElementById('radarPlayBtn');
+            if (btn) btn.innerHTML = "▶️ Play";
+        }
+
+        function toggleRadarLayer() {
+            isRadarVisible = !isRadarVisible;
+            const btn = document.getElementById('radarToggleBtn');
+            if (btn) {
+                btn.classList.toggle('active', isRadarVisible);
+            }
+
+            if (!isRadarVisible) {
+                if (radarLayer && map.hasLayer(radarLayer)) {
+                    map.removeLayer(radarLayer);
+                }
+            } else {
+                showRadarFrame(radarCurrentFrameIndex >= 0 ? radarCurrentFrameIndex : 0);
+            }
+        }
+
+        function changeRadarOpacity(val) {
+            radarOpacity = parseFloat(val) / 100.0;
+            if (radarLayer) {
+                radarLayer.setOpacity(radarOpacity);
+            }
         }
 
         async function handleSearch(e) {

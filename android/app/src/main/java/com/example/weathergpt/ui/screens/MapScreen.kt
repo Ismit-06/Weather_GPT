@@ -284,11 +284,13 @@ fun MapScreen(
 
                 val cleanHost = host.trimEnd('/')
                 val cleanPath = if (frame.path.startsWith("/")) frame.path else "/${frame.path}"
-                // Support zoom levels from 0 to 12 for high resolution precipitation radar
+                // RainViewer public radar tiles support up to zoom 7.
+                // Beyond zoom 7, RainViewer serves "Zoom Level Not Supported" placeholder tiles.
+                // Limiting maxZoomLevel to 7 tells osmdroid to scale up zoom 7 tiles smoothly when zooming further.
                 val tileSource = XYTileSource(
                     "RainViewer_${frame.time}",
                     0,
-                    12,
+                    7,
                     256,
                     "/2/1_1.png",
                     arrayOf("$cleanHost$cleanPath/256/"),
@@ -301,10 +303,10 @@ fun MapScreen(
                     loadingLineColor = AndroidColor.TRANSPARENT
                 }
 
-                // Place radar overlay above base tiles
+                // Place radar overlay at index 0 so it renders on top of the base satellite map and underneath markers
                 view.overlays.add(0, newOverlay)
                 currentRadarOverlay = newOverlay
-                view.invalidate()
+                view.postInvalidate()
             } catch (_: Throwable) {
                 currentRadarOverlay = null
             }

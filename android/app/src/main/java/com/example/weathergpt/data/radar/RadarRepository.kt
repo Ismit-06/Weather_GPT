@@ -45,6 +45,7 @@ class RadarRepository {
             val host = root.optString("host", "https://tilecache.rainviewer.com")
             val radar = root.optJSONObject("radar") ?: return@withContext cached
             val past = radar.optJSONArray("past")
+            val nowcast = radar.optJSONArray("nowcast")
 
             val frameList = mutableListOf<RadarFrame>()
             if (past != null) {
@@ -57,13 +58,23 @@ class RadarRepository {
                     }
                 }
             }
+            if (nowcast != null) {
+                for (i in 0 until nowcast.length()) {
+                    val item = nowcast.optJSONObject(i) ?: continue
+                    val time = item.optLong("time", 0L)
+                    val path = item.optString("path", "")
+                    if (time > 0L && path.isNotBlank()) {
+                        frameList.add(RadarFrame(time = time, path = path))
+                    }
+                }
+            }
 
             // Sort chronologically ascending
             frameList.sortBy { it.time }
 
-            // Keep the last 12 frames (~2 hours of radar history)
-            val trimmedFrames = if (frameList.size > 12) {
-                frameList.takeLast(12)
+            // Keep the latest 15 frames for optimal memory and comprehensive timeline
+            val trimmedFrames = if (frameList.size > 15) {
+                frameList.takeLast(15)
             } else {
                 frameList
             }
