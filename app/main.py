@@ -86,12 +86,12 @@ if static_dir.exists():
 
 @app.get("/", response_class=HTMLResponse)
 async def root_web():
-    return HTMLResponse(content=get_web_app_html())
+    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
 
 
 @app.get("/app", response_class=HTMLResponse)
 async def web_app():
-    return HTMLResponse(content=get_web_app_html())
+    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
 
 
 @app.get("/api/v1")
