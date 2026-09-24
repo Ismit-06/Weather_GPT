@@ -28,7 +28,6 @@ from app.routers.dams import router as dams_router
 from app.routers.earthquakes import router as earthquakes_router
 from app.routers.flood import router as flood_router
 from app.routers.agriculture import router as agriculture_router
-from app.routers.chat import router as chat_router
 from app.routers.weather_chat import router as weather_chat_router
 
 from app.routers.ingestion import router as ingestion_router
