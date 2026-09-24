@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeatherGPT • SIH Live Prototype Platform</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #EFF2F6;
+            --bg-white: #FFFFFF;
+            --primary-navy: #0F2942;
+            --ocean-blue: #0284C7;
+            --electric-blue: #2563EB;
+            --slate-primary: #0F172A;
+            --slate-secondary: #475569;
+            --slate-muted: #64748B;
+            --border-glass: #D6DFE8;
+            --danger-red: #DC2626;
+            --warning-amber: #D97706;
+            --success-green: #059669;
+            --card-shadow: 0 10px 30px rgba(15, 41, 66, 0.05);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--slate-primary); min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-glass); position: sticky; top: 0; z-index: 1000; padding: 12px 24px; }
+        .header-container { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .brand-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--primary-navy); }
+        .brand-logo .icon-box { width: 38px; height: 38px; background: var(--primary-navy); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+        .brand-logo h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+        .nav-tabs { display: flex; align-items: center; gap: 6px; background: var(--bg-dark); padding: 4px; border-radius: 14px; border: 1px solid var(--border-glass); }
+        .nav-btn { padding: 8px 16px; border-radius: 10px; border: none; background: transparent; color: var(--slate-secondary); font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px; }
+        .nav-btn.active { background: var(--primary-navy); color: white; box-shadow: 0 4px 12px rgba(15, 41, 66, 0.15); }
+        .location-search-bar { display: flex; align-items: center; gap: 8px; background: white; border: 1px solid var(--border-glass); border-radius: 12px; padding: 6px 12px; width: 320px; position: relative; }
+        .location-search-bar input { border: none; outline: none; width: 100%; font-size: 13px; color: var(--slate-primary); }
+        .search-results-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-glass); border-radius: 12px; margin-top: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-height: 250px; overflow-y: auto; z-index: 1001; display: none; }
+        .search-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+        .search-item:hover { background: #f8fafc; }
+        main { max-width: 1400px; margin: 0 auto; padding: 24px; width: 100%; flex: 1; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .glass-card { background: var(--bg-white); border: 1px solid var(--border-glass); border-radius: 20px; padding: 20px; box-shadow: var(--card-shadow); margin-bottom: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 900px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } .header-container { flex-direction: column; gap: 12px; } .location-search-bar { width: 100%; } }
+        .weather-hero { background: linear-gradient(135deg, #0F2942 0%, #1E3A8A 100%); color: white; border-radius: 24px; padding: 28px; position: relative; overflow: hidden; box-shadow: 0 15px 35px rgba(15, 41, 66, 0.2); }
+        .weather-hero-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .temp-display { font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -2px; margin: 16px 0 8px; }
+        .metrics-row { display: flex; gap: 24px; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.15); }
+        .metric-item { display: flex; flex-direction: column; }
+        .metric-item .label { font-size: 11px; color: rgba(255, 255, 255, 0.7); text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-item .val { font-size: 16px; font-weight: 700; margin-top: 2px; }
+        .cyclone-alert-banner { background: #FEF2F2; border: 2px solid #FCA5A5; border-radius: 18px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 14px; }
+        .cyclone-alert-banner .badge { background: var(--danger-red); color: white; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; }
+        .chat-container { display: flex; flex-direction: column; height: 600px; border-radius: 20px; background: white; border: 1px solid var(--border-glass); overflow: hidden; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+        .message-bubble { max-width: 80%; padding: 14px 18px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+        .message-bubble.user { align-self: flex-end; background: var(--primary-navy); color: white; border-bottom-right-radius: 4px; }
+        .message-bubble.ai { align-self: flex-start; background: #F1F5F9; color: var(--slate-primary); border-bottom-left-radius: 4px; border: 1px solid var(--border-glass); }
+        .chat-input-row { padding: 14px; border-top: 1px solid var(--border-glass); display: flex; gap: 10px; background: #FAFAFA; }
+        .chat-input-row input { flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-glass); font-size: 14px; outline: none; }
+        .btn-send { padding: 0 20px; background: var(--primary-navy); color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th, .data-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #E2E8F0; }
+        .data-table th { background: #F8FAFC; color: var(--slate-secondary); font-weight: 700; }
+        #map { height: 550px; width: 100%; border-radius: 20px; border: 1px solid var(--border-glass); }
+        .pill-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .pill-danger { background: #FEE2E2; color: #DC2626; }
+        .pill-warning { background: #FEF3C7; color: #D97706; }
+        .pill-success { background: #D1FAE5; color: #059669; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <a href="#" class="brand-logo">
+                <div class="icon-box">W</div>
+                <div><h1>WeatherGPT</h1></div>
+            </a>
+            <div class="nav-tabs">
+                <button class="nav-btn active" onclick="switchTab('dashboard')">🌤️ Forecast</button>
+                <button class="nav-btn" onclick="switchTab('alerts')">🚨 Alerts & Cyclones</button>
+                <button class="nav-btn" onclick="switchTab('chat')">🤖 AI Assistant</button>
+                <button class="nav-btn" onclick="switchTab('sky-ai')">☁️ Sky AI Vision</button>
+                <button class="nav-btn" onclick="switchTab('reservoirs')">🌊 Reservoirs</button>
+                <button class="nav-btn" onclick="switchTab('map-view')">🗺️ Hazards Map</button>
+            </div>
+            <div class="location-search-bar">
+                <span>📍</span>
+                <input type="text" id="searchInput" placeholder="Search location in India..." onkeyup="handleSearch(event)">
+                <div class="search-results-dropdown" id="searchDropdown"></div>
+            </div>
+        </div>
+    </header>
+    <main>
+        <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: var(--ocean-blue); font-weight: 700; font-size: 15px;" id="currentLocationName">📍 Visakhapatnam, Andhra Pradesh</span>
+                <span style="color: var(--slate-muted); font-size: 12px;" id="currentCoords">(17.6868°N, 83.2185°E)</span>
+            </div>
+            <button onclick="useDeviceLocation()" style="background: white; border: 1px solid var(--border-glass); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">🎯 Use My GPS</button>
+        </div>
+        <div id="tab-dashboard" class="tab-content active">
+            <div id="cycloneBanner" class="cyclone-alert-banner" style="display:none;">
+                <span style="font-size: 24px;">🚨</span>
+                <div style="flex:1;">
+                    <div style="display:flex; gap: 8px; align-items: center; margin-bottom: 4px;">
+                        <span class="badge" id="cycloneBadge">CRITICAL CYCLONE WARNING</span>
+                        <strong style="color: #991B1B; font-size: 14px;" id="cycloneTitle">Severe Cyclonic Storm Signal</strong>
+                    </div>
+                    <p style="font-size: 13px; color: #7F1D1D;" id="cycloneMessage">Deep depression over Bay of Bengal moving towards Odisha-Vizag coast with high wind gusts.</p>
+                    <p style="font-size: 12px; color: #991B1B; font-weight: 600; margin-top: 6px;" id="cycloneAdvisory">Recommendation: Immediate coastal evacuation to designated emergency shelters.</p>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="weather-hero">
+                    <div class="weather-hero-header">
+                        <div>
+                            <span style="background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;">LIVE MET TELEMETRY</span>
+                            <h2 style="font-size: 28px; margin-top: 8px;" id="heroCity">Visakhapatnam</h2>
+                        </div>
+                        <div style="font-size: 48px;" id="heroIcon">⛈️</div>
+                    </div>
+                    <div class="temp-display" id="heroTemp">28.4°C</div>
+                    <div style="font-size: 16px; font-weight: 600;" id="heroCondition">Heavy Rain & Thunderstorm</div>
+                    <div class="metrics-row">
+                        <div class="metric-item"><span class="label">Wind Speed</span><span class="val" id="metricWind">47.5 km/h</span></div>
+                        <div class="metric-item"><span class="label">Pressure</span><span class="val" id="metricPressure">993 hPa</span></div>
+                        <div class="metric-item"><span class="label">Humidity</span><span class="val" id="metricHumidity">88%</span></div>
+                        <div class="metric-item"><span class="label">Precipitation</span><span class="val" id="metricRain">12.4 mm</span></div>
+                    </div>
+                </div>
+                <div class="glass-card">
+                    <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">🌾 Agriculture & Farming Intelligence</h3>
+                    <div id="agriContent"><p style="color: var(--slate-secondary); font-size: 13px;">Loading agricultural risk assessment...</p></div>
+                </div>
+            </div>
+            <div class="glass-card" style="margin-top: 20px;">
+                <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px;">📅 Next 48-Hour Meteorological Forecast</h3>
+                <div id="hourlyContainer" style="display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px;"></div>
+            </div>
+        </div>
+        <div id="tab-alerts" class="tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 16px; color: var(--danger-red);">🚨 Live Severe Hazard & Emergency Alert Feed</h3>
+                <div id="alertsFeed"><p style="color: var(--slate-secondary);">Fetching latest IMD and regional weather warnings...</p></div>
+            </div>
+        </div>
+        <div id="tab-chat" class="tab-content">
+            <div class="chat-container">
+                <div style="padding: 16px 20px; background: var(--primary-navy); color: white; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">🤖</span>
+                        <div>
+                            <strong style="font-size: 15px;">WeatherGPT AI Reasoning Assistant</strong>
+                            <div style="font-size: 11px; opacity: 0.8;">Powered by Realtime Weather Agent</div>
+                        </div>
+                    </div>
+                    <span class="pill-badge pill-success">ONLINE</span>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message-bubble ai">Hello! I am WeatherGPT. Ask me any detailed question about weather, storm tracking, flood risk, or agriculture.</div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chatInput" placeholder="Ask WeatherGPT..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                    <button class="btn-send" onclick="sendChatMessage()">Ask AI</button>
+                </div>
+            </div>
+        </div>
+        <div id="tab-sky-ai" class="tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">☁️ Sky AI Vision Engine</h3>
+                <p style="color: var(--slate-secondary); font-size: 13px; margin-bottom: 20px;">Upload a sky photograph to run computer vision analysis fused with live weather context.</p>
+                <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <input type="file" id="skyImageInput" accept="image/*" style="margin-bottom: 14px;">
+                        <button onclick="analyzeSkyImage()" style="padding: 12px 20px; background: var(--primary-navy); color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer;">Analyze Sky Photo</button>
+                    </div>
+                    <div id="skyResult" style="flex: 2; min-width: 300px; background: #F8FAFC; border: 1px solid var(--border-glass); border-radius: 16px; padding: 18px;">
+                        <p style="color: var(--slate-muted); font-size: 13px;">Upload an image to see cloud type and atmospheric analysis.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="tab-reservoirs" class="tab-content">
+            <div class="glass-card">
+                <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">🌊 CWC Monitored Dam & Reservoir Intelligence</h3>
+                <p style="color: var(--slate-secondary); font-size: 13px; margin-bottom: 16px;">Live storage capacity and flood warning thresholds for major Indian dams.</p>
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th>Reservoir Name</th><th>State</th><th>Basin</th><th>Current Storage (%)</th><th>FRL Level (m)</th><th>Risk Level</th></tr>
+                        </thead>
+                        <tbody id="damsTableBody"><tr><td colspan="6">Loading reservoir data...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div id="tab-map-view" class="tab-content">
+            <div class="glass-card" style="padding: 12px;"><div id="map"></div></div>
+        </div>
+    </main>
+    <script>
+        const API_BASE = "https://weather-gpt-ymze.onrender.com";
+        let currentLat = 17.6868, currentLon = 83.2185, currentLocationStr = "Visakhapatnam, Andhra Pradesh", map = null;
+        document.addEventListener("DOMContentLoaded", () => {
+            fetchWeatherData(currentLat, currentLon, currentLocationStr);
+            fetchAlerts(currentLat, currentLon);
+            fetchAgriData(currentLat, currentLon);
+            fetchDamsData();
+        });
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            event.target.classList.add('active');
+            if (tabId === 'map-view' && !map) initMap();
+        }
+        async function fetchWeatherData(lat, lon, name) {
+            currentLat = lat; currentLon = lon; currentLocationStr = name;
+            document.getElementById('currentLocationName').innerText = "📍 " + name;
+            document.getElementById('currentCoords').innerText = `(${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`;
+            document.getElementById('heroCity').innerText = name.split(',')[0];
+            try {
+                const res = await fetch(`${API_BASE}/weather/current?latitude=${lat}&longitude=${lon}`);
+                const data = await res.json();
+                if (data.status === "success" && data.current) {
+                    const c = data.current;
+                    document.getElementById('heroTemp').innerText = `${c.temperature_c.toFixed(1)}°C`;
+                    document.getElementById('heroCondition').innerText = c.symbol_code || "Clear";
+                    document.getElementById('metricWind').innerText = `${(c.wind_speed_ms * 3.6).toFixed(1)} km/h`;
+                    document.getElementById('metricPressure').innerText = `${c.pressure_hpa || 1013} hPa`;
+                    document.getElementById('metricHumidity').innerText = `${c.relative_humidity_pct}%`;
+                    document.getElementById('metricRain').innerText = `${c.precipitation_mm || 0} mm`;
+                }
+                if (data.forecast) renderHourlyForecast(data.forecast);
+            } catch (err) { console.error(err); }
+        }
+        function renderHourlyForecast(forecast) {
+            const container = document.getElementById('hourlyContainer'); container.innerHTML = '';
+            forecast.slice(0, 24).forEach(item => {
+                const timeStr = new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const el = document.createElement('div');
+                el.style.cssText = "min-width: 90px; background: #F8FAFC; border: 1px solid var(--border-glass); border-radius: 14px; padding: 12px; text-align: center;";
+                el.innerHTML = `<div style="font-size: 11px; color: var(--slate-secondary); font-weight: 600;">${timeStr}</div><div style="font-size: 22px; margin: 6px 0;">🌧️</div><div style="font-size: 14px; font-weight: 800;">${item.temperature_c}°C</div><div style="font-size: 10px; color: var(--slate-muted); margin-top: 4px;">💧 ${item.precipitation_mm || 0} mm</div>`;
+                container.appendChild(el);
+            });
+        }
+        async function fetchAlerts(lat, lon) {
+            try {
+                const res = await fetch(`${API_BASE}/alerts?latitude=${lat}&longitude=${lon}`);
+                const data = await res.json();
+                const container = document.getElementById('alertsFeed'); container.innerHTML = '';
+                if (data.alerts && data.alerts.length > 0) {
+                    const cyclone = data.alerts.find(a => a.type === 'CYCLONE_WARNING' || a.type === 'CYCLONE_ALERT' || a.severity === 'CRITICAL');
+                    if (cyclone) {
+                        document.getElementById('cycloneBanner').style.display = 'flex';
+                        document.getElementById('cycloneTitle').innerText = cyclone.message;
+                        document.getElementById('cycloneAdvisory').innerText = "Recommendation: " + (cyclone.advisory || "Stay indoors.");
+                    } else { document.getElementById('cycloneBanner').style.display = 'none'; }
+                    data.alerts.forEach(alert => {
+                        const div = document.createElement('div');
+                        div.style.cssText = "padding: 16px; border-radius: 14px; border: 1px solid var(--border-glass); margin-bottom: 12px; background: white;";
+                        div.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><strong style="color: var(--slate-primary); font-size: 15px;">${alert.type}</strong><span class="pill-badge pill-danger">${alert.severity}</span></div><p style="font-size: 13px; color: var(--slate-secondary);">${alert.message}</p>${alert.advisory ? `<p style="font-size: 12px; color: var(--slate-primary); font-weight: 600; margin-top: 6px;">💡 Advisory: ${alert.advisory}</p>` : ''}`;
+                        container.appendChild(div);
+                    });
+                } else { container.innerHTML = '<p style="color: var(--slate-secondary);">No severe warnings active for this region.</p>'; }
+            } catch (err) { console.error(err); }
+        }
+        async function fetchAgriData(lat, lon) {
+            try {
+                const res = await fetch(`${API_BASE}/agriculture?latitude=${lat}&longitude=${lon}`);
+                const data = await res.json();
+                const container = document.getElementById('agriContent');
+                if (data.status === 'success') {
+                    container.innerHTML = `<div style="display: flex; justify-content: space-between; margin-bottom: 10px;"><span style="font-size: 13px; font-weight: 600;">Crop Suitability Level:</span><span class="pill-badge pill-success">${data.suitability_level} (${data.suitability_score}/100)</span></div><p style="font-size: 12px; color: var(--slate-secondary); margin-bottom: 8px;"><strong>Rainfall Impact:</strong> ${data.rainfall_assessment?.irrigation_impact || 'Normal'}</p><div style="background: #F8FAFC; padding: 10px; border-radius: 10px; font-size: 12px;"><strong>Recommended Actions:</strong><ul style="margin-left: 16px; margin-top: 4px;">${(data.actions || []).map(a => `<li>${a}</li>`).join('')}</ul></div>`;
+                }
+            } catch (err) { console.error(err); }
+        }
+        async function fetchDamsData() {
+            try {
+                const res = await fetch(`${API_BASE}/dams?limit=15`);
+                const data = await res.json();
+                const tbody = document.getElementById('damsTableBody'); tbody.innerHTML = '';
+                if (data.reservoirs) {
+                    data.reservoirs.forEach(dam => {
+                        const tr = document.createElement('tr');
+                        const pct = dam.storage_percent || dam.pct || 0;
+                        const badgeClass = pct >= 85 ? 'pill-danger' : (pct >= 70 ? 'pill-warning' : 'pill-success');
+                        tr.innerHTML = `<td><strong>${dam.name || dam.reservoir_name}</strong></td><td>${dam.state}</td><td>${dam.basin || 'Basin'}</td><td><strong>${pct.toFixed(1)}%</strong></td><td>${dam.frl_m || dam.frl || 'N/A'} m</td><td><span class="pill-badge ${badgeClass}">${pct >= 85 ? 'CRITICAL SPILL' : 'NORMAL'}</span></td>`;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) { console.error(err); }
+        }
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const q = input.value.trim(); if (!q) return;
+            const messagesDiv = document.getElementById('chatMessages');
+            const uMsg = document.createElement('div'); uMsg.className = 'message-bubble user'; uMsg.innerText = q;
+            messagesDiv.appendChild(uMsg); input.value = ''; messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            try {
+                const res = await fetch(`${API_BASE}/chat/weather`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, latitude: currentLat, longitude: currentLon }) });
+                const data = await res.json();
+                const aiMsg = document.createElement('div'); aiMsg.className = 'message-bubble ai'; aiMsg.innerText = data.answer || data.response || "No response received.";
+                messagesDiv.appendChild(aiMsg); messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } catch (err) { console.error(err); }
+        }
+        async function analyzeSkyImage() {
+            const input = document.getElementById('skyImageInput');
+            if (!input.files || !input.files[0]) { alert("Please select a photo first."); return; }
+            const formData = new FormData();
+            formData.append("image", input.files[0]); formData.append("latitude", currentLat); formData.append("longitude", currentLon);
+            const resDiv = document.getElementById('skyResult');
+            resDiv.innerHTML = "<p style='color: var(--ocean-blue); font-weight:600;'>Running Sky AI vision analysis...</p>";
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/weather/analyze-sky`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    resDiv.innerHTML = `<h4 style="color: var(--primary-navy); margin-bottom: 8px;">Analysis Complete</h4><p style="font-size: 13px; margin-bottom: 6px;"><strong>Assessment:</strong> ${data.assessment}</p><p style="font-size: 13px; color: var(--slate-secondary);">${data.explanation}</p>`;
+                } else { resDiv.innerHTML = `<p style="color: var(--danger-red);">Analysis failed: ${data.detail || 'Error processing image'}</p>`; }
+            } catch (err) { resDiv.innerHTML = `<p style="color: var(--danger-red);">Vision AI request failed.</p>`; }
+        }
+        function initMap() {
+            map = L.map('map').setView([currentLat, currentLon], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            L.marker([currentLat, currentLon]).addTo(map).bindPopup(`<b>${currentLocationStr}</b><br>Active Target`).openPopup();
+        }
+        async function handleSearch(e) {
+            const query = e.target.value.trim(); const dropdown = document.getElementById('searchDropdown');
+            if (query.length < 2) { dropdown.style.display = 'none'; return; }
+            try {
+                const res = await fetch(`${API_BASE}/location/search?query=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    dropdown.innerHTML = '';
+                    data.results.forEach(item => {
+                        const div = document.createElement('div'); div.className = 'search-item';
+                        div.innerText = `${item.name}, ${item.admin1 || ''} (${item.country || 'India'})`;
+                        div.onclick = () => { dropdown.style.display = 'none'; e.target.value = item.name; fetchWeatherData(item.latitude, item.longitude, `${item.name}, ${item.admin1 || ''}`); fetchAlerts(item.latitude, item.longitude); fetchAgriData(item.latitude, item.longitude); };
+                        dropdown.appendChild(div);
+                    });
+                    dropdown.style.display = 'block';
+                }
+            } catch (err) { console.error(err); }
+        }
+        function useDeviceLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    fetchWeatherData(pos.coords.latitude, pos.coords.longitude, "GPS Location");
+                    fetchAlerts(pos.coords.latitude, pos.coords.longitude);
+                    fetchAgriData(pos.coords.latitude, pos.coords.longitude);
+                });
+            }
+        }
+    </script>
+</body>
+</html>
