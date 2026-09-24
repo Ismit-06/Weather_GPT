@@ -81,7 +81,7 @@ WEB_APP_HTML = """<!DOCTYPE html>
     <header>
         <div class="header-container">
             <a href="#" class="brand-logo">
-                <div class="icon-box">W</div>
+                <img src="https://raw.githubusercontent.com/Ismit-06/Weather_GPT/main/assets/logo.png" alt="WeatherGPT Logo" style="width: 38px; height: 38px; border-radius: 10px; object-fit: contain;">
                 <div><h1>WeatherGPT</h1></div>
             </a>
             <div class="nav-tabs">
