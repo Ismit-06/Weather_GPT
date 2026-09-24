@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 router = APIRouter(
-    prefix="/chat",
+    prefix="/api/v1/chat_legacy",
     tags=["Chat"]
 )
 

@@ -6,7 +6,7 @@ from app.tools.weather_alerts import (
 
 
 router = APIRouter(
-    prefix="/alerts",
+    prefix="/api/v1/alerts",
     tags=["Alerts"],
 )
 
