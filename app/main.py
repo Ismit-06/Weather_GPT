@@ -124,7 +124,6 @@ app.include_router(dams_router)
 app.include_router(earthquakes_router)
 app.include_router(flood_router)
 app.include_router(agriculture_router)
-app.include_router(chat_router)
 app.include_router(weather_chat_router)
 
 # Data and historical weather.
