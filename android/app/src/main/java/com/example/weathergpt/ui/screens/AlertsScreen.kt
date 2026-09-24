@@ -73,8 +73,14 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 
+import androidx.compose.ui.platform.LocalContext
+import com.weathergpt.app.location.LocationStore
+import com.weathergpt.app.data.MetWeatherClient
+
 @Composable
 fun AlertsScreen() {
+    val context = LocalContext.current
+    val activeLocation = remember { LocationStore.getLocation(context) }
     var damItems by remember { mutableStateOf(DamClient.OFFICIAL_CWC_RESERVOIRS) }
     var refreshKey by remember { mutableIntStateOf(0) }
     var lastUpdatedText by remember { mutableStateOf("Just now") }
@@ -86,17 +92,97 @@ fun AlertsScreen() {
     var activeCycloneAlert by remember { mutableStateOf<com.weathergpt.app.data.AlertItem?>(null) }
 
     // Periodic time-to-time automatic updating (every 5 minutes) + immediate manual refresh
-    LaunchedEffect(refreshKey) {
+    LaunchedEffect(refreshKey, activeLocation) {
         while (isActive) {
             try {
                 val alertsRes = withContext(Dispatchers.IO) {
-                    com.weathergpt.app.data.FeatureClient.api.getAlerts(latitude = 17.6868, longitude = 83.2185)
+                    com.weathergpt.app.data.FeatureClient.api.getAlerts(
+                        latitude = activeLocation.latitude,
+                        longitude = activeLocation.longitude
+                    )
                 }
-                if (alertsRes.alerts != null) {
-                    liveAlerts = alertsRes.alerts
-                    activeCycloneAlert = alertsRes.alerts.firstOrNull { 
-                        it.type == "CYCLONE_WARNING" || it.type == "CYCLONE_ALERT" || it.severity == "CRITICAL"
+                var alertsList = alertsRes.alerts ?: emptyList()
+
+                // If backend alerts are empty, evaluate local forecast to generate real, accurate alerts
+                if (alertsList.isEmpty()) {
+                    val weather = withContext(Dispatchers.IO) {
+                        try {
+                            MetWeatherClient.getCachedWeather(activeLocation.latitude, activeLocation.longitude, context)
+                                ?: MetWeatherClient.getFastWeather(activeLocation.latitude, activeLocation.longitude, context)
+                        } catch (_: Exception) { null }
                     }
+                    if (weather != null && weather.forecast.isNotEmpty()) {
+                        val computed = mutableListOf<com.weathergpt.app.data.AlertItem>()
+                        val firstForecast = weather.forecast.take(24)
+
+                        // 1. Rain / Precipitation alert
+                        val rainyItem = firstForecast.firstOrNull { (it.precipitation_mm ?: 0.0) >= 2.0 || (it.precipitation_probability_pct ?: 0.0) >= 65.0 }
+                        if (rainyItem != null) {
+                            val precip = rainyItem.precipitation_mm ?: 0.0
+                            val prob = rainyItem.precipitation_probability_pct?.toInt() ?: 0
+                            val isHigh = precip >= 10.0 || (rainyItem.symbol_code.orEmpty().contains("heavy"))
+                            computed.add(
+                                com.weathergpt.app.data.AlertItem(
+                                    type = "RAIN",
+                                    severity = if (isHigh) "HIGH" else "MEDIUM",
+                                    source_type = "PRECIPITATION",
+                                    time = rainyItem.time,
+                                    value = precip,
+                                    unit = "mm",
+                                    message = if (isHigh) "Heavy rainfall expected (${"%.1f".format(precip)} mm)" else "Rainfall expected (${prob}% chance, ${"%.1f".format(precip)} mm)",
+                                    advisory = "Carry an umbrella and avoid low-lying roads during showers.",
+                                    pressure_hpa = rainyItem.pressure_hpa
+                                )
+                            )
+                        }
+
+                        // 2. Strong Winds / Gusts alert
+                        val windyItem = firstForecast.firstOrNull { (it.wind_speed_ms ?: 0.0) >= 10.0 || (it.wind_gust_ms ?: 0.0) >= 14.0 }
+                        if (windyItem != null) {
+                            val windKmh = ((windyItem.wind_speed_ms ?: 0.0) * 3.6).toInt()
+                            val gustKmh = ((windyItem.wind_gust_ms ?: 0.0) * 3.6).toInt()
+                            val isHigh = windKmh >= 50 || gustKmh >= 60
+                            computed.add(
+                                com.weathergpt.app.data.AlertItem(
+                                    type = "WIND",
+                                    severity = if (isHigh) "HIGH" else "MEDIUM",
+                                    source_type = "WIND",
+                                    time = windyItem.time,
+                                    value = windKmh,
+                                    unit = "km/h",
+                                    message = "Strong winds up to $windKmh km/h (gusts $gustKmh km/h)",
+                                    advisory = "Secure loose outdoor belongings and take precautions while commuting.",
+                                    pressure_hpa = windyItem.pressure_hpa
+                                )
+                            )
+                        }
+
+                        // 3. Extreme Heat or Low Temp
+                        val maxTempItem = firstForecast.maxByOrNull { it.temperature_c ?: 0.0 }
+                        if (maxTempItem != null && (maxTempItem.temperature_c ?: 0.0) >= 38.0) {
+                            val temp = maxTempItem.temperature_c ?: 0.0
+                            computed.add(
+                                com.weathergpt.app.data.AlertItem(
+                                    type = "HEAT",
+                                    severity = if (temp >= 42.0) "HIGH" else "MEDIUM",
+                                    source_type = "TEMPERATURE",
+                                    time = maxTempItem.time,
+                                    value = temp,
+                                    unit = "°C",
+                                    message = "Extreme heat condition (${"%.1f".format(temp)}°C)",
+                                    advisory = "Stay hydrated and avoid prolonged midday sun exposure.",
+                                    pressure_hpa = maxTempItem.pressure_hpa
+                                )
+                            )
+                        }
+
+                        alertsList = computed
+                    }
+                }
+
+                liveAlerts = alertsList
+                activeCycloneAlert = alertsList.firstOrNull { 
+                    it.type == "CYCLONE_WARNING" || it.type == "CYCLONE_ALERT" || it.severity == "CRITICAL"
                 }
             } catch (_: Exception) { }
 
@@ -327,14 +413,26 @@ fun AlertsScreen() {
                     Text(text = "💡", fontSize = 18.sp)
                     Column {
                         Text(
-                            text = "WeatherGPT Safety Intelligence",
+                            text = "WeatherGPT Safety Intelligence (${activeLocation.name})",
                             color = SecondaryCyan,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(3.dp))
+                        val adviceText = when {
+                            activeCycloneAlert != null -> "CRITICAL: Cyclone alert active for this region. Strictly avoid coastal and exposed open areas."
+                            liveAlerts.any { it.severity?.uppercase() == "HIGH" || it.severity?.uppercase() == "CRITICAL" } -> {
+                                val top = liveAlerts.first { it.severity?.uppercase() == "HIGH" || it.severity?.uppercase() == "CRITICAL" }
+                                top.advisory ?: top.message ?: "Hazardous conditions detected. Take necessary precautions."
+                            }
+                            liveAlerts.isNotEmpty() -> {
+                                val top = liveAlerts.first()
+                                top.advisory ?: top.message ?: "Moderate weather fluctuations active. Normal precautions advised."
+                            }
+                            else -> "No adverse weather hazards currently detected for ${activeLocation.name}. All clear for routine travel and outdoor activities."
+                        }
                         Text(
-                            text = "You don't need to change your plans unless you're travelling between 4–6 PM.",
+                            text = adviceText,
                             color = TextPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
@@ -346,65 +444,160 @@ fun AlertsScreen() {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // HIGH PRIORITY
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "HIGH PRIORITY",
-                    color = DangerRed,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.6.sp
-                )
-                MockupAlertCard(
-                    icon = Icons.Default.WaterDrop,
-                    title = "🌧️ Heavy rain",
-                    severity = "HIGH",
-                    explanation = "Expected 4:20 – 6:10 PM with possible water accumulation on roads.",
-                    action = "Avoid low-lying routes; delay outdoor travel until 6:15 PM.",
-                    accentColor = DangerRed
-                )
-            }
+            if (liveAlerts.isEmpty()) {
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    padding = 16.dp
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SuccessGreen.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "All Clear",
+                                tint = SuccessGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "All Clear in ${activeLocation.name}",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "No active meteorological warnings or high rain/wind hazards for the next 24 hours.",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Aggregate by distinct hazard type to eliminate duplicate cards (e.g. repeated hourly MODERATE_RAIN)
+                val distinctAlerts = liveAlerts
+                    .groupBy { it.type?.uppercase() ?: "OTHER" }
+                    .values
+                    .map { items ->
+                        // Take the item with highest severity
+                        val rankMap = mapOf("CRITICAL" to 4, "HIGH" to 3, "MEDIUM" to 2, "MODERATE" to 2, "LOW" to 1)
+                        items.maxByOrNull { rankMap[it.severity?.uppercase()] ?: 0 } ?: items.first()
+                    }
 
-            Spacer(modifier = Modifier.height(10.dp))
+                val highAlerts = distinctAlerts.filter { it.severity?.uppercase() in listOf("HIGH", "CRITICAL") }
+                val mediumAlerts = distinctAlerts.filter { it.severity?.uppercase() in listOf("MEDIUM", "MODERATE") }
+                val lowAlerts = distinctAlerts.filter { it !in highAlerts && it !in mediumAlerts }
 
-            // MEDIUM PRIORITY
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "MEDIUM",
-                    color = WarningAmber,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.6.sp
-                )
-                MockupAlertCard(
-                    icon = Icons.Default.Warning,
-                    title = "🌬️ Strong winds",
-                    severity = "MEDIUM",
-                    explanation = "Gusts up to 35 km/h expected after 7:00 PM.",
-                    action = "Secure outdoor items and drive cautiously on exposed bridges.",
-                    accentColor = WarningAmber
-                )
-            }
+                fun formatAlertTitle(alert: com.weathergpt.app.data.AlertItem, defaultIcon: String): String {
+                    if (!alert.title.isNullOrBlank()) {
+                        return "$defaultIcon ${alert.title}"
+                    }
+                    val type = alert.type?.uppercase() ?: ""
+                    return when {
+                        type.contains("RAIN") || type.contains("PRECIPITATION") -> {
+                            if (alert.severity?.uppercase() in listOf("HIGH", "CRITICAL")) "🌧️ Heavy Rain Alert" else "🌧️ Moderate Rain"
+                        }
+                        type.contains("WIND") -> {
+                            if (alert.severity?.uppercase() in listOf("HIGH", "CRITICAL")) "🌬️ High Winds Warning" else "🌬️ Wind Advisory"
+                        }
+                        type.contains("HEAT") -> "☀️ Heat Advisory"
+                        type.contains("THUNDER") -> "⚡ Thunderstorm Warning"
+                        type.contains("CYCLONE") -> "🌀 Cyclone Alert"
+                        type.contains("DEPRESSION") -> "⚠️ Deep Depression"
+                        else -> "$defaultIcon " + type.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+                    }
+                }
 
-            Spacer(modifier = Modifier.height(10.dp))
+                if (highAlerts.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "HIGH PRIORITY",
+                            color = DangerRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp
+                        )
+                        highAlerts.forEach { alert ->
+                            val icon = when {
+                                alert.type?.contains("RAIN", ignoreCase = true) == true -> Icons.Default.WaterDrop
+                                alert.type?.contains("WIND", ignoreCase = true) == true -> Icons.Default.Warning
+                                alert.type?.contains("HEAT", ignoreCase = true) == true -> Icons.Default.Warning
+                                else -> Icons.Default.Warning
+                            }
+                            MockupAlertCard(
+                                icon = icon,
+                                title = formatAlertTitle(alert, "⚠️"),
+                                severity = "HIGH",
+                                explanation = alert.message ?: "Hazardous weather conditions detected.",
+                                action = alert.advisory ?: "Follow local weather guidance and avoid travel if conditions deteriorate.",
+                                accentColor = DangerRed
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
-            // LOW PRIORITY
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "LOW",
-                    color = SuccessGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.6.sp
-                )
-                MockupAlertCard(
-                    icon = Icons.Default.Cloud,
-                    title = "☀️ High UV tomorrow",
-                    severity = "LOW",
-                    explanation = "UV Index reaches 8.0 during midday peak (11:30 AM – 2:30 PM).",
-                    action = "Sunscreen and eyewear recommended if outdoors.",
-                    accentColor = SuccessGreen
-                )
+                if (mediumAlerts.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "MEDIUM",
+                            color = WarningAmber,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp
+                        )
+                        mediumAlerts.forEach { alert ->
+                            val icon = when {
+                                alert.type?.contains("RAIN", ignoreCase = true) == true -> Icons.Default.WaterDrop
+                                alert.type?.contains("WIND", ignoreCase = true) == true -> Icons.Default.Warning
+                                alert.type?.contains("HEAT", ignoreCase = true) == true -> Icons.Default.Info
+                                else -> Icons.Default.Info
+                            }
+                            MockupAlertCard(
+                                icon = icon,
+                                title = formatAlertTitle(alert, "ℹ️"),
+                                severity = "MEDIUM",
+                                explanation = alert.message ?: "Forecast indicates moderate conditions.",
+                                action = alert.advisory ?: "Plan outdoor activities accordingly.",
+                                accentColor = WarningAmber
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                if (lowAlerts.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "LOW",
+                            color = SuccessGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.6.sp
+                        )
+                        lowAlerts.forEach { alert ->
+                            MockupAlertCard(
+                                icon = Icons.Default.Cloud,
+                                title = formatAlertTitle(alert, "🌤️"),
+                                severity = "LOW",
+                                explanation = alert.message ?: "Minor conditions observed.",
+                                action = alert.advisory ?: "Normal routine can continue.",
+                                accentColor = SuccessGreen
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))

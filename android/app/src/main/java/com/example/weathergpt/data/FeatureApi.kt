@@ -8,6 +8,7 @@ import retrofit2.http.Query
 
 data class AlertItem(
     val type: String?,
+    val title: String? = null,
     val severity: String?,
     val source_type: String?,
     val time: String?,
@@ -15,7 +16,8 @@ data class AlertItem(
     val unit: String?,
     val message: String?,
     val advisory: String?,
-    val pressure_hpa: Double?
+    val pressure_hpa: Double?,
+    val duration_hours: Int? = null
 )
 
 

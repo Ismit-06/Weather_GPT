@@ -274,22 +274,89 @@ def classify_alert(
 def _deduplicate_alerts(
     alerts: list[dict],
 ) -> list[dict]:
+    """
+    Consolidates raw hourly alerts by hazard type.
+    Instead of returning one alert card per hour (e.g. 10 MODERATE_RAIN cards),
+    aggregates repeated alerts of the same hazard type into a single concise alert
+    with peak intensity and active time range.
+    """
+    if not alerts:
+        return []
 
-    seen = set()
-    result = []
+    # Map raw type into human-friendly hazard labels
+    type_labels = {
+        "MODERATE_RAIN": "Moderate Rain",
+        "HEAVY_RAIN": "Heavy Rain",
+        "RAIN": "Rain Expected",
+        "PRECIPITATION": "Precipitation",
+        "HIGH_WIND": "High Winds",
+        "STRONG_WIND": "Strong Winds",
+        "WIND": "Wind Advisory",
+        "THUNDERSTORM": "Thunderstorm",
+        "EXTREME_HEAT": "Extreme Heat",
+        "HEAT": "Elevated Temperature",
+        "CYCLONE_WARNING": "Cyclone Warning",
+        "CYCLONE_ALERT": "Cyclone Alert",
+        "DEEP_DEPRESSION": "Deep Depression",
+    }
 
+    # Group by alert type
+    grouped: dict[str, list[dict]] = {}
     for alert in alerts:
+        t = alert.get("type") or "WEATHER_ALERT"
+        grouped.setdefault(t, []).append(alert)
 
-        key = (
-            alert.get("type"),
-            alert.get("time"),
-        )
+    result = []
+    for alert_type, items in grouped.items():
+        # Pick the most severe entry
+        highest_item = max(items, key=lambda x: _severity_rank(x.get("severity")))
+        severity = highest_item.get("severity") or "MEDIUM"
+        
+        # Determine peak numerical value if available
+        num_values = [it.get("value") for it in items if isinstance(it.get("value"), (int, float))]
+        peak_val = max(num_values) if num_values else highest_item.get("value")
+        unit = highest_item.get("unit") or ""
+        
+        # Determine earliest and latest times
+        times = [it.get("time") for it in items if it.get("time")]
+        start_time = times[0] if times else None
+        
+        readable_title = type_labels.get(alert_type.upper(), alert_type.replace("_", " ").title())
+        count = len(items)
 
-        if key in seen:
-            continue
+        # Build clean message
+        if "RAIN" in alert_type:
+            val_str = f"up to {peak_val:.1f} mm/h" if isinstance(peak_val, (int, float)) else ""
+            msg = f"{readable_title} forecasted across {count} hours ({val_str})." if count > 1 else f"{readable_title} forecasted ({val_str})."
+            advisory = "Carry rain gear and drive with caution on wet roads."
+        elif "WIND" in alert_type:
+            val_str = f"gusts up to {peak_val:.0f} {unit}" if isinstance(peak_val, (int, float)) else ""
+            msg = f"Wind speeds {val_str} expected over the coming hours."
+            advisory = "Secure loose outdoor objects and stay clear of weak branches."
+        elif "HEAT" in alert_type:
+            val_str = f"reaching {peak_val:.1f}°C" if isinstance(peak_val, (int, float)) else ""
+            msg = f"High temperatures {val_str} anticipated."
+            advisory = "Keep hydrated and minimize direct sun exposure during peak hours."
+        elif "THUNDER" in alert_type:
+            msg = "Thunderstorm activity detected in local forecast models."
+            advisory = "Remain indoors during lightning activity."
+        else:
+            msg = highest_item.get("message") or f"{readable_title} conditions detected."
+            advisory = highest_item.get("advisory") or "Follow standard local safety guidance."
 
-        seen.add(key)
-        result.append(alert)
+        result.append({
+            "type": alert_type,
+            "title": readable_title,
+            "severity": severity,
+            "source_type": highest_item.get("source_type", "FORECAST_SIGNAL"),
+            "time": start_time,
+            "value": peak_val,
+            "unit": unit,
+            "message": msg,
+            "advisory": advisory,
+            "pressure_hpa": highest_item.get("pressure_hpa"),
+            "duration_hours": count,
+        })
 
     return result
 

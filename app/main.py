@@ -76,8 +76,33 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def root():
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+# Mount static web interface files
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+def root_web():
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>WeatherGPT API Active</h1><p>Visit <a href='/app'>/app</a></p>")
+
+
+@app.get("/app", response_class=HTMLResponse)
+def web_app():
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return HTMLResponse(content=index_file.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>WeatherGPT Web App</h1>")
+
+
+@app.get("/api/v1")
+def api_v1_root():
     return {
         "status": "ok",
         "service": "WeatherGPT API",

@@ -284,10 +284,11 @@ fun MapScreen(
 
                 val cleanHost = host.trimEnd('/')
                 val cleanPath = if (frame.path.startsWith("/")) frame.path else "/${frame.path}"
+                // Support zoom levels from 0 to 12 for high resolution precipitation radar
                 val tileSource = XYTileSource(
                     "RainViewer_${frame.time}",
                     0,
-                    7,
+                    12,
                     256,
                     "/2/1_1.png",
                     arrayOf("$cleanHost$cleanPath/256/"),
@@ -297,9 +298,10 @@ fun MapScreen(
                 val provider = MapTileProviderBasic(context.applicationContext, tileSource)
                 val newOverlay = TilesOverlay(provider, context.applicationContext).apply {
                     loadingBackgroundColor = AndroidColor.TRANSPARENT
+                    loadingLineColor = AndroidColor.TRANSPARENT
                 }
 
-                // Place radar overlay right above base map
+                // Place radar overlay above base tiles
                 view.overlays.add(0, newOverlay)
                 currentRadarOverlay = newOverlay
                 view.invalidate()
