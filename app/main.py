@@ -84,6 +84,11 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "database": "connected"}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root_web():
     return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
@@ -92,6 +97,7 @@ async def root_web():
 @app.get("/app", response_class=HTMLResponse)
 async def web_app():
     return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
+
 
 
 # Core application routers.
