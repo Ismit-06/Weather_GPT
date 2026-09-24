@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 from app.database import Base, engine
 from app.models.reservoir import Reservoir
 
-from app.routers.alerts import router as alerts_router
+from app.routers.weather_alerts import router as weather_alerts_router
 from app.routers.dams import router as dams_router
 from app.routers.earthquakes import router as earthquakes_router
 from app.routers.flood import router as flood_router
@@ -112,7 +112,7 @@ def health():
 
 
 # Core application routers.
-app.include_router(alerts_router)
+app.include_router(weather_alerts_router)
 app.include_router(dams_router)
 app.include_router(earthquakes_router)
 app.include_router(flood_router)
