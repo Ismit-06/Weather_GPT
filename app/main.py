@@ -84,6 +84,16 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
+@app.get("/", response_class=HTMLResponse)
+async def root_web():
+    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def web_app():
+    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
+
+
 # Core application routers.
 app.include_router(weather_alerts_router)
 app.include_router(dams_router)
@@ -113,16 +123,6 @@ app.include_router(safety_router)
 app.include_router(tts_router)
 app.include_router(voice_ws_router)
 app.include_router(visual_cloud_router)
-
-
-@app.get("/", response_class=HTMLResponse)
-async def root_web():
-    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
-
-
-@app.get("/app", response_class=HTMLResponse)
-async def web_app():
-    return HTMLResponse(content=get_web_app_html(), media_type="text/html; charset=utf-8")
 
 # Conversational intelligence.
 # New location search/geocoding API.
